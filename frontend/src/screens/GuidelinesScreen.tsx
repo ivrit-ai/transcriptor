@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopNav, LineCrop, Icon, PrimaryBtn } from '../components/shared'
 import { SAMPLE_PAGE } from '../components/shared/ManuscriptPreview'
@@ -61,7 +62,7 @@ function WorkedExample({ width }: { width: number }) {
       borderRadius: 16, padding: 20,
     }}>
       <div style={{
-        fontFamily: 'var(--font-ui)', fontSize: 12.5, fontWeight: 600,
+        fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
         color: 'var(--tl-muted)', marginBottom: 10,
       }}>השורה המודגשת</div>
       <LineCrop
@@ -73,7 +74,7 @@ function WorkedExample({ width }: { width: number }) {
       />
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px',
-        fontFamily: 'var(--font-ui)', fontSize: 12.5, color: 'var(--tl-muted)',
+        fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--tl-muted)',
       }}>
         <Icon name="forward" size={14} color="var(--tl-muted)" />
         <span>מקלידים</span>
@@ -92,12 +93,18 @@ function WorkedExample({ width }: { width: number }) {
 
 export function GuidelinesScreen() {
   const navigate = useNavigate()
-  const isMobile = window.innerWidth < 768
+  const [viewportW, setViewportW] = useState(window.innerWidth)
+  useEffect(() => {
+    const h = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  const isMobile = viewportW < 768
 
   const intro = (
     <>
       <div style={{
-        fontSize: isMobile ? 12.5 : 13.5, fontWeight: 600,
+        fontSize: isMobile ? 13 : 14, fontWeight: 600,
         color: 'oklch(0.55 0.1 60)', letterSpacing: '0.04em', marginBottom: 10,
       }}>מדריך קצר</div>
       <h1 style={{
@@ -132,7 +139,7 @@ export function GuidelinesScreen() {
         color: 'var(--tl-ink)', marginBottom: 4,
       }}>מתי לדווח על שורה</div>
       <p style={{
-        fontSize: isMobile ? 13.5 : 14.5, color: 'var(--tl-muted)',
+        fontSize: isMobile ? 14 : 15, color: 'var(--tl-muted)',
         margin: '0 0 16px', lineHeight: 1.5,
       }}>
         אם השורה לא ניתנת לתעתוק, סמנו את הסיבה לכך והמשיכו. דיווח הוא חלק נורמלי מהעבודה — לא טעות.
@@ -150,7 +157,7 @@ export function GuidelinesScreen() {
           }}>
             <Icon name="flag" size={16} color="var(--tl-muted)" />
             <div>
-              <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--tl-ink)' }}>{f.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--tl-ink)' }}>{f.label}</div>
               <div style={{ fontSize: 13, color: 'var(--tl-muted)', marginTop: 2, lineHeight: 1.45 }}>{f.d}</div>
             </div>
           </div>

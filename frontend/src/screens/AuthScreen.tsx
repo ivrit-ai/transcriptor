@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../contexts/SessionContext'
 import { BrandMark, ManuscriptPreview, PrimaryBtn } from '../components/shared'
@@ -59,7 +59,13 @@ export function AuthScreen() {
     }
   }, [searchParams, isAuthenticated, setToken, navigate])
 
-  const isMobile = window.innerWidth < 768
+  const [viewportW, setViewportW] = useState(window.innerWidth)
+  useEffect(() => {
+    const h = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  const isMobile = viewportW < 768
 
   // ── mobile ──
   if (isMobile) {

@@ -29,6 +29,11 @@
   --r-card: 16px;
   --r-pill: 999px;
 
+  /* Accessibility tokens */
+  --tl-label-warm: oklch(0.55 0.1 60);
+  --tl-success-text: oklch(0.5 0.1 150);
+  --tl-streak-text: oklch(0.45 0.1 50);
+
   /* Legacy aliases kept for existing components */
   --color-bg: var(--tl-page);
   --color-surface: var(--tl-surface);
@@ -48,7 +53,7 @@
 }
 
 body {
-  background: #f0eee9;
+  background: var(--tl-page);
   color: var(--tl-ink);
   font-family: var(--font-ui);
   direction: rtl;
@@ -82,6 +87,7 @@ body {
 .pg-primary:hover { background: var(--tl-accent-hover); }
 .pg-primary:active { transform: translateY(1px); }
 .pg-primary:disabled { opacity: 0.4; cursor: default; }
+.pg-primary:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* Ghost / outline button */
 .pg-ghost {
@@ -103,6 +109,7 @@ body {
   background: var(--tl-surface);
   border-color: oklch(0.6 0.05 60 / 0.5);
 }
+.pg-ghost:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* On-accent white button (used on coloured card bg) */
 .pg-onaccent {
@@ -124,6 +131,7 @@ body {
 }
 .pg-onaccent:hover { background: oklch(0.97 0.01 60); }
 .pg-onaccent:active { transform: translateY(1px); }
+.pg-onaccent:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* Auth / form inputs */
 .pg-input {
@@ -163,6 +171,7 @@ body {
   transition: background 0.15s, border-color 0.15s;
 }
 .pg-oauth:hover { background: var(--tl-muted-fill); }
+.pg-oauth:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* Guest / secondary text button */
 .pg-guest {
@@ -223,6 +232,7 @@ body {
 .tl-submit:hover:not(:disabled) { background: var(--tl-accent-hover); }
 .tl-submit:active:not(:disabled) { transform: translateY(1px); }
 .tl-submit:disabled { opacity: 0.4; cursor: default; }
+.tl-submit:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* Keyboard hint that appears under submit on hover */
 .tl-kbd {
@@ -260,6 +270,7 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 .tl-flagbtn:hover { background: var(--tl-muted-fill); color: var(--tl-ink); }
+.tl-flagbtn:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 .tl-reason {
   display: block;
@@ -293,6 +304,7 @@ body {
   transition: background 0.12s, color 0.12s;
 }
 .tl-reason-inline:hover { background: var(--tl-muted-fill); color: var(--tl-ink); }
+.tl-reason-inline:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
 /* ── Animations ── */
 @keyframes tlpulse {
@@ -303,4 +315,41 @@ body {
 @keyframes tlshimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surfaces — deep warm charcoal */
+    --tl-page: oklch(0.14 0.02 60);
+    --tl-surface: oklch(0.18 0.02 60);
+    --tl-ink: oklch(0.91 0.02 60);
+    --tl-muted: oklch(0.55 0.03 60);
+    --tl-border: rgba(255, 220, 180, 0.12);
+    --tl-muted-fill: oklch(0.23 0.02 60);
+
+    /* Accent — same hue, boosted lightness for dark bg */
+    --tl-accent: oklch(0.63 0.1 60);
+    --tl-accent-hover: oklch(0.67 0.1 60);
+    --tl-spotlight: oklch(0.68 0.2 35);
+    --tl-spotlight-glow: oklch(0.68 0.2 35 / 0.5);
+    --tl-success: oklch(0.58 0.095 150);
+    --tl-success-fill: oklch(0.22 0.05 150);
+    --tl-streak: oklch(0.68 0.13 50);
+    --tl-accent-text: oklch(0.78 0.09 60);
+
+    /* Accessibility tokens — lightened for dark bg */
+    --tl-label-warm: oklch(0.7 0.1 60);
+    --tl-success-text: oklch(0.65 0.1 150);
+    --tl-streak-text: oklch(0.72 0.1 50);
+  }
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

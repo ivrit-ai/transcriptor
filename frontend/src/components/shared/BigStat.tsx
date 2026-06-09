@@ -22,7 +22,7 @@ export function BigStat({ value, label, accent = 'var(--tl-ink)', size = 40, sub
       </div>
       <div style={{
         fontFamily: 'var(--font-ui)',
-        fontSize: 13.5,
+        fontSize: 14,
         color: 'var(--tl-muted)',
         marginTop: 6,
       }}>

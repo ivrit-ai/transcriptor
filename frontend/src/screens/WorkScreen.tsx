@@ -21,7 +21,7 @@ function ImmTicks({ lines, cursor, onJump }: {
             key={l.id}
             onClick={() => onJump(i)}
             title={`שורה ${i + 1}`}
-            style={{ border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer', lineHeight: 0 }}
+            style={{ border: 'none', background: 'transparent', padding: '20px 8px', cursor: 'pointer', lineHeight: 0, minWidth: 24 }}
           >
             <span style={{
               display: 'block',
@@ -45,8 +45,10 @@ function FinishedOverlay({ daily, done, onContinue }: {
   onContinue: () => void
 }) {
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { btnRef.current?.focus() }, [])
   return (
-    <div style={{
+    <div role="dialog" aria-modal={true} aria-label="סיום עמוד" style={{
       position: 'absolute', inset: 0,
       background: 'var(--tl-page)',
       display: 'flex', flexDirection: 'column',
@@ -70,6 +72,7 @@ function FinishedOverlay({ daily, done, onContinue }: {
         </div>
       </div>
       <button
+        ref={btnRef}
         onClick={onContinue}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -376,11 +379,11 @@ export function WorkScreen() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: `0 ${sideM}px`, fontFamily: 'var(--font-ui)',
       }}>
-        <span style={{ fontSize: 12.5, color: 'var(--tl-muted)' }}>
+        <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={L.goTo} />
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
           <span style={{ direction: 'ltr', display: 'inline-block' }}>
             {new Intl.NumberFormat('en-US').format(L.daily)}
           </span>{' '}היום
@@ -433,7 +436,7 @@ export function WorkScreen() {
 
   const console_ = (
     <div ref={cardRef} dir="rtl" style={consoleCardStyle}>
-      <div style={{
+      <label htmlFor="transcription-input" style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
         fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
       }}>
@@ -453,9 +456,10 @@ export function WorkScreen() {
             <span style={{ direction: 'ltr', display: 'inline-block' }}>3</span>
           </span>
         )}
-      </div>
+      </label>
 
       <textarea
+        id="transcription-input"
         ref={taRef}
         className="tl-textarea"
         dir="rtl"
@@ -552,7 +556,7 @@ export function WorkScreen() {
       {innerContent}
 
       {/* page-fill progress bar (fills RTL) */}
-      <div style={{ height: 5, background: 'var(--tl-muted-fill)', flexShrink: 0 }}>
+      <div role="progressbar" aria-valuenow={Math.round(L.pageFill * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="התקדמות בעמוד" style={{ height: 5, background: 'var(--tl-muted-fill)', flexShrink: 0 }}>
         <div style={{
           height: '100%', width: `${L.pageFill * 100}%`,
           background: 'oklch(0.62 0.08 150)',

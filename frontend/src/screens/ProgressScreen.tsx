@@ -8,13 +8,6 @@ const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
 const FALLBACK: ProfileDTO = { name: 'מתנדב', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0 }
 
-const RECENT = [
-  { p: 'גנז קאירו — עמוד 14', lines: 22, when: 'היום' },
-  { p: 'כתובות ירושלים — עמוד 8', lines: 31, when: 'אתמול' },
-  { p: 'גנז קאירו — עמוד 13', lines: 19, when: 'אתמול' },
-  { p: 'ספר יהושע רמב"ן — עמוד 41', lines: 27, when: 'לפני שבוע' },
-]
-
 function GoalRing({ value, goal, size = 150 }: { value: number; goal: number; size?: number }) {
   const pct = Math.min(1, value / goal)
   const r = (size - 16) / 2
@@ -22,7 +15,8 @@ function GoalRing({ value, goal, size = 150 }: { value: number; goal: number; si
   const reached = value >= goal
   return (
     <div style={{ position: 'relative', width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }} role="img" aria-label={`${value} שורות מתוך ${goal} היום`}>
+        <title>{value} שורות מתוך {goal} היום</title>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--tl-muted-fill)" strokeWidth={11} />
         <circle
           cx={size / 2} cy={size / 2} r={r} fill="none"
@@ -41,7 +35,7 @@ function GoalRing({ value, goal, size = 150 }: { value: number; goal: number; si
           fontFamily: 'var(--font-serif)', fontSize: size * 0.26,
           fontWeight: 700, color: 'var(--tl-ink)', lineHeight: 1, direction: 'ltr',
         }}>{value}</div>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12.5, color: 'var(--tl-muted)', marginTop: 4 }}>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--tl-muted)', marginTop: 4 }}>
           מתוך {goal} היום
         </div>
       </div>
@@ -64,7 +58,7 @@ function StreakBadge({ days, big }: { days: number; big?: boolean }) {
         <Icon name="spark" size={big ? 14 : 12} color="#fff" />
       </span>
       <span style={{
-        fontFamily: 'var(--font-ui)', fontSize: big ? 15 : 13.5,
+        fontFamily: 'var(--font-ui)', fontSize: big ? 15 : 14,
         fontWeight: 600, color: 'oklch(0.45 0.1 50)',
       }}>
         רצף של{' '}
@@ -86,7 +80,7 @@ function StatCard({ value, label, accent, sub }: { value: string | number; label
         direction: 'ltr', textAlign: 'right',
       }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--tl-muted)', marginTop: 6 }}>{label}</div>
-      {sub && <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11.5, color: 'var(--tl-muted)', opacity: 0.8, marginTop: 1 }}>{sub}</div>}
+      {sub && <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)', opacity: 0.8, marginTop: 1 }}>{sub}</div>}
     </div>
   )
 }
@@ -126,41 +120,18 @@ function ContribGrid({ weeks = 7, cell = 16, gap = 5 }: { weeks?: number; cell?:
   )
 }
 
-function RecentList() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {RECENT.map((r, i) => (
-        <div key={i} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '13px 2px',
-          borderBottom: i < RECENT.length - 1 ? '0.5px solid var(--tl-border)' : 'none',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 8,
-              background: 'var(--tl-muted-fill)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto',
-            }}>
-              <Icon name="check" size={15} color="oklch(0.5 0.09 150)" strokeWidth={2.2} />
-            </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14.5, fontWeight: 500, color: 'var(--tl-ink)' }}>{r.p}</div>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12.5, color: 'var(--tl-muted)' }}>{r.when}</div>
-            </div>
-          </div>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13.5, color: 'var(--tl-muted)' }}>
-            <span style={{ direction: 'ltr', display: 'inline-block', fontWeight: 600, color: 'var(--tl-ink)' }}>{r.lines}</span> שורות
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function ProgressScreen() {
   const navigate = useNavigate()
-  const isMobile = window.innerWidth < 768
+  const [viewportW, setViewportW] = useState(window.innerWidth)
   const [ME, setME] = useState<ProfileDTO>(FALLBACK)
+
+  useEffect(() => {
+    const h = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+
+  const isMobile = viewportW < 768
 
   useEffect(() => {
     api.getProfile().then((data) => { if (data) setME(data) }).catch(() => { /* keep fallback */ })
@@ -194,7 +165,7 @@ export function ProgressScreen() {
       background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
       borderRadius: 16, padding: isMobile ? '18px' : '22px 24px',
     }}>
-      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13.5, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
         הפעילות שלך
       </div>
       <ContribGrid weeks={isMobile ? 6 : 7} cell={isMobile ? 14 : 16} />
@@ -202,24 +173,12 @@ export function ProgressScreen() {
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6,
         marginTop: 12, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
       }}>
-        <span>פחות</span>
+        <span>שורות: פחות</span>
         {['var(--tl-muted-fill)', 'oklch(0.86 0.06 60)', 'oklch(0.74 0.1 55)', 'oklch(0.62 0.12 50)'].map((c, i) => (
           <span key={i} style={{ width: 12, height: 12, borderRadius: 3, background: c }} />
         ))}
         <span>יותר</span>
       </div>
-    </div>
-  )
-
-  const recentCard = (
-    <div style={{
-      background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
-      borderRadius: 16, padding: isMobile ? '8px 18px 14px' : '12px 24px 18px',
-    }}>
-      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13.5, fontWeight: 600, color: 'var(--tl-ink)', padding: '12px 0 2px' }}>
-        עמודים אחרונים
-      </div>
-      <RecentList />
     </div>
   )
 
@@ -234,8 +193,8 @@ export function ProgressScreen() {
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? 19 : 22, fontWeight: 500, color: '#fff' }}>
           ממשיכים מאיפה שעצרת
         </div>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13.5, color: 'rgba(255,255,255,0.82)', marginTop: 3 }}>
-          כתב יד פרמא · עמוד 14 · נותרו 3 שורות
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'rgba(255,255,255,0.82)', marginTop: 3 }}>
+          המשיכו לתרום לתיעוד כתבי היד
         </div>
       </div>
       <button
@@ -264,7 +223,6 @@ export function ProgressScreen() {
           {statsRow}
           {resumeCard}
           {activityCard}
-          {recentCard}
         </div>
       </div>
     )
@@ -290,7 +248,6 @@ export function ProgressScreen() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
           {activityCard}
-          {recentCard}
         </div>
       </div>
     </div>

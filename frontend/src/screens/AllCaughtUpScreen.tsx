@@ -1,15 +1,17 @@
-import { TopNav } from '../components/shared'
+import { useState, useEffect } from 'react'
+import { TopNav, Icon } from '../components/shared'
+import { api } from '../api'
+import type { ProfileDTO } from '../api'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
-// Placeholder — replace with real session data in Phase 5
-const STATS = { today: 142, streak: 6, total: 3847 }
+const FALLBACK: ProfileDTO = { name: '', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0 }
 
-function CaughtUpStats({ isMobile }: { isMobile?: boolean }) {
+function CaughtUpStats({ isMobile, profile }: { isMobile?: boolean; profile: ProfileDTO }) {
   const items = [
-    { v: String(STATS.today),    l: 'שורות היום' },
-    { v: String(STATS.streak),   l: 'ימים ברצף' },
-    { v: fmt(STATS.total),       l: 'סה״כ שורות' },
+    { v: String(profile.today),    l: 'שורות היום' },
+    { v: String(profile.streak),   l: 'ימים ברצף' },
+    { v: fmt(profile.total),       l: 'סה״כ שורות' },
   ]
   return (
     <div style={{
@@ -32,7 +34,7 @@ function CaughtUpStats({ isMobile }: { isMobile?: boolean }) {
               color: 'var(--tl-ink)', direction: 'ltr',
             }}>{it.v}</div>
             <div style={{
-              fontFamily: 'var(--font-ui)', fontSize: 12.5,
+              fontFamily: 'var(--font-ui)', fontSize: 13,
               color: 'var(--tl-muted)', marginTop: 3,
             }}>{it.l}</div>
           </div>
@@ -43,7 +45,20 @@ function CaughtUpStats({ isMobile }: { isMobile?: boolean }) {
 }
 
 export function AllCaughtUpScreen() {
-  const isMobile = window.innerWidth < 768
+  const [profile, setProfile] = useState<ProfileDTO>(FALLBACK)
+  const [viewportW, setViewportW] = useState(window.innerWidth)
+
+  useEffect(() => {
+    api.getProfile().then(d => { if (d) setProfile(d) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const h = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+
+  const isMobile = viewportW < 768
 
   const body = (
     <div style={{
@@ -88,7 +103,7 @@ export function AllCaughtUpScreen() {
         marginBottom: 30, width: '100%',
         display: 'flex', justifyContent: 'center',
       }}>
-        <CaughtUpStats isMobile={isMobile} />
+        <CaughtUpStats isMobile={isMobile} profile={profile} />
       </div>
 
     </div>

@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { PrimaryBtn } from './PrimaryBtn'
 
@@ -35,61 +35,98 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
     }}>
       <div style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: compact ? '0 20px' : '0 40px',
-        height: compact ? 56 : 72,
+        flexDirection: 'column',
       }}>
-        <BrandMark size={compact ? 25 : 30} withName={!compact} />
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: compact ? '0 20px' : '0 40px',
+          height: compact ? 56 : 72,
+        }}>
+          <BrandMark size={compact ? 25 : 30} withName={!compact} />
 
-        {!compact && (
-          <nav style={{ display: 'flex', gap: 4, fontFamily: 'var(--font-ui)' }}>
+          {!compact && (
+            <nav style={{ display: 'flex', gap: 4, fontFamily: 'var(--font-ui)' }}>
+              {NAV_LINKS.map((l) => {
+                const isActive = currentId === l.id
+                return (
+                  <Link
+                    key={l.id}
+                    to={l.path}
+                    style={{
+                      fontSize: 15,
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? 'var(--tl-ink)' : 'var(--tl-muted)',
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      background: isActive ? 'var(--tl-muted-fill)' : 'transparent',
+                      border: 'none',
+                      fontFamily: 'var(--font-ui)',
+                      transition: 'background 0.15s, color 0.15s',
+                      textDecoration: 'none',
+                      display: 'inline-block',
+                    }}
+                  >
+                    {l.label}
+                  </Link>
+                )
+              })}
+            </nav>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {!compact && (
+              <button
+                onClick={() => navigate('/me')}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: 'var(--tl-muted)',
+                  cursor: 'pointer',
+                  background: 'none',
+                  border: 'none',
+                  transition: 'color 0.15s',
+                }}
+              >
+                הפרופיל שלי
+              </button>
+            )}
+            <PrimaryBtn size="sm" onClick={() => navigate('/work')}>התחל</PrimaryBtn>
+          </div>
+        </div>
+
+        {compact && (
+          <div style={{
+            display: 'flex', justifyContent: 'center', gap: 4,
+            borderTop: '0.5px solid var(--tl-border)',
+            padding: '0 16px 2px',
+          }}>
             {NAV_LINKS.map((l) => {
               const isActive = currentId === l.id
               return (
-                <button
+                <Link
                   key={l.id}
-                  onClick={() => navigate(l.path)}
+                  to={l.path}
                   style={{
-                    fontSize: 14.5,
-                    fontWeight: isActive ? 600 : 500,
+                    fontSize: 13, fontWeight: isActive ? 600 : 500,
                     color: isActive ? 'var(--tl-ink)' : 'var(--tl-muted)',
-                    padding: '8px 14px',
+                    padding: '7px 12px',
                     borderRadius: 8,
-                    cursor: 'pointer',
                     background: isActive ? 'var(--tl-muted-fill)' : 'transparent',
-                    border: 'none',
+                    textDecoration: 'none',
                     fontFamily: 'var(--font-ui)',
-                    transition: 'background 0.15s, color 0.15s',
+                    display: 'inline-block',
                   }}
                 >
                   {l.label}
-                </button>
+                </Link>
               )
             })}
-          </nav>
+          </div>
         )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {!compact && (
-            <button
-              onClick={() => navigate('/me')}
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'var(--tl-muted)',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-                transition: 'color 0.15s',
-              }}
-            >
-              התחברות
-            </button>
-          )}
-          <PrimaryBtn size="sm" onClick={() => navigate('/work')}>התחל</PrimaryBtn>
-        </div>
       </div>
     </div>
   )

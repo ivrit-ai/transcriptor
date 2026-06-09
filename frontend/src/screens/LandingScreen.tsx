@@ -37,7 +37,7 @@ function CommunityStrip({ compact, items }: { compact?: boolean; items: { v: str
           }}>{it.v}</div>
           <div style={{
             fontFamily: 'var(--font-ui)',
-            fontSize: compact ? 12.5 : 13.5,
+            fontSize: compact ? 13 : 14,
             color: 'var(--tl-muted)',
             marginTop: 3,
           }}>{it.l}</div>
@@ -49,7 +49,13 @@ function CommunityStrip({ compact, items }: { compact?: boolean; items: { v: str
 
 export function LandingScreen() {
   const navigate = useNavigate()
-  const isMobile = window.innerWidth < 768
+  const [viewportW, setViewportW] = useState(window.innerWidth)
+  useEffect(() => {
+    const h = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  const isMobile = viewportW < 768
   const [communityItems, setCommunityItems] = useState(COMMUNITY_FALLBACK)
 
   useEffect(() => {
@@ -78,7 +84,7 @@ export function LandingScreen() {
         <TopNav compact safeTop={50} />
         <div style={{ padding: '26px 22px 30px' }}>
           <div style={{
-            fontSize: 12.5, fontWeight: 600,
+            fontSize: 13, fontWeight: 600,
             color: 'oklch(0.55 0.1 60)', letterSpacing: '0.04em', marginBottom: 10,
           }}>תיעוד כתבי יד עבריים</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 26 }}>
@@ -111,8 +117,8 @@ export function LandingScreen() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>{s.n}</div>
                 <div>
-                  <div style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--tl-ink)' }}>{s.t}</div>
-                  <div style={{ fontSize: 13.5, color: 'var(--tl-muted)', marginTop: 2, lineHeight: 1.5 }}>{s.d}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--tl-ink)' }}>{s.t}</div>
+                  <div style={{ fontSize: 14, color: 'var(--tl-muted)', marginTop: 2, lineHeight: 1.5 }}>{s.d}</div>
                 </div>
               </div>
             ))}
@@ -139,9 +145,9 @@ export function LandingScreen() {
       }}>
         <div>
           <div style={{
-            fontSize: 13.5, fontWeight: 600,
+            fontSize: 14, fontWeight: 600,
             color: 'oklch(0.55 0.1 60)', letterSpacing: '0.04em', marginBottom: 14,
-          }}>יחד נלמד א המחשב לקרוא עברית</div>
+          }}>יחד נלמד את המחשב לקרוא עברית</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <PrimaryBtn size="lg" onClick={onStart}>
               התחל לתעתק <Icon name="forward" size={18} color="#fff" />
@@ -168,7 +174,7 @@ export function LandingScreen() {
       <div style={{ padding: '52px 56px 60px' }}>
         <div style={{
           fontFamily: 'var(--font-serif)',
-          fontSize: 13.5, fontWeight: 700,
+          fontSize: 14, fontWeight: 700,
           color: 'var(--tl-muted)',
           letterSpacing: '0.04em',
           marginBottom: 22, textAlign: 'center',
@@ -185,7 +191,7 @@ export function LandingScreen() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>{s.n}</div>
               <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 6 }}>{s.t}</div>
-              <div style={{ fontSize: 14.5, color: 'var(--tl-muted)', lineHeight: 1.55 }}>{s.d}</div>
+              <div style={{ fontSize: 15, color: 'var(--tl-muted)', lineHeight: 1.55 }}>{s.d}</div>
             </div>
           ))}
         </div>
