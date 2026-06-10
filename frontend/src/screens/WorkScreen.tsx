@@ -5,6 +5,8 @@ import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon } from '../components/shared'
 
 const EASE = 'cubic-bezier(.3,.8,.3,1)'
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 4
 
 // ── Tick bar ──────────────────────────────────────────────────────────────────
 function ImmTicks({ lines, cursor, onJump }: {
@@ -34,6 +36,37 @@ function ImmTicks({ lines, cursor, onJump }: {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ── Zoom controls ─────────────────────────────────────────────────────────────
+function ZoomControls({ zoom, onChange }: { zoom: number; onChange: (z: number) => void }) {
+  const pct = Math.round(zoom * 100)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <button
+        onClick={() => onChange(Math.max(MIN_ZOOM, zoom - 0.25))}
+        title="התקרב פחות"
+        style={{
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
+          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
+        }}
+      >−</button>
+      <span style={{
+        fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
+        minWidth: 34, textAlign: 'center',
+      }}>{pct}%</span>
+      <button
+        onClick={() => onChange(Math.min(MAX_ZOOM, zoom + 0.25))}
+        title="התקרב יותר"
+        style={{
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
+          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
+        }}
+      >+</button>
     </div>
   )
 }
@@ -138,12 +171,14 @@ export function WorkScreen() {
   const taRef = useRef<HTMLTextAreaElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ y: number } | null>(null)
+  const drag = useRef<{ x: number; y: number } | null>(null)
 
   // Initialize from window so there's no layout flash on first render
   const [box, setBox] = useState({ w: window.innerWidth, h: window.innerHeight })
   const [cardH, setCardH] = useState(150)
   const [peek, setPeek] = useState(0)
+  const [offsetX, setOffsetX] = useState(0)
+  const [zoom, setZoom] = useState(1)
   // Track full viewport width separately — box.w measures the image column in wide mode,
   // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
@@ -186,8 +221,8 @@ export function WorkScreen() {
     }
   }, [L.cursor, L.finished, L.loading])
 
-  // Snap back to line when cursor advances
-  useEffect(() => { setPeek(0) }, [L.cursor])
+  // Snap back to line (reset pan) when cursor advances
+  useEffect(() => { setPeek(0); setOffsetX(0) }, [L.cursor])
 
   // ── Go-back: find the last line this user annotated before the current cursor ─
   let prevDoneIdx = -1
@@ -205,14 +240,16 @@ export function WorkScreen() {
 
   const pagePxW = page?.width_px ?? 474
   const pagePxH = page?.height_px ?? 218
-  const scale = pageDispW / pagePxW
-  const pageDispH = pagePxH * scale
+  const baseScale = pageDispW / pagePxW
+  const displayScale = baseScale * zoom
+  const zoomedW = pagePxW * displayScale
+  const zoomedH = pagePxH * displayScale
 
   const b = L.current?.bbox ?? { x: 0, y: 0, w: pagePxW, h: 30 }
-  const lx = b.x * scale
-  const ly = b.y * scale
-  const lw = b.w * scale
-  const lh = b.h * scale
+  const lx = b.x * displayScale
+  const ly = b.y * displayScale
+  const lw = b.w * displayScale
+  const lh = b.h * displayScale
 
   const baseTop = headerH + (window.innerWidth < 768 ? 6 : 12)
   // In wide mode the console is a sidebar, so the full column height is available
@@ -220,14 +257,14 @@ export function WorkScreen() {
   const cardTopY = box.h - effectiveCardH
   const zonePad = window.innerWidth < 768 ? 12 : 26
   const availH = cardTopY - zonePad - baseTop
-  const fits = pageDispH <= availH
-  const centerTop = (box.h - pageDispH) / 2
+  const fits = zoomedH <= availH
+  const centerTop = (box.h - zoomedH) / 2
   const pageTop0 = fits
-    ? Math.max(baseTop, Math.min(centerTop, cardTopY - zonePad - pageDispH))
+    ? Math.max(baseTop, Math.min(centerTop, cardTopY - zonePad - zoomedH))
     : baseTop
   const lineBottom0 = pageTop0 + ly + lh
   const autoTy = fits ? 0 : Math.min(0, cardTopY - zonePad - lineBottom0)
-  const minTy = fits ? 0 : Math.min(0, cardTopY - zonePad - (pageTop0 + pageDispH))
+  const minTy = fits ? 0 : Math.min(0, cardTopY - zonePad - (pageTop0 + zoomedH))
   const peekLo = minTy - autoTy
   const peekHi = -autoTy
   const clamp = useCallback((p: number) => Math.max(peekLo, Math.min(peekHi, p)), [peekLo, peekHi])
@@ -235,30 +272,66 @@ export function WorkScreen() {
   const canRoam = minTy < -1
   const peeking = canRoam && Math.abs(clamp(peek)) > 4
 
-  // Wheel roam
+  // ── Horizontal pan when zoomed ────────────────────────────────────────────
+  const canRoamX = zoomedW > pageDispW
+  const txMin = canRoamX ? pageDispW - zoomedW : 0   // right edge flush with column
+  const txMax = 0                                      // left edge flush with column
+  // Auto-center the spotlight horizontally
+  const rawAutoTx = canRoamX ? pageDispW / 2 - (lx + lw / 2) : 0
+  const autoTx = Math.max(txMin, Math.min(txMax, rawAutoTx))
+  const clampX = useCallback(
+    (x: number) => Math.max(txMin - autoTx, Math.min(txMax - autoTx, x)),
+    [txMin, txMax, autoTx],
+  )
+  const finalTx = autoTx + clampX(offsetX)
+
+  // ── Wheel: Ctrl = zoom, plain = pan ──────────────────────────────────────
+  const changeZoom = useCallback((newZoom: number) => {
+    setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)))
+    setOffsetX(0)
+  }, [])
+
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const handler = (e: WheelEvent) => {
-      if (!canRoam) return
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        const delta = e.deltaY > 0 ? -0.12 : 0.12
+        setZoom(z => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z + delta)))
+        setOffsetX(0)
+        return
+      }
+      if (!canRoam && !canRoamX) return
       e.preventDefault()
       e.stopPropagation()
-      setPeek((p) => clamp(p - e.deltaY))
+      // Prefer axis with larger delta; horizontal scroll (trackpad) pans X
+      if (canRoamX && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        setOffsetX(x => clampX(x - e.deltaX))
+      } else if (canRoam) {
+        setPeek(p => clamp(p - e.deltaY))
+      } else if (canRoamX) {
+        setOffsetX(x => clampX(x - e.deltaY))
+      }
     }
     el.addEventListener('wheel', handler, { capture: true, passive: false })
     return () => el.removeEventListener('wheel', handler, true)
-  }, [canRoam, clamp])
+  }, [canRoam, canRoamX, clamp, clampX])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!canRoam) return
-    drag.current = { y: e.clientY }
+    if (!canRoam && !canRoamX) return
+    drag.current = { x: e.clientX, y: e.clientY }
     try { wrapRef.current?.setPointerCapture(e.pointerId) } catch { /* ignore */ }
   }
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag.current) return
+    const dx = e.clientX - drag.current.x
     const dy = e.clientY - drag.current.y
+    drag.current.x = e.clientX
     drag.current.y = e.clientY
-    setPeek((p) => clamp(p + dy))
+    if (canRoam) setPeek(p => clamp(p + dy))
+    if (canRoamX) setOffsetX(x => clampX(x + dx))
   }
   const onPointerUp = (e: React.PointerEvent) => {
     drag.current = null
@@ -283,7 +356,7 @@ export function WorkScreen() {
       onPointerCancel={onPointerUp}
       style={{
         position: 'absolute', inset: 0, overflow: 'hidden',
-        cursor: !canRoam ? 'default' : isDragging ? 'grabbing' : 'grab',
+        cursor: (!canRoam && !canRoamX) ? 'default' : isDragging ? 'grabbing' : 'grab',
         touchAction: 'none', userSelect: 'none',
       }}
     >
@@ -292,8 +365,8 @@ export function WorkScreen() {
 
       {/* page + spotlight */}
       <div style={{
-        position: 'absolute', left: sideM, top: pageTop0, width: pageDispW,
-        transform: `translateY(${ty}px)`,
+        position: 'absolute', left: sideM, top: pageTop0, width: zoomedW,
+        transform: `translate(${finalTx}px, ${ty}px)`,
         transition,
         willChange: 'transform',
       }}>
@@ -303,7 +376,7 @@ export function WorkScreen() {
           alt=""
           draggable={false}
           style={{
-            width: pageDispW, display: 'block', borderRadius: 6,
+            width: zoomedW, display: 'block', borderRadius: 6,
             boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
             filter: 'brightness(0.64) saturate(0.82) contrast(0.98)',
             pointerEvents: 'none',
@@ -312,10 +385,10 @@ export function WorkScreen() {
         {/* Faint outlines for all line boxes — subtle spatial context */}
         {L.lines.map((line, i) => {
           if (i === L.cursor) return null
-          const ox = line.bbox.x * scale
-          const oy = line.bbox.y * scale
-          const ow = line.bbox.w * scale
-          const oh = line.bbox.h * scale
+          const ox = line.bbox.x * displayScale
+          const oy = line.bbox.y * displayScale
+          const ow = line.bbox.w * displayScale
+          const oh = line.bbox.h * displayScale
           const done = line.status === 'done_by_you' || line.status === 'flagged'
           return (
             <div key={line.id} style={{
@@ -344,7 +417,7 @@ export function WorkScreen() {
               draggable={false}
               style={{
                 position: 'absolute', left: -lx, top: -ly,
-                width: pageDispW, maxWidth: 'none', display: 'block',
+                width: zoomedW, maxWidth: 'none', display: 'block',
                 pointerEvents: 'none',
               }}
             />
@@ -383,16 +456,19 @@ export function WorkScreen() {
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={L.goTo} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
-          <span style={{ direction: 'ltr', display: 'inline-block' }}>
-            {new Intl.NumberFormat('en-US').format(L.daily)}
-          </span>{' '}היום
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ZoomControls zoom={zoom} onChange={changeZoom} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
+            <span style={{ direction: 'ltr', display: 'inline-block' }}>
+              {new Intl.NumberFormat('en-US').format(L.daily)}
+            </span>{' '}היום
+          </span>
+        </div>
       </div>
 
       {/* return-to-line pill */}
       <button
-        onClick={(e) => { e.stopPropagation(); setPeek(0) }}
+        onClick={(e) => { e.stopPropagation(); setPeek(0); setOffsetX(0) }}
         onPointerDown={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', top: headerH + 4, left: '50%', transform: 'translateX(-50%)',
@@ -523,7 +599,7 @@ export function WorkScreen() {
       {/* Image column — 60% */}
       <div style={{ flex: '0 0 60%', position: 'relative' }}>
         {L.loading
-          ? <Skeleton top={baseTop} sideM={sideM} pageH={pageDispH} />
+          ? <Skeleton top={baseTop} sideM={sideM} pageH={zoomedH} />
           : stage
         }
       </div>
@@ -541,7 +617,7 @@ export function WorkScreen() {
   ) : (
     <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
       {L.loading
-        ? <Skeleton top={baseTop} sideM={sideM} pageH={pageDispH} />
+        ? <Skeleton top={baseTop} sideM={sideM} pageH={zoomedH} />
         : stage
       }
       {!L.loading && console_}
