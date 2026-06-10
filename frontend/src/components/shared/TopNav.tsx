@@ -1,6 +1,7 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { PrimaryBtn } from './PrimaryBtn'
+import { useSession } from '../../contexts/SessionContext'
 
 type NavId = 'work' | 'guide' | 'progress'
 
@@ -19,6 +20,7 @@ interface TopNavProps {
 export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAuthenticated } = useSession()
 
   const currentId = active ?? (NAV_LINKS.find((l) => l.path === location.pathname)?.id)
 
@@ -79,7 +81,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {!compact && (
               <button
-                onClick={() => navigate('/me')}
+                onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
                 style={{
                   fontFamily: 'var(--font-ui)',
                   fontSize: 14,
@@ -91,10 +93,12 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                   transition: 'color 0.15s',
                 }}
               >
-                הפרופיל שלי
+                {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
               </button>
             )}
-            <PrimaryBtn size="sm" onClick={() => navigate('/work')}>התחל</PrimaryBtn>
+            <PrimaryBtn size="sm" onClick={() => navigate(isAuthenticated ? '/work' : '/auth')}>
+              {isAuthenticated ? 'המשך' : 'התחל'}
+            </PrimaryBtn>
           </div>
         </div>
 

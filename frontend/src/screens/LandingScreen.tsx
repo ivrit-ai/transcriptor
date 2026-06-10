@@ -87,6 +87,10 @@ export function LandingScreen() {
             fontSize: 13, fontWeight: 600,
             color: 'oklch(0.55 0.1 60)', letterSpacing: '0.04em', marginBottom: 10,
           }}>תיעוד כתבי יד עבריים</div>
+          <h1 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 34, fontWeight: 500,
+            color: 'var(--tl-ink)', margin: '0 0 20px', lineHeight: 1.2,
+          }}>תעתקו כתבי יד עבריים</h1>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 26 }}>
             <PrimaryBtn size="lg" onClick={onStart} style={{ width: '100%', justifyContent: 'center' }}>
               התחל לתעתק <Icon name="forward" size={17} color="#fff" />
@@ -148,6 +152,10 @@ export function LandingScreen() {
             fontSize: 14, fontWeight: 600,
             color: 'oklch(0.55 0.1 60)', letterSpacing: '0.04em', marginBottom: 14,
           }}>יחד נלמד את המחשב לקרוא עברית</div>
+          <h1 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 48, fontWeight: 500,
+            color: 'var(--tl-ink)', margin: '0 0 28px', lineHeight: 1.15,
+          }}>תעתקו כתבי יד עבריים</h1>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <PrimaryBtn size="lg" onClick={onStart}>
               התחל לתעתק <Icon name="forward" size={18} color="#fff" />

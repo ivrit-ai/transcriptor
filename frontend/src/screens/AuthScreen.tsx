@@ -26,18 +26,37 @@ function AuthForm({ isMobile }: { isMobile?: boolean }) {
         fontSize: isMobile ? 28 : 34, fontWeight: 500,
         color: 'var(--tl-ink)', margin: '0 0 6px',
       }}>
-        ברוך שובך
+        ברוכים הבאים
       </h1>
       <p style={{
         fontFamily: 'var(--font-ui)', fontSize: 15,
         color: 'var(--tl-muted)', margin: '0 0 24px', lineHeight: 1.5,
       }}>
-        להתחבר כדי להמשיך מהיכן שעצרת.
+        כנסו עם Google כדי לתרום לתיעוד כתבי יד עבריים.
       </p>
 
       <button className="pg-oauth" onClick={handleGoogle} type="button">
         <GoogleMark /> המשך עם Google
       </button>
+
+      {isMobile && (
+        <div style={{
+          marginTop: 32, padding: '20px 18px',
+          background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
+          borderRadius: 16, textAlign: 'center', width: '100%',
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500,
+            color: 'var(--tl-ink)', marginBottom: 8,
+          }}>כל שורה עוזרת</div>
+          <div style={{
+            fontFamily: 'var(--font-ui)', fontSize: 14,
+            color: 'var(--tl-muted)', lineHeight: 1.6,
+          }}>
+            מתנדבים כמוכם עוזרים ללמד מחשבים לקרוא כתבי יד עבריים היסטוריים.
+          </div>
+        </div>
+      )}
     </div>
   )
 }
