@@ -27,14 +27,16 @@ def _make_session_token(sub: str, email: str, name: str) -> str:
 
 @router.get("/auth/google")
 def google_login():
-    params = urlencode({
-        "client_id": settings.google_client_id,
-        "redirect_uri": settings.google_redirect_uri,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "prompt": "select_account",
-    })
+    params = urlencode(
+        {
+            "client_id": settings.google_client_id,
+            "redirect_uri": settings.google_redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "access_type": "offline",
+            "prompt": "select_account",
+        }
+    )
     return RedirectResponse(f"{GOOGLE_AUTH_URL}?{params}")
 
 

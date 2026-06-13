@@ -20,6 +20,7 @@ class Page(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     batch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("batches.id"), nullable=False)
     external_id: Mapped[str] = mapped_column(String, nullable=False)
+    document_name: Mapped[str] = mapped_column(String, nullable=False)
     image_path: Mapped[str] = mapped_column(String, nullable=False)
     width_px: Mapped[int] = mapped_column(Integer, nullable=False)
     height_px: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-key"
     consent_version: str = "1.0"
     dev_mode: bool = False
+    local_data_dir: str = "data_sample"
     admin_emails: list[str] = []
     google_client_id: str = ""
     google_client_secret: str = ""

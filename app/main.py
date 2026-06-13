@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, community, consent, leaderboard, progress, session, transcription
+from app.api.routes import admin, community, consent, leaderboard, progress, session, transcription, xhost_local_emulation
 from app.config import settings
 
 app = FastAPI(title="Transcriptor")
@@ -19,8 +19,9 @@ if settings.dev_mode:
         allow_headers=["*"],
     )
 
-_data_dir = Path(__file__).parent.parent / "data_sample"
+_data_dir = Path(settings.local_data_dir)
 if _data_dir.exists():
+    print(f"Serving images from {_data_dir.absolute()}")
     app.mount("/images", StaticFiles(directory=str(_data_dir)), name="images")
 
 app.include_router(community.router, prefix="/api")
@@ -30,6 +31,8 @@ app.include_router(consent.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
 app.include_router(leaderboard.router, prefix="/api")
 app.include_router(admin.router, prefix="/api/admin")
+if settings.dev_mode:
+    app.include_router(xhost_local_emulation.router, prefix="/xhost-auth")
 
 
 @app.get("/health")

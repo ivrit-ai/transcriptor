@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=2.4.6",
     "pillow>=12.2.0",
     "requests>=2.34.2",
+    "boto3>=1.35.0",
 ]
 
 [dependency-groups]
