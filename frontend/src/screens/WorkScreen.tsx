@@ -8,14 +8,14 @@ const EASE = 'cubic-bezier(.3,.8,.3,1)'
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
 
-// ── Tick bar ──────────────────────────────────────────────────────────────────
+// ── Tick bar ─────────────────────────────────────────────────────────────────
 function ImmTicks({ lines, cursor, onJump }: {
   lines: LoopLine[]
   cursor: number
   onJump: (i: number) => void
 }) {
   return (
-    <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto', maxWidth: '50%', flexShrink: 1 }}>
       {lines.map((l, i) => {
         const done = l.status === 'done_by_you' || l.status === 'flagged'
         return (
@@ -23,7 +23,7 @@ function ImmTicks({ lines, cursor, onJump }: {
             key={l.id}
             onClick={() => onJump(i)}
             title={`שורה ${i + 1}`}
-            style={{ border: 'none', background: 'transparent', padding: '20px 8px', cursor: 'pointer', lineHeight: 0, minWidth: 24 }}
+            style={{ border: 'none', background: 'transparent', padding: '20px 8px', cursor: 'pointer', lineHeight: 0, minWidth: 24, flexShrink: 0 }}
           >
             <span style={{
               display: 'block',
@@ -235,7 +235,9 @@ export function WorkScreen() {
   // ── Layout math ──────────────────────────────────────────────────────────────
   const sideM = window.innerWidth < 768 ? 14 : 26
   const headerH = window.innerWidth < 768 ? 36 : 44
-  const pageDispW = Math.max(40, box.w - sideM * 2)
+  // In wide mode, column is 60% of viewport; use viewportW directly for reliability
+  const columnW = wide ? viewportW * 0.6 : box.w
+  const pageDispW = Math.max(40, columnW - sideM * 2)
   const page = L.page
 
   const pagePxW = page?.width_px ?? 474
@@ -355,7 +357,7 @@ export function WorkScreen() {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       style={{
-        position: 'absolute', inset: 0, overflow: 'hidden',
+        position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden',
         cursor: (!canRoam && !canRoamX) ? 'default' : isDragging ? 'grabbing' : 'grab',
         touchAction: 'none', userSelect: 'none',
       }}
