@@ -6,10 +6,15 @@ import { api } from '../api'
 type State = 'loading' | 'allowed' | 'denied' | 'unauthenticated'
 
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useSession()
+  const { isAuthenticated, isLoading } = useSession()
   const [state, setState] = useState<State>('loading')
 
   useEffect(() => {
+    if (isLoading) {
+      setState('loading')
+      return
+    }
+    
     if (!isAuthenticated) {
       setState('unauthenticated')
       return

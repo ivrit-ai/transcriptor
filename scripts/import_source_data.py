@@ -17,6 +17,7 @@ Examples:
 import argparse
 import csv
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -330,9 +331,18 @@ def main() -> None:
     )
     parser.add_argument("--source", required=True, help="Batch source identifier")
     parser.add_argument("--license", required=True, help="License string")
-    parser.add_argument("--s3-key", help="AWS Access Key ID (required for S3 sources)")
-    parser.add_argument("--s3-secret", help="AWS Secret Access Key (required for S3 sources)")
-    parser.add_argument("--s3-region", help="AWS Region (required for S3 sources)")
+    parser.add_argument(
+        "--s3-key",
+        help="AWS Access Key ID (or set IMPORT_AWS_ACCESS_KEY_ID)",
+    )
+    parser.add_argument(
+        "--s3-secret",
+        help="AWS Secret Access Key (or set IMPORT_AWS_SECRET_ACCESS_KEY)",
+    )
+    parser.add_argument(
+        "--s3-region",
+        help="AWS Region (or set IMPORT_AWS_REGION)",
+    )
     parser.add_argument(
         "--clear-existing",
         action="store_true",
@@ -341,15 +351,21 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # S3 credentials: CLI args take precedence, fall back to IMPORT_* env vars.
+    s3_key = args.s3_key or os.environ.get("IMPORT_AWS_ACCESS_KEY_ID")
+    s3_secret = args.s3_secret or os.environ.get("IMPORT_AWS_SECRET_ACCESS_KEY")
+    s3_region = args.s3_region or os.environ.get("IMPORT_AWS_REGION")
+
     cleanup_temp = False
     remote_images = False
     if _is_s3_uri(args.source_path):
-        if not all([args.s3_key, args.s3_secret, args.s3_region]):
+        if not all([s3_key, s3_secret, s3_region]):
             parser.error(
-                "--s3-key, --s3-secret, and --s3-region are required for S3 sources"
+                "S3 credentials required: provide --s3-key/--s3-secret/--s3-region "
+                "or set IMPORT_AWS_ACCESS_KEY_ID / IMPORT_AWS_SECRET_ACCESS_KEY / IMPORT_AWS_REGION"
             )
         print(f"Downloading from S3 (manifests only): {args.source_path}")
-        root = _download_s3_to_temp(args.source_path, args.s3_key, args.s3_secret, args.s3_region)
+        root = _download_s3_to_temp(args.source_path, s3_key, s3_secret, s3_region)
         cleanup_temp = True
         remote_images = True
     else:

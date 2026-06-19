@@ -1,4 +1,5 @@
 .root {
+  direction: ltr;
   min-height: 100vh;
   background: var(--tl-page);
   font-family: var(--font-ui);

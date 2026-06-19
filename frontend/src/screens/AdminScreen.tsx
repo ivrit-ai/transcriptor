@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../api'
-import type { AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO } from '../types'
+import type { AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportMode } from '../types'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
 const dateStr = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-type Tab = 'overview' | 'users' | 'coverage'
+type Tab = 'overview' | 'users' | 'coverage' | 'import'
 type SortDir = 'asc' | 'desc'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -237,6 +237,372 @@ function CoverageTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; queue:
   )
 }
 
+// ── Import Tab ────────────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  running: 'oklch(0.74 0.1 55)',
+  completed: 'oklch(0.58 0.1 150)',
+  failed: 'oklch(0.55 0.18 25)',
+  idle: 'var(--tl-muted)',
+}
+
+function ImportTab() {
+  const [importStatus, setImportStatus] = useState<ImportStatusDTO | null>(null)
+  const [logs, setLogs] = useState<string>('')
+  const [mode, setMode] = useState<ImportMode>('local-folder')
+  const [source, setSource] = useState('handwriting_form')
+  const [license, setLicense] = useState('CC-BY-4.0')
+  const [dataPath, setDataPath] = useState('')
+  const [clearExisting, setClearExisting] = useState(false)
+  const [s3Key, setS3Key] = useState('')
+  const [s3Secret, setS3Secret] = useState('')
+  const [s3Region, setS3Region] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchStatus = () => api.getImportStatus().then(s => { if (s) setImportStatus(s) })
+  const fetchLogs = () => api.getImportLogs(500).then(r => { if (r) setLogs(r.logs) })
+
+  // Initial load
+  useEffect(() => {
+    fetchStatus()
+    fetchLogs()
+  }, [])
+
+  // Polling while running
+  useEffect(() => {
+    const isRunning = importStatus?.status === 'running'
+    if (isRunning) {
+      intervalRef.current = setInterval(() => {
+        fetchStatus()
+        fetchLogs()
+      }, 2000)
+    } else {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [importStatus?.status])
+
+  const isRunning = importStatus?.status === 'running'
+
+  // Determine if required fields are filled for the chosen mode
+  const canSubmit = useMemo(() => {
+    if (!source.trim() || !license.trim()) return false
+    if (mode === 'local-folder' && !dataPath.trim()) return false
+    if (mode === 'custom-s3') {
+      if (!dataPath.trim() || !s3Key.trim() || !s3Secret.trim() || !s3Region.trim()) return false
+    }
+    return true
+  }, [mode, source, license, dataPath, s3Key, s3Secret, s3Region])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      const body = {
+        mode,
+        source: source.trim(),
+        license: license.trim(),
+        clear_existing: clearExisting,
+        data_path: mode === 'default-s3' && !dataPath.trim() ? null : dataPath.trim() || null,
+        ...(mode === 'custom-s3' ? {
+          s3_key: s3Key.trim(),
+          s3_secret: s3Secret.trim(),
+          s3_region: s3Region.trim(),
+        } : {
+          s3_key: null,
+          s3_secret: null,
+          s3_region: null,
+        }),
+      }
+      const result = await api.startImport(body)
+      if (result) setImportStatus(result)
+      // Refresh logs right after starting
+      fetchLogs()
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'unknown'
+      setError(`Failed to start import (HTTP ${code})`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const defaultS3Available = importStatus?.default_s3_available ?? false
+
+  const dataPathLabel =
+    mode === 'local-folder' ? 'Server folder path (required)' :
+    mode === 'default-s3' ? 'Key prefix within bucket (optional)' :
+    's3://bucket/prefix (required)'
+
+  const dataPathPlaceholder =
+    mode === 'local-folder' ? '/data/imports/batch1' :
+    mode === 'default-s3' ? 'optional/prefix/' :
+    's3://my-bucket/my-prefix'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* ── Status panel ── */}
+      {importStatus && (
+        <div>
+          <div className={css.sectionTitle}>Current Import Status</div>
+          <div className={css.queueBarWrap}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                borderRadius: 99,
+                fontSize: 12,
+                fontWeight: 600,
+                background: STATUS_COLORS[importStatus.status] ?? 'var(--tl-muted)',
+                color: '#fff',
+              }}>
+                {importStatus.status.toUpperCase()}
+              </span>
+              {importStatus.mode && (
+                <span className={css.muted} style={{ fontSize: 13 }}>{importStatus.mode}</span>
+              )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '6px 24px', fontSize: 13 }}>
+              {importStatus.source && (
+                <div><span className={css.muted}>Source: </span>{importStatus.source}</div>
+              )}
+              {importStatus.license && (
+                <div><span className={css.muted}>License: </span>{importStatus.license}</div>
+              )}
+              {importStatus.data_path && (
+                <div><span className={css.muted}>Path: </span>{importStatus.data_path}</div>
+              )}
+              <div><span className={css.muted}>Clear existing: </span>{importStatus.clear_existing ? 'Yes' : 'No'}</div>
+              {importStatus.started_at && (
+                <div><span className={css.muted}>Started: </span>{new Date(importStatus.started_at).toLocaleString()}</div>
+              )}
+              {importStatus.finished_at && (
+                <div><span className={css.muted}>Finished: </span>{new Date(importStatus.finished_at).toLocaleString()}</div>
+              )}
+              {importStatus.exit_code !== null && (
+                <div><span className={css.muted}>Exit code: </span>{importStatus.exit_code}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Start import form ── */}
+      <div>
+        <div className={css.sectionTitle}>Start New Import</div>
+        <div className={css.queueBarWrap}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Mode selector */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)', marginBottom: 8 }}>MODE</div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {([
+                  { value: 'local-folder', label: 'Local folder' },
+                  { value: 'default-s3', label: defaultS3Available ? 'Default S3' : 'Default S3 (not configured on server)' },
+                  { value: 'custom-s3', label: 'Custom S3' },
+                ] as { value: ImportMode; label: string }[]).map(opt => (
+                  <label key={opt.value} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
+                    cursor: opt.value === 'default-s3' && !defaultS3Available ? 'not-allowed' : 'pointer',
+                    color: opt.value === 'default-s3' && !defaultS3Available ? 'var(--tl-muted)' : 'var(--tl-ink)',
+                  }}>
+                    <input
+                      type="radio"
+                      name="import-mode"
+                      value={opt.value}
+                      checked={mode === opt.value}
+                      disabled={opt.value === 'default-s3' && !defaultS3Available}
+                      onChange={() => setMode(opt.value)}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Source + License */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>SOURCE (required)</span>
+                <input
+                  type="text"
+                  value={source}
+                  onChange={e => setSource(e.target.value)}
+                  placeholder="e.g. nli-batch-2024"
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>LICENSE (required)</span>
+                <input
+                  type="text"
+                  value={license}
+                  onChange={e => setLicense(e.target.value)}
+                  placeholder="e.g. CC-BY-4.0"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+
+            {/* Source path */}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>
+                {dataPathLabel.toUpperCase()}
+              </span>
+              <input
+                type="text"
+                value={dataPath}
+                onChange={e => setDataPath(e.target.value)}
+                placeholder={dataPathPlaceholder}
+                style={inputStyle}
+              />
+            </label>
+
+            {/* Custom S3 credentials */}
+            {mode === 'custom-s3' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', background: 'var(--tl-page)', borderRadius: 10, border: '0.5px solid var(--tl-border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>CUSTOM S3 CREDENTIALS</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--tl-muted)' }}>Access Key ID (required)</span>
+                    <input
+                      type="password"
+                      value={s3Key}
+                      onChange={e => setS3Key(e.target.value)}
+                      placeholder="AKIA…"
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--tl-muted)' }}>Secret Access Key (required)</span>
+                    <input
+                      type="password"
+                      value={s3Secret}
+                      onChange={e => setS3Secret(e.target.value)}
+                      placeholder="secret…"
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--tl-muted)' }}>Region (required)</span>
+                    <input
+                      type="text"
+                      value={s3Region}
+                      onChange={e => setS3Region(e.target.value)}
+                      placeholder="us-east-1"
+                      style={inputStyle}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Clear existing */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={clearExisting}
+                onChange={e => setClearExisting(e.target.checked)}
+              />
+              Clear existing submissions in manifest before import
+            </label>
+
+            {/* Error */}
+            {error && (
+              <div style={{ fontSize: 13, color: STATUS_COLORS.failed, padding: '8px 12px', background: 'oklch(0.97 0.02 25)', border: '0.5px solid oklch(0.85 0.08 25)', borderRadius: 8 }}>
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <div>
+              <button
+                type="submit"
+                disabled={!canSubmit || isRunning || submitting}
+                style={{
+                  padding: '9px 22px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: 'none',
+                  background: !canSubmit || isRunning || submitting ? 'var(--tl-muted-fill)' : 'var(--tl-accent)',
+                  color: !canSubmit || isRunning || submitting ? 'var(--tl-muted)' : '#fff',
+                  cursor: !canSubmit || isRunning || submitting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
+              >
+                {submitting ? 'Starting…' : isRunning ? 'Import running…' : 'Start import'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* ── Logs viewer ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+          <div className={css.sectionTitle} style={{ margin: 0 }}>Import Logs</div>
+          <button
+            onClick={() => { fetchLogs() }}
+            style={{
+              padding: '4px 12px',
+              fontSize: 12,
+              fontWeight: 500,
+              borderRadius: 6,
+              border: '0.5px solid var(--tl-border)',
+              background: 'var(--tl-surface)',
+              color: 'var(--tl-ink)',
+              cursor: 'pointer',
+            }}
+          >
+            Refresh logs
+          </button>
+          {isRunning && <span style={{ fontSize: 12, color: STATUS_COLORS.running }}>● live</span>}
+        </div>
+        <div className={css.tableWrap}>
+          <pre style={{
+            margin: 0,
+            padding: '16px',
+            maxHeight: 360,
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: 'var(--tl-ink)',
+          }}>
+            {logs || <span className={css.muted}>No logs yet.</span>}
+          </pre>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '7px 10px',
+  fontSize: 13,
+  borderRadius: 7,
+  border: '0.5px solid var(--tl-border)',
+  background: 'var(--tl-page)',
+  color: 'var(--tl-ink)',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export function AdminScreen() {
@@ -265,6 +631,7 @@ export function AdminScreen() {
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: `Users${users.length ? ` (${users.length})` : ''}` },
     { id: 'coverage', label: 'Coverage & Queue' },
+    { id: 'import', label: 'Import' },
   ]
 
   return (
@@ -296,6 +663,9 @@ export function AdminScreen() {
         )}
         {!loading && tab === 'coverage' && queue && (
           <CoverageTab coverage={coverage} queue={queue} />
+        )}
+        {tab === 'import' && (
+          <ImportTab />
         )}
       </div>
     </div>

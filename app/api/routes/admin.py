@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
+from app.services import import_runner
 
 router = APIRouter()
 
@@ -212,3 +214,62 @@ def admin_queue(
         "pages_complete": pages_complete,
         "batches_complete": batches_complete,
     }
+
+
+# ── Source-data import ────────────────────────────────────────────────────────
+
+
+class ImportStartRequest(BaseModel):
+    mode: Literal["local-folder", "default-s3", "custom-s3"]
+    source: str
+    license: str
+    # local-folder: filesystem path on the server. default-s3: optional key
+    # prefix within the configured bucket. custom-s3: full s3://bucket/prefix URI.
+    data_path: str | None = None
+    clear_existing: bool = False
+    # custom-s3 only. Passed to the subprocess via env, never stored or returned.
+    s3_key: str | None = None
+    s3_secret: str | None = None
+    s3_region: str | None = None
+
+
+@router.get("/import/status")
+def admin_import_status(
+    _: Annotated[User, Depends(require_admin)],
+) -> dict:
+    state = import_runner.get_status()
+    return {
+        **state.to_public_dict(),
+        "default_s3_available": import_runner.default_s3_available(),
+    }
+
+
+@router.get("/import/logs")
+def admin_import_logs(
+    _: Annotated[User, Depends(require_admin)],
+    tail: int | None = None,
+) -> dict:
+    return {"logs": import_runner.get_logs(tail=tail)}
+
+
+@router.post("/import")
+def admin_import_start(
+    _: Annotated[User, Depends(require_admin)],
+    body: ImportStartRequest,
+) -> dict:
+    try:
+        state = import_runner.start_import(
+            mode=body.mode,
+            source=body.source,
+            license_=body.license,
+            data_path=body.data_path,
+            s3_key=body.s3_key,
+            s3_secret=body.s3_secret,
+            s3_region=body.s3_region,
+            clear_existing=body.clear_existing,
+        )
+    except import_runner.ImportAlreadyRunning as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except import_runner.ImportConfigError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return state.to_public_dict()

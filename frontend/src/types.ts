@@ -81,3 +81,32 @@ export interface AdminQueueDTO {
   pages_complete: number
   batches_complete: number
 }
+
+// ── Import DTOs ───────────────────────────────────────────────────────────────
+
+export type ImportMode = 'local-folder' | 'default-s3' | 'custom-s3'
+export type ImportStatus = 'idle' | 'running' | 'completed' | 'failed'
+
+export interface ImportStatusDTO {
+  status: ImportStatus
+  mode: ImportMode | null
+  source: string | null
+  license: string | null
+  data_path: string | null
+  clear_existing: boolean
+  started_at: string | null
+  finished_at: string | null
+  exit_code: number | null
+  default_s3_available: boolean
+}
+
+export interface ImportStartBody {
+  mode: ImportMode
+  source: string
+  license: string
+  data_path?: string | null
+  clear_existing: boolean
+  s3_key?: string | null
+  s3_secret?: string | null
+  s3_region?: string | null
+}

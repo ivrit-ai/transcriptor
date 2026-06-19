@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody } from './types'
 
 const BASE = ''
 
@@ -77,4 +77,13 @@ export const api = {
 
   getAdminQueue: (): Promise<AdminQueueDTO | null> =>
     request<AdminQueueDTO>('/api/admin/queue'),
+
+  getImportStatus: (): Promise<ImportStatusDTO | null> =>
+    request<ImportStatusDTO>('/api/admin/import/status'),
+
+  getImportLogs: (tail = 500): Promise<{ logs: string } | null> =>
+    request<{ logs: string }>(`/api/admin/import/logs?tail=${tail}`),
+
+  startImport: (body: ImportStartBody): Promise<ImportStatusDTO | null> =>
+    request<ImportStatusDTO>('/api/admin/import', { method: 'POST', body: JSON.stringify(body) }),
 }
