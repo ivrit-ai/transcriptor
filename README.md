@@ -77,6 +77,39 @@ Opens at `http://localhost:5173`. The Vite dev proxy forwards `/api/*` and `/ima
 
 ---
 
+## Deploy
+
+Deployment targets the xhostd platform, which exposes a plain git endpoint. The
+deploy script builds the frontend and force-pushes a single fresh commit
+containing the runtime app to the deploy branch.
+
+```bash
+python scripts/deploy.py            # build frontend + deploy
+python scripts/deploy.py --dry-run  # build + assemble, but don't push
+python scripts/deploy.py --skip-build  # reuse existing frontend/dist
+```
+
+What gets deployed:
+
+- **Backend**: all git-tracked files under `app/`, `alembic/`, `scripts/`, plus
+  `alembic.ini`, `install.sh`, `launch.sh`, `pyproject.toml`, `uv.lock`. New
+  files are picked up automatically (via `git ls-files`) — there is no hardcoded
+  list to maintain.
+- **Frontend**: the freshly built `frontend/dist/**`, with its directory layout
+  preserved (the server serves it from `frontend/dist`, see `app/main.py`).
+- Dev-only paths (`tests/`, `planning/`, docs, `data*/`) are excluded.
+
+Notes:
+
+- The deploy repo's history is independent of `origin`; each deploy replaces the
+  branch tip with one clean commit (force-push).
+- **Auth** is handled by your local git credential manager — the same way a
+  normal `git push` to that host authenticates. No tokens live in the repo.
+- Config via env / `.env`: `XHOST_GIT_URL`, `XHOST_GIT_BRANCH` (see
+  `.env.example`).
+
+---
+
 ## Input
 
 Transcriptor does not run OCR itself. It consumes pre-segmented line data produced by a detector such as [Surya](https://github.com/VikParuchuri/surya).
