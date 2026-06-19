@@ -25,13 +25,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.models.batch import Batch
+from app.models.event import Event
 from app.models.line import Line
 from app.models.page import Page
+from app.models.transcription import Transcription
 from app.services.rules import mint_line_external_id
 
 
@@ -100,6 +102,51 @@ def _image_dims(image_path: Path) -> tuple[int, int]:
     with Image.open(image_path) as img:
         return img.size  # (width, height)
 
+
+# ── Clear existing data ─────────────────────────────────────────────────────
+
+def clear_existing_submissions(session: Session, root: Path) -> None:
+    """Delete all submissions (batches + pages + lines) listed in the manifest."""
+    submissions_csv = root / "submissions.csv"
+    if not submissions_csv.exists():
+        print(f"ERROR: {submissions_csv} not found")
+        sys.exit(1)
+
+    submission_ids: list[str] = []
+    with open(submissions_csv, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            submission_ids.append(row["submission_id"])
+
+    if not submission_ids:
+        print("No submissions in manifest, nothing to clear")
+        return
+
+    batches = (
+        session.execute(select(Batch).where(Batch.external_id.in_(submission_ids)))
+        .scalars()
+        .all()
+    )
+
+    if not batches:
+        print("No existing submissions found to clear")
+        return
+
+    batch_ids = [b.id for b in batches]
+    pages = session.execute(select(Page).where(Page.batch_id.in_(batch_ids))).scalars().all()
+    page_ids = [p.id for p in pages]
+
+    if page_ids:
+        line_ids_subq = select(Line.id).where(Line.page_id.in_(page_ids))
+        session.execute(delete(Event).where(Event.line_id.in_(line_ids_subq)))
+        session.execute(delete(Transcription).where(Transcription.line_id.in_(line_ids_subq)))
+        session.execute(delete(Line).where(Line.page_id.in_(page_ids)))
+    session.execute(delete(Page).where(Page.batch_id.in_(batch_ids)))
+    for batch in batches:
+        session.delete(batch)
+
+    session.flush()
+    print(f"Cleared {len(batches)} submissions ({len(page_ids)} pages)")
 
 # ── Import logic ────────────────────────────────────────────────────────────
 
@@ -286,6 +333,11 @@ def main() -> None:
     parser.add_argument("--s3-key", help="AWS Access Key ID (required for S3 sources)")
     parser.add_argument("--s3-secret", help="AWS Secret Access Key (required for S3 sources)")
     parser.add_argument("--s3-region", help="AWS Region (required for S3 sources)")
+    parser.add_argument(
+        "--clear-existing",
+        action="store_true",
+        help="Delete all submissions (and cascading data) listed in the manifest before importing",
+    )
 
     args = parser.parse_args()
 
@@ -308,6 +360,8 @@ def main() -> None:
 
     try:
         with SessionLocal() as session:
+            if args.clear_existing:
+                clear_existing_submissions(session, root)
             import_source_data(session, root, args.source, args.license, remote_images)
             session.commit()
         print("Import complete.")
