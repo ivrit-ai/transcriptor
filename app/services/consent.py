@@ -28,6 +28,7 @@ def has_active_contribution_consent(
     user: User,
     current_version: str,
 ) -> bool:
+    return True # Disabled for now until we setup a proper consent page
     result = session.execute(
         select(Consent).where(
             Consent.user_id == user.id,
