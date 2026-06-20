@@ -137,6 +137,73 @@
   width: 100%;
 }
 
+/* ── Lines panel (middle) ─────────────────────────────────────────────── */
+
+.linesPanel {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  border-right: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.linesPanelHeader {
+  padding: 12px 14px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tl-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 0.5px solid var(--tl-border);
+  position: sticky;
+  top: 0;
+  background: var(--tl-surface);
+  z-index: 1;
+}
+
+.linesPanelList {
+  display: flex;
+  flex-direction: column;
+}
+
+.linesPanelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  color: var(--tl-ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 0.5px solid var(--tl-border);
+}
+
+.linesPanelRow:hover,
+.linesPanelRowActive {
+  background: rgba(255, 255, 0, 0.12);
+}
+
+.linesPanelIndex {
+  font-weight: 600;
+  min-width: 24px;
+  color: var(--tl-muted);
+}
+
+.linesPanelConf {
+  color: var(--tl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Line box highlight ──────────────────────────────────────────────── */
+
+.lineBoxHighlighted {
+  border-color: yellow !important;
+  background: rgba(255, 255, 0, 0.12);
+}
+
 /* ── Right panel ───────────────────────────────────────────────────────── */
 
 .rightPanel {

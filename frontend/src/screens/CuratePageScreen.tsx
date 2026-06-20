@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys, queryClient } from '../queries'
@@ -79,7 +79,9 @@ export function CuratePageScreen() {
   const [saving, setSaving] = useState(false)
 
   const imageAreaRef = useRef<HTMLDivElement>(null)
+  const imageFrameRef = useRef<HTMLDivElement>(null)
   const [imageAreaSize, setImageAreaSize] = useState({ w: 0, h: 0 })
+  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null)
 
   const { data: serverData, isLoading, isError } = useQuery({
     queryKey: queryKeys.curate.pageLines(pageId ?? ''),
@@ -140,6 +142,45 @@ export function CuratePageScreen() {
   const imageFrameW = dispW * scale
   const imageFrameH = dispH * scale
 
+  // ── Sorted lines for panel ────────────────────────────────────────────────
+
+  const sortedLines = useMemo(
+    () => [...actualLines].sort((a, b) => a.line_index - b.line_index),
+    [actualLines],
+  )
+
+  // ── Line hover via pointer intersection ────────────────────────────────────
+
+  const findLineAtPoint = useCallback((clientX: number, clientY: number) => {
+    if (!imageFrameRef.current || scale <= 0) return null
+    const rect = imageFrameRef.current.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+
+    const intersecting = actualLines.filter(l => {
+      const lx = l.bbox.x * scale
+      const ly = l.bbox.y * scale
+      const lw = Math.max(l.bbox.w * scale, 1)
+      const lh = Math.max(l.bbox.h * scale, 1)
+      return px >= lx && px <= lx + lw && py >= ly && py <= ly + lh
+    })
+
+    if (intersecting.length === 0) return null
+    if (intersecting.length === 1) return intersecting[0].id
+    return intersecting.reduce((a, b) =>
+      a.bbox.w * a.bbox.h < b.bbox.w * b.bbox.h ? a : b
+    ).id
+  }, [actualLines, scale])
+
+  const handleImagePointerMove = useCallback((e: React.PointerEvent) => {
+    const id = findLineAtPoint(e.clientX, e.clientY)
+    setHoveredLineId(id)
+  }, [findLineAtPoint])
+
+  const handleImagePointerLeave = useCallback(() => {
+    setHoveredLineId(null)
+  }, [])
+
   // ── Rotation ──────────────────────────────────────────────────────────────
 
   const rotateBy = useCallback((deltaRotation: number) => {
@@ -184,7 +225,7 @@ export function CuratePageScreen() {
           line_index: l.line_index,
           bbox: l.bbox,
           polygon: l.polygon,
-          detection_confidence: null,
+          detection_confidence: l.detection_confidence,
           transcription_count: l.transcription_count,
         }))
       }
@@ -410,6 +451,28 @@ export function CuratePageScreen() {
         </div>
       </div>
 
+      {/* ── Lines panel ──────────────────────────────────────────────── */}
+      <div className={css.linesPanel}>
+        <div className={css.linesPanelHeader}>Lines</div>
+        <div className={css.linesPanelList}>
+          {sortedLines.map(line => (
+            <div
+              key={line.id}
+              className={`${css.linesPanelRow} ${hoveredLineId === line.id ? css.linesPanelRowActive : ''}`}
+              onMouseEnter={() => setHoveredLineId(line.id)}
+              onMouseLeave={() => setHoveredLineId(null)}
+            >
+              <span className={css.linesPanelIndex}>{line.line_index}</span>
+              <span className={css.linesPanelConf}>
+                {line.detection_confidence != null
+                  ? line.detection_confidence.toFixed(2)
+                  : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* ── Right panel ────────────────────────────────────────────────── */}
       <div className={css.rightPanel}>
         {isLoading && <div className={css.status}>Loading page data…</div>}
@@ -418,11 +481,14 @@ export function CuratePageScreen() {
         {page && (
           <div ref={imageAreaRef} className={css.imageArea}>
             <div
+              ref={imageFrameRef}
               className={css.imageFrame}
               style={{
                 width: imageFrameW,
                 height: imageFrameH,
               }}
+              onPointerMove={handleImagePointerMove}
+              onPointerLeave={handleImagePointerLeave}
             >
               <div
                 className={css.imageLayer}
@@ -446,7 +512,7 @@ export function CuratePageScreen() {
                 {scale > 0 && actualLines.map(line => (
                   <div
                     key={line.id}
-                    className={css.lineBox}
+                    className={`${css.lineBox} ${hoveredLineId === line.id ? css.lineBoxHighlighted : ''}`}
                     style={{
                       left: line.bbox.x * scale,
                       top: line.bbox.y * scale,

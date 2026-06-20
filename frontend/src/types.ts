@@ -116,6 +116,7 @@ export interface AdminPageLineDTO {
   bbox: BBox
   polygon?: unknown
   transcription_count: number
+  detection_confidence?: number | null
 }
 
 export interface AdminPageLinesDTO {
