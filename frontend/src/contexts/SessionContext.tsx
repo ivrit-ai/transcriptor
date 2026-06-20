@@ -6,6 +6,8 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import type { SessionDTO } from '../types'
 
 const CONSENT_KEY_PREFIX = 'consent_given_'
@@ -31,26 +33,27 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null)
 
+function fetchWhoami(): Promise<WhoAmI> {
+  return fetch('/xhost-auth/whoami').then(r => r.json())
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [whoami, setWhoami] = useState<WhoAmI | null>(null)
+  const { data: whoami, isLoading } = useQuery({
+    queryKey: queryKeys.whoami,
+    queryFn: fetchWhoami,
+    staleTime: Infinity,
+    retry: 1,
+  })
   const [consentGiven, setConsentGivenState] = useState(false)
   const [currentSession, setCurrentSession] = useState<SessionDTO | null>(null)
 
   useEffect(() => {
-    fetch('/xhost-auth/whoami')
-      .then(r => r.json())
-      .then((data: WhoAmI) => {
-        setWhoami(data)
-        if (data.logged_in && data.sub) {
-          setConsentGivenState(
-            localStorage.getItem(CONSENT_KEY_PREFIX + data.sub) === 'true'
-          )
-        }
-      })
-      .catch(() => setWhoami({ logged_in: false }))
-      .finally(() => setIsLoading(false))
-  }, [])
+    if (whoami?.logged_in && whoami?.sub) {
+      setConsentGivenState(
+        localStorage.getItem(CONSENT_KEY_PREFIX + whoami.sub) === 'true'
+      )
+    }
+  }, [whoami?.logged_in, whoami?.sub])
 
   const setConsentGiven = useCallback((val: boolean) => {
     if (whoami?.sub) {
@@ -66,7 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return (
     <SessionContext.Provider
       value={{
-        isAuthenticated: !!(whoami?.logged_in && whoami.sub),
+        isAuthenticated: !!(whoami?.logged_in && whoami?.sub),
         isLoading,
         userEmail: whoami?.email ?? null,
         userName: whoami?.name ?? null,

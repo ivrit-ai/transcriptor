@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { queryKeys, queryClient } from '../queries'
 import type { AdminUserDTO, UserRole } from '../types'
 import { api } from '../api'
 import css from './AdminScreen.module.css'
@@ -42,11 +44,14 @@ export function UsersTab({ users }: { users: AdminUserDTO[] }) {
   const [sort, setSort] = useState('text_count')
   const [dir, setDir] = useState<SortDir>('desc')
 
-  // Track per-user role overrides (userId -> role)
   const [roleOverrides, setRoleOverrides] = useState<Record<string, UserRole>>({})
-  // Track which rows are saving / errored
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const updateRoleMutation = useMutation({
+    mutationFn: (params: { userId: string; role: UserRole }) =>
+      api.updateUserRole(params.userId, params.role),
+  })
 
   const sorted = useMemo(() => {
     const key = sort as keyof AdminUserDTO
@@ -73,19 +78,26 @@ export function UsersTab({ users }: { users: AdminUserDTO[] }) {
 
   const handleRoleBlur = async (userId: string, originalRole: UserRole) => {
     const pending = roleOverrides[userId]
-    // Nothing changed — skip
     if (pending === undefined || pending === originalRole) return
 
     setSaving(prev => ({ ...prev, [userId]: true }))
-    try {
-      await api.updateUserRole(userId, pending)
-      // Commit: remove override so the refreshed list drives the value
-      setRoleOverrides(prev => { const next = { ...prev }; delete next[userId]; return next })
-    } catch {
-      setErrors(prev => ({ ...prev, [userId]: 'Save failed' }))
-    } finally {
-      setSaving(prev => { const next = { ...prev }; delete next[userId]; return next })
-    }
+    setErrors(prev => { const next = { ...prev }; delete next[userId]; return next })
+
+    updateRoleMutation.mutate(
+      { userId, role: pending },
+      {
+        onSuccess: () => {
+          setRoleOverrides(prev => { const next = { ...prev }; delete next[userId]; return next })
+          queryClient.invalidateQueries({ queryKey: queryKeys.admin.users })
+        },
+        onError: () => {
+          setErrors(prev => ({ ...prev, [userId]: 'Save failed' }))
+        },
+        onSettled: () => {
+          setSaving(prev => { const next = { ...prev }; delete next[userId]; return next })
+        },
+      }
+    )
   }
 
   return (

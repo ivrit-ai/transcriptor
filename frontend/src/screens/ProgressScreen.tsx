@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { TopNav, Icon } from '../components/shared'
 import { api } from '../api'
 import type { ProfileDTO } from '../api'
@@ -123,7 +125,6 @@ function ContribGrid({ weeks = 7, cell = 16, gap = 5 }: { weeks?: number; cell?:
 export function ProgressScreen() {
   const navigate = useNavigate()
   const [viewportW, setViewportW] = useState(window.innerWidth)
-  const [ME, setME] = useState<ProfileDTO>(FALLBACK)
 
   useEffect(() => {
     const h = () => setViewportW(window.innerWidth)
@@ -133,9 +134,13 @@ export function ProgressScreen() {
 
   const isMobile = viewportW < 768
 
-  useEffect(() => {
-    api.getProfile().then((data) => { if (data) setME(data) }).catch(() => { /* keep fallback */ })
-  }, [])
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.profile.me,
+    queryFn: () => api.getProfile(),
+    staleTime: 30_000,
+  })
+
+  const ME = profileData ?? FALLBACK
 
   const greeting = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>

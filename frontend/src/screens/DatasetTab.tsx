@@ -1,74 +1,41 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { api } from '../api'
-import type { AdminDatasetRowDTO, AdminPageLinesDTO } from '../types'
 import { PageLinesPreview } from '../components/shared'
 import css from './DatasetTab.module.css'
 
 const PAGE_SIZE = 20
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function DatasetTab() {
-  const [rows, setRows] = useState<AdminDatasetRowDTO[]>([])
-  const [serverPage, setServerPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-
-  // Single global cursor — 0-based index across the entire dataset
   const [globalIdx, setGlobalIdx] = useState(0)
-
-  // Preview for the selected row
-  const [preview, setPreview] = useState<AdminPageLinesDTO | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
 
   const listRef = useRef<HTMLDivElement>(null)
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-
-  // Which server page does globalIdx live on?
   const neededServerPage = Math.floor(globalIdx / PAGE_SIZE) + 1
-  // Local index within the current server page
   const localIdx = globalIdx % PAGE_SIZE
 
-  // ── Load server page whenever neededServerPage changes ────────────────────
+  const { data: pageData, isFetching } = useQuery({
+    queryKey: queryKeys.admin.pages(neededServerPage, PAGE_SIZE),
+    queryFn: () => api.getAdminPages(neededServerPage, PAGE_SIZE),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  })
 
-  useEffect(() => {
-    if (neededServerPage === serverPage && rows.length > 0) return
-    setLoading(true)
-    api.getAdminPages(neededServerPage, PAGE_SIZE)
-      .then(r => {
-        if (!r) return
-        setRows(r.items)
-        setTotalPages(r.total_pages)
-        setTotal(r.total)
-        setServerPage(neededServerPage)
-      })
-      .finally(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [neededServerPage])
+  const rows = pageData?.items ?? []
+  const total = pageData?.total ?? 0
+  const totalPages = pageData?.total_pages ?? 1
+  const loading = isFetching && rows.length === 0
 
-  // After a load completes: restore focus to the list container and scroll the
-  // active row into view. This prevents focus being lost across page navigations.
-  useEffect(() => {
-    if (!loading) {
-      listRef.current?.focus({ preventScroll: true })
-      setTimeout(() => rowRefs.current[localIdx]?.scrollIntoView({ block: 'nearest' }), 0)
-    }
-  }, [localIdx, loading])
+  const selectedRow = rows[localIdx] ?? null
 
-  // Load preview for the row at globalIdx
-  const selectedRow = !loading ? rows[localIdx] ?? null : null
-  useEffect(() => {
-    if (!selectedRow) { setPreview(null); return }
-    setPreviewLoading(true)
-    api.getAdminPageLines(selectedRow.page_id)
-      .then(r => setPreview(r ?? null))
-      .finally(() => setPreviewLoading(false))
-  }, [selectedRow?.page_id])
-
-  // ── Navigation ────────────────────────────────────────────────────────────
+  const { data: preview, isLoading: previewLoading } = useQuery({
+    queryKey: queryKeys.admin.pageLines(selectedRow?.page_id ?? ''),
+    queryFn: () => api.getAdminPageLines(selectedRow!.page_id),
+    staleTime: 30_000,
+    enabled: !!selectedRow?.page_id,
+  })
 
   const clampedMax = Math.max(0, total - 1)
 
@@ -84,13 +51,10 @@ export function DatasetTab() {
     else if (e.key === 'PageUp')    { e.preventDefault(); navigate(globalIdx - 10) }
   }, [globalIdx, navigate])
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
   return (
     <div className={css.layout}>
-      {/* ── List column ── */}
       <div
         ref={listRef}
         className={css.listCol}
@@ -119,7 +83,7 @@ export function DatasetTab() {
                   ref={el => { rowRefs.current[i] = el }}
                   type="button"
                   className={`${css.row} ${isActive ? css.rowActive : ''}`}
-                  onClick={() => navigate((serverPage - 1) * PAGE_SIZE + i)}
+                  onClick={() => navigate((neededServerPage - 1) * PAGE_SIZE + i)}
                 >
                   {row.approved && (
                     <span className={css.approvedDot} title="Approved" aria-label="Approved" />
@@ -161,7 +125,6 @@ export function DatasetTab() {
         )}
       </div>
 
-      {/* ── Preview panel ── */}
       <div className={css.preview}>
         <div className={css.previewHeader}>Page Preview</div>
 
@@ -171,7 +134,11 @@ export function DatasetTab() {
           </div>
         )}
 
-        {(loading || previewLoading) && selectedRow && (
+        {loading && selectedRow && (
+          <div className={css.previewEmpty}>Loading…</div>
+        )}
+
+        {selectedRow && previewLoading && (
           <div className={css.previewEmpty}>Loading…</div>
         )}
 

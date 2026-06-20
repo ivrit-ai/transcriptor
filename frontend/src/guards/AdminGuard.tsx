@@ -1,34 +1,23 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { useSession } from '../contexts/SessionContext'
 import { api } from '../api'
 
-type State = 'loading' | 'allowed' | 'denied' | 'unauthenticated'
-
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useSession()
-  const [state, setState] = useState<State>('loading')
+  const { isAuthenticated, isLoading: authLoading } = useSession()
+  const { isLoading, isError } = useQuery({
+    queryKey: queryKeys.admin.stats,
+    queryFn: () => api.getAdminStats(),
+    staleTime: Infinity,
+    retry: false,
+    enabled: isAuthenticated && !authLoading,
+  })
 
-  useEffect(() => {
-    if (isLoading) {
-      setState('loading')
-      return
-    }
-    
-    if (!isAuthenticated) {
-      setState('unauthenticated')
-      return
-    }
-    api.getAdminStats()
-      .then(() => setState('allowed'))
-      .catch((err: Error) => {
-        setState(err.message === '403' ? 'denied' : 'denied')
-      })
-  }, [isAuthenticated])
+  if (!isAuthenticated && !authLoading) return <Navigate to="/auth" replace />
 
-  if (state === 'unauthenticated') return <Navigate to="/auth" replace />
-
-  if (state === 'loading') {
+  if (authLoading || (isAuthenticated && isLoading)) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -39,7 +28,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  if (state === 'denied') {
+  if (isError) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
