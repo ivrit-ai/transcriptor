@@ -27,4 +27,8 @@ export const queryKeys = {
     pages: (page: number, pageSize: number) => ['admin', 'pages', page, pageSize] as const,
     pageLines: (pageId: string) => ['admin', 'pageLines', pageId] as const,
   },
+  curate: {
+    pages: (page: number, pageSize: number) => ['curate', 'pages', page, pageSize] as const,
+    pageLines: (pageId: string) => ['curate', 'pageLines', pageId] as const,
+  },
 }

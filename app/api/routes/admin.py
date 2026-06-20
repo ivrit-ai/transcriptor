@@ -211,7 +211,7 @@ def admin_coverage(
 
 @router.get("/pages")
 def admin_pages(
-    _: Annotated[User, Depends(require_admin)],
+    _: Annotated[User, Depends(require_curator)],
     db: Annotated[Session, Depends(get_db)],
     page: int = 1,
     page_size: int = 50,
@@ -266,7 +266,7 @@ def admin_pages(
 
 @router.get("/page_lines")
 def admin_page_lines(
-    _: Annotated[User, Depends(require_admin)],
+    _: Annotated[User, Depends(require_curator)],
     db: Annotated[Session, Depends(get_db)],
     page_id: str,
 ) -> dict:
@@ -288,18 +288,97 @@ def admin_page_lines(
     return {
         "page_id": str(page.id),
         "external_id": page.external_id,
+        "batch_external_id": page.batch.external_id,
+        "document_name": page.document_name,
         "image_url": resolve_image_url(page.image_path),
         "width_px": page.width_px,
         "height_px": page.height_px,
+        "image_rotation": page.image_rotation,
+        "approved": page.approved,
         "lines": [
             {
                 "id": str(line.id),
+                "external_id": line.external_id,
                 "line_index": line.line_index,
                 "bbox": line.bbox,
+                "polygon": line.polygon,
                 "transcription_count": line.transcription_count,
             }
             for line in lines
         ],
+    }
+
+
+# ── Curation save (update page lines, rotation, approval) ────────────────────
+
+
+class UpdatePageLinesRequest(BaseModel):
+    rotation: int | None = None
+    lines: list[dict] | None = None
+    approved: bool | None = None
+
+
+@router.put("/page_lines")
+def update_page_lines(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+    page_id: str,
+    body: UpdatePageLinesRequest,
+) -> dict:
+    if body.rotation is not None and body.lines is None:
+        raise HTTPException(
+            status_code=422,
+            detail="lines must be provided when rotation is specified",
+        )
+
+    try:
+        pid = uuid.UUID(page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid page_id") from e
+
+    page = db.get(Page, pid)
+    if page is None:
+        raise HTTPException(status_code=404, detail="page not found")
+
+    if body.rotation is not None:
+        page.image_rotation = body.rotation
+
+    if body.approved is not None:
+        page.approved = body.approved
+
+    update_line_ids: list[str] | None = None
+
+    if body.lines is not None:
+        db.query(Line).filter(Line.page_id == page.id).delete()
+        new_lines = []
+        # Sort lines by visual flow: top-to-bottom (y asc), right-to-left (x+w desc)
+        sorted_lines = sorted(
+            body.lines,
+            key=lambda ld: (ld["bbox"]["y"], -(ld["bbox"]["x"] + ld["bbox"]["w"])),
+        )
+        for idx, line_data in enumerate(sorted_lines):
+            new_line = Line(
+                page_id=page.id,
+                line_index=idx,
+                bbox=line_data["bbox"],
+                polygon=line_data.get("polygon"),
+                detection_confidence=line_data.get("detection_confidence"),
+                external_id=line_data["external_id"],
+                transcription_count=line_data.get("transcription_count", 0),
+            )
+            db.add(new_line)
+            new_lines.append(new_line)
+        db.flush()
+        update_line_ids = [str(l.id) for l in new_lines]
+
+    db.commit()
+    db.refresh(page)
+
+    return {
+        "page_id": str(page.id),
+        "image_rotation": page.image_rotation,
+        "approved": page.approved,
+        "line_ids": update_line_ids,
     }
 
 

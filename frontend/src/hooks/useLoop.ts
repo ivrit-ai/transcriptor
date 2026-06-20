@@ -21,7 +21,8 @@ export interface LoopPage {
   image_url: string
   width_px: number
   height_px: number
-  page_label?: number
+  image_rotation: number
+  page_label?: string | number
 }
 
 export type SaveToastKind = 'retry' | 'error'
@@ -117,6 +118,7 @@ export function useLoop(): LoopState {
       image_url: session.image_url,
       width_px: session.width_px,
       height_px: session.height_px,
+      image_rotation: session.image_rotation ?? 0,
       page_label: session.page_label,
     })
     setLines(loaded)

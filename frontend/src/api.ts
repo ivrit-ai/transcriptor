@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse } from './types'
 
 const BASE = ''
 
@@ -100,5 +100,17 @@ export const api = {
     request<{ user_id: string; role: string }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
+    }),
+
+  getCuratePages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
+    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
+
+  getCuratePageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
+    request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
+
+  updateCuratePageLines: (pageId: string, body: UpdatePageLinesBody): Promise<UpdatePageLinesResponse | null> =>
+    request<UpdatePageLinesResponse>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
     }),
 }

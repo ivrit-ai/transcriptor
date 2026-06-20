@@ -15,6 +15,7 @@ dist/
 # Node
 frontend/node_modules/
 frontend/dist/
+node-compile-cache/
 
 # coding assistants
 .claude/
