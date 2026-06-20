@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_admin
+from app.api.deps import get_db, require_admin, require_curator
 from app.models.batch import Batch
 from app.models.line import Line
 from app.models.page import Page
@@ -19,6 +19,14 @@ from app.storage import resolve_image_url
 router = APIRouter()
 
 _COMPLETION_TARGET = 3
+
+
+@router.get("/curator/check")
+def curator_check(
+    _: Annotated[User, Depends(require_curator)],
+) -> dict:
+    """Lightweight endpoint the frontend uses to verify curator access."""
+    return {"ok": True}
 
 
 @router.get("/stats")
@@ -81,6 +89,7 @@ def admin_users(
             User.id,
             User.display_name,
             User.email,
+            User.role,
             User.created_at,
             func.max(Transcription.updated_at).label("last_active"),
             func.count(Transcription.id).label("total_submissions"),
@@ -102,7 +111,7 @@ def admin_users(
             ).label("flag_count"),
         )
         .outerjoin(Transcription, Transcription.user_id == User.id)
-        .group_by(User.id, User.display_name, User.email, User.created_at)
+        .group_by(User.id, User.display_name, User.email, User.role, User.created_at)
         .order_by(func.count(
             case((Transcription.kind == TranscriptionKind.text, Transcription.id))
         ).desc())
@@ -113,6 +122,7 @@ def admin_users(
             "user_id": str(r["id"]),
             "display_name": r["display_name"],
             "email": r["email"],
+            "role": r["role"],
             "joined_at": r["created_at"].isoformat() if r["created_at"] else None,
             "last_active": r["last_active"].isoformat() if r["last_active"] else None,
             "total_submissions": r["total_submissions"],
@@ -122,6 +132,39 @@ def admin_users(
         }
         for r in rows
     ]
+
+
+_VALID_ROLES = {"user", "curator", "admin"}
+
+
+class UpdateUserRequest(BaseModel):
+    role: str
+
+
+@router.patch("/users/{user_id}")
+def admin_update_user(
+    user_id: str,
+    body: UpdateUserRequest,
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    if body.role not in _VALID_ROLES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid role. Must be one of: {', '.join(sorted(_VALID_ROLES))}",
+        )
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid user_id") from e
+
+    target = db.get(User, uid)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target.role = body.role
+    db.commit()
+    return {"user_id": str(target.id), "role": target.role}
 
 
 @router.get("/coverage")
@@ -188,6 +231,7 @@ def admin_pages(
             Page.id,
             Page.external_id,
             Page.image_path,
+            Page.approved,
             Batch.id.label("batch_id"),
             Batch.external_id.label("batch_external_id"),
             Batch.source,
@@ -203,6 +247,7 @@ def admin_pages(
             "page_id": str(r["id"]),
             "page_external_id": r["external_id"],
             "image_path": r["image_path"],
+            "approved": r["approved"],
             "batch_id": str(r["batch_id"]),
             "batch_external_id": r["batch_external_id"],
             "source": r["source"],

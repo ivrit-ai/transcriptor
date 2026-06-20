@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class Page(Base):
     image_path: Mapped[str] = mapped_column(String, nullable=False)
     width_px: Mapped[int] = mapped_column(Integer, nullable=False)
     height_px: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
     batch: Mapped["Batch"] = relationship("Batch", back_populates="pages")

@@ -65,7 +65,7 @@ def get_next_session(
 
     page = session.execute(
         select(Page)
-        .where(has_eligible)
+        .where(Page.approved.is_(True), has_eligible)
         .order_by(eligible_count_subq.desc())
         .limit(1)
     ).scalar_one_or_none()

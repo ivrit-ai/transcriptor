@@ -92,4 +92,13 @@ export const api = {
 
   getAdminPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
     request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
+
+  getCuratorCheck: (): Promise<{ ok: boolean } | null> =>
+    request<{ ok: boolean }>('/api/admin/curator/check'),
+
+  updateUserRole: (userId: string, role: string): Promise<{ user_id: string; role: string } | null> =>
+    request<{ user_id: string; role: string }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
 }

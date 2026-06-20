@@ -50,10 +50,13 @@ export interface AdminStatsDTO {
   overall_completion_pct: number
 }
 
+export type UserRole = 'user' | 'curator' | 'admin'
+
 export interface AdminUserDTO {
   user_id: string
   display_name: string
   email: string
+  role: UserRole
   joined_at: string | null
   last_active: string | null
   total_submissions: number
@@ -88,6 +91,7 @@ export interface AdminDatasetRowDTO {
   page_id: string
   page_external_id: string
   image_path: string
+  approved: boolean
   batch_id: string
   batch_external_id: string
   source: string

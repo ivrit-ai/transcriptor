@@ -2,14 +2,13 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../api'
 import type { AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportMode } from '../types'
 import { DatasetTab } from './DatasetTab'
+import { UsersTab } from './UsersTab'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
-const dateStr = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
 type Tab = 'overview' | 'users' | 'dataset' | 'coverage' | 'import'
-type SortDir = 'asc' | 'desc'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -19,19 +18,6 @@ function StatCard({ value, label, accent }: { value: string | number; label: str
       <div className={css.statValue} style={accent ? { color: accent } : undefined}>{value}</div>
       <div className={css.statLabel}>{label}</div>
     </div>
-  )
-}
-
-function SortTh({
-  col, label, sort, dir, onSort,
-}: {
-  col: string; label: string; sort: string; dir: SortDir; onSort: (c: string) => void
-}) {
-  const active = sort === col
-  return (
-    <th className={`${css.sortable}`} onClick={() => onSort(col)}>
-      {label} {active ? (dir === 'desc' ? '↓' : '↑') : ''}
-    </th>
   )
 }
 
@@ -101,64 +87,6 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
         <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" />
       </div>
     </>
-  )
-}
-
-// ── Users Tab ─────────────────────────────────────────────────────────────────
-
-function UsersTab({ users }: { users: AdminUserDTO[] }) {
-  const [sort, setSort] = useState('text_count')
-  const [dir, setDir] = useState<SortDir>('desc')
-
-  const sorted = useMemo(() => {
-    const key = sort as keyof AdminUserDTO
-    return [...users].sort((a, b) => {
-      const av = a[key] ?? ''
-      const bv = b[key] ?? ''
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0
-      return dir === 'desc' ? -cmp : cmp
-    })
-  }, [users, sort, dir])
-
-  const onSort = (col: string) => {
-    if (sort === col) setDir(d => d === 'desc' ? 'asc' : 'desc')
-    else { setSort(col); setDir('desc') }
-  }
-
-  return (
-    <div className={css.tableWrap}>
-      <table className={css.table}>
-        <thead>
-          <tr>
-            <SortTh col="display_name" label="Name" sort={sort} dir={dir} onSort={onSort} />
-            <th>Email</th>
-            <SortTh col="text_count" label="Text ↓" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="total_submissions" label="Total" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="cant_read_count" label="Can't read" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="flag_count" label="Flags" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="joined_at" label="Joined" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="last_active" label="Last active" sort={sort} dir={dir} onSort={onSort} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(u => (
-            <tr key={u.user_id}>
-              <td style={{ fontWeight: 500 }}>{u.display_name}</td>
-              <td className={css.muted}>{u.email}</td>
-              <td style={{ fontWeight: 600, color: 'oklch(0.58 0.1 150)' }}>{fmt(u.text_count)}</td>
-              <td>{fmt(u.total_submissions)}</td>
-              <td className={css.muted}>{fmt(u.cant_read_count)}</td>
-              <td className={css.muted}>{fmt(u.flag_count)}</td>
-              <td className={css.muted}>{dateStr(u.joined_at)}</td>
-              <td className={css.muted}>{dateStr(u.last_active)}</td>
-            </tr>
-          ))}
-          {sorted.length === 0 && (
-            <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>No users yet</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
   )
 }
 

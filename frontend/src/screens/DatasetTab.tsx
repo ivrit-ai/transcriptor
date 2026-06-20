@@ -121,6 +121,9 @@ export function DatasetTab() {
                   className={`${css.row} ${isActive ? css.rowActive : ''}`}
                   onClick={() => navigate((serverPage - 1) * PAGE_SIZE + i)}
                 >
+                  {row.approved && (
+                    <span className={css.approvedDot} title="Approved" aria-label="Approved" />
+                  )}
                   <span className={css.rowId}>{row.page_external_id}</span>
                   <span className={css.rowBatch}>{row.batch_external_id}</span>
                   <span className={css.rowPath} title={row.image_path}>{row.image_path}</span>
