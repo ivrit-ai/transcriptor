@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import http.client
+import json
 import os
 import subprocess
 import sys
@@ -209,8 +211,33 @@ def main() -> None:
         push.append("--dry-run")
     push += [git_url, f"{commit}:refs/heads/{git_branch}"]
 
-    print(f"==> Pushing to {git_branch} (force{', dry-run' if args.dry_run else ''})...")
+    print(
+        f"==> Pushing to {git_branch} (force{', dry-run' if args.dry_run else ''})..."
+    )
     run(push, cwd=REPO_ROOT)
+
+    print(f"==> Triggering a deploy...")
+    app_id = os.environ.get("XHOST_API_BASE")
+    channel_id = os.environ.get("XHOST_API_CHANNEL")
+    xhost_api_base = os.environ.get("XHOST_API_BASE", "api.xhostd.com")
+    if token and app_id and channel_id:
+        conn = http.client.HTTPSConnection(xhost_api_base)
+        payload = json.dumps({"sha": "HEAD"})
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+        conn.request(
+            "POST",
+            f"/apps/{app_id}/channels/{channel_id}/deploy",
+            payload,
+            headers,
+        )
+        res = conn.getresponse()
+        data = res.read()
+        print(data.decode("utf-8"))
+
     print("==> Deploy complete.")
 
 
