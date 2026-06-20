@@ -56,6 +56,8 @@ function applyRotationToLines(
   }))
 }
 
+const CURATE_PAGE_SIZE = 20
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function CuratePageScreen() {
@@ -98,6 +100,22 @@ export function CuratePageScreen() {
   const page = serverData
   const imgW = page?.width_px ?? 1
   const imgH = page?.height_px ?? 1
+
+  // ── Shared pages list query ───────────────────────────────────────────────
+
+  const listPageNum = navState?.listPage ?? 1
+
+  const { data: pagesData } = useQuery({
+    queryKey: queryKeys.curate.pages(listPageNum, CURATE_PAGE_SIZE),
+    queryFn: () => api.getCuratePages(listPageNum, CURATE_PAGE_SIZE),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  })
+
+  const effectiveListData = pagesData ?? navState?.listData ?? null
+  const effectiveListIdx = navState?.listIdx ?? (
+    effectiveListData?.items.findIndex(item => item.page_id === pageId) ?? -1
+  )
 
   useEffect(() => {
     const el = imageAreaRef.current
@@ -183,14 +201,30 @@ export function CuratePageScreen() {
         setApproved(result.approved)
         setCurrentRotation(result.image_rotation)
         setLocalLines(nextLines)
+
+        // Update pageLines cache
         queryClient.setQueryData(queryKeys.curate.pageLines(pageId), (prev: typeof serverData) =>
           prev ? { ...prev, image_rotation: result.image_rotation, approved: result.approved, lines: nextLines } : prev
         )
+
+        // Update pages list cache so navigation reflects the new approved status
+        queryClient.setQueryData(queryKeys.curate.pages(listPageNum, CURATE_PAGE_SIZE), (prev: AdminDatasetDTO | undefined) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            items: prev.items.map(item =>
+              item.page_id === pageId ? { ...item, approved: result.approved } : item
+            ),
+          }
+        })
+
+        // Invalidate all pages queries so CurateScreen gets fresh data on return
+        queryClient.invalidateQueries({ queryKey: ['curate', 'pages'] })
       }
     } finally {
       setSaving(false)
     }
-  }, [page, pageId, actualLines, imgW, imgH])
+  }, [page, pageId, actualLines, listPageNum])
 
   const handleSave = useCallback(() => {
     doSave({ approved, rotation: currentRotation })
@@ -199,39 +233,38 @@ export function CuratePageScreen() {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   const navigateToPage = useCallback((targetPageId: string) => {
+    const targetIdx = effectiveListData?.items.findIndex(item => item.page_id === targetPageId) ?? -1
     navigate(`/curate/${targetPageId}`, {
       state: {
-        listPage: navState?.listPage,
-        listIdx: navState?.listIdx,
-        listData: navState?.listData,
+        listPage: listPageNum,
+        listIdx: targetIdx,
+        listData: effectiveListData,
         unapprovedOnly,
       },
     })
-  }, [navigate, navState, unapprovedOnly])
+  }, [navigate, listPageNum, effectiveListData, unapprovedOnly])
 
   const goPrev = useCallback(() => {
-    if (!navState?.listData) return
-    const items = navState.listData.items
-    const idx = navState.listIdx ?? 0
-    for (let i = idx - 1; i >= 0; i--) {
+    if (!effectiveListData) return
+    const items = effectiveListData.items
+    for (let i = effectiveListIdx - 1; i >= 0; i--) {
       if (!unapprovedOnly || !items[i].approved) {
         navigateToPage(items[i].page_id)
         return
       }
     }
-  }, [navState, unapprovedOnly, navigateToPage])
+  }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage])
 
   const goNext = useCallback(() => {
-    if (!navState?.listData) return
-    const items = navState.listData.items
-    const idx = navState.listIdx ?? 0
-    for (let i = idx + 1; i < items.length; i++) {
+    if (!effectiveListData) return
+    const items = effectiveListData.items
+    for (let i = effectiveListIdx + 1; i < items.length; i++) {
       if (!unapprovedOnly || !items[i].approved) {
         navigateToPage(items[i].page_id)
         return
       }
     }
-  }, [navState, unapprovedOnly, navigateToPage])
+  }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage])
 
   const approveSaveNext = useCallback(async () => {
     await doSave({ approved: true, rotation: currentRotation })
@@ -347,10 +380,10 @@ export function CuratePageScreen() {
 
           <div className={css.actionsSection}>
             <div className={css.btnRow}>
-              <button type="button" className={css.actionBtn} onClick={goPrev} disabled={!navState?.listData}>
+              <button type="button" className={css.actionBtn} onClick={goPrev} disabled={!effectiveListData}>
                 ← Prev <span className={css.keyHint}>←</span>
               </button>
-              <button type="button" className={css.actionBtn} onClick={goNext} disabled={!navState?.listData}>
+              <button type="button" className={css.actionBtn} onClick={goNext} disabled={!effectiveListData}>
                 Next → <span className={css.keyHint}>→</span>
               </button>
             </div>

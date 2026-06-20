@@ -103,6 +103,7 @@ export interface AdminDatasetDTO {
   page: number
   page_size: number
   total: number
+  approved_count: number
   total_pages: number
 }
 

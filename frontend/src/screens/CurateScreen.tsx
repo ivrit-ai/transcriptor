@@ -21,6 +21,8 @@ export function CurateScreen() {
 
   const rows = pageData?.items ?? []
   const totalPages = pageData?.total_pages ?? 1
+  const total = pageData?.total ?? 0
+  const approvedCount = pageData?.approved_count ?? 0
   const loading = isFetching && rows.length === 0
 
   const handleRowClick = (row: AdminDatasetDTO['items'][number], idx: number) => {
@@ -32,7 +34,14 @@ export function CurateScreen() {
   return (
     <div className={css.page}>
       <div className={css.header}>
-        <div className={css.title}>Curate Pages</div>
+        <div className={css.title}>
+          Curate Pages
+          {total > 0 && (
+            <span className={css.summary}>
+              — {total} pages, {approvedCount} approved
+            </span>
+          )}
+        </div>
         {totalPages > 1 && (
           <div className={css.pager}>
             <button
@@ -62,6 +71,12 @@ export function CurateScreen() {
 
       {!loading && (
         <div className={css.rowList}>
+          <div className={css.headerRow}>
+            <span className={css.colPageId}>Page ID</span>
+            <span className={css.colBatchId}>Batch ID</span>
+            <span className={css.colExternalId}>External ID</span>
+            <span className={css.colApproved}>Approved?</span>
+          </div>
           {rows.map((row, i) => (
             <button
               key={row.page_id}
@@ -69,12 +84,10 @@ export function CurateScreen() {
               className={css.row}
               onClick={() => handleRowClick(row, i)}
             >
-              {row.approved && (
-                <span className={css.approvedDot} title="Approved" aria-label="Approved" />
-              )}
-              <span className={css.rowId}>{row.page_external_id}</span>
-              <span className={css.rowBatch}>{row.batch_external_id}</span>
-              <span className={css.rowPath} title={row.image_path}>{row.image_path}</span>
+              <span className={css.colPageId}>{row.page_id}</span>
+              <span className={css.colBatchId}>{row.batch_id}</span>
+              <span className={css.colExternalId}>{row.page_external_id}</span>
+              <span className={css.colApproved}>{row.approved ? '✓' : '—'}</span>
             </button>
           ))}
           {rows.length === 0 && (

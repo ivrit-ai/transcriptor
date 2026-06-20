@@ -225,6 +225,9 @@ def admin_pages(
     offset = (page - 1) * page_size
 
     total: int = db.execute(select(func.count(Page.id))).scalar_one()
+    approved_count: int = db.execute(
+        select(func.count(Page.id)).where(Page.approved.is_(True))
+    ).scalar_one()
 
     rows = db.execute(
         select(
@@ -260,6 +263,7 @@ def admin_pages(
         "page": page,
         "page_size": page_size,
         "total": total,
+        "approved_count": approved_count,
         "total_pages": (total + page_size - 1) // page_size if page_size else 0,
     }
 
