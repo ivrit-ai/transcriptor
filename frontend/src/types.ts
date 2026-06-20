@@ -93,6 +93,8 @@ export interface AdminDatasetRowDTO {
   page_external_id: string
   image_path: string
   approved: boolean
+  approved_by: string | null
+  updated_at: string | null
   batch_id: string
   batch_external_id: string
   source: string

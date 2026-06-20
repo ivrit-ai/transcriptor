@@ -21,6 +21,17 @@ router = APIRouter()
 _COMPLETION_TARGET = 3
 
 
+@router.get("/curators")
+def curator_list(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict]:
+    rows = db.execute(
+        select(User.id, User.email).where(User.role.in_(["curator", "admin"]))
+    ).mappings().all()
+    return [{"user_id": str(r["id"]), "email": r["email"]} for r in rows]
+
+
 @router.get("/curator/check")
 def curator_check(
     _: Annotated[User, Depends(require_curator)],
@@ -235,6 +246,8 @@ def admin_pages(
             Page.external_id,
             Page.image_path,
             Page.approved,
+            Page.approved_by,
+            Page.updated_at,
             Batch.id.label("batch_id"),
             Batch.external_id.label("batch_external_id"),
             Batch.source,
@@ -251,6 +264,8 @@ def admin_pages(
             "page_external_id": r["external_id"],
             "image_path": r["image_path"],
             "approved": r["approved"],
+            "approved_by": str(r["approved_by"]) if r["approved_by"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
             "batch_id": str(r["batch_id"]),
             "batch_external_id": r["batch_external_id"],
             "source": r["source"],
@@ -349,6 +364,7 @@ def update_page_lines(
 
     if body.approved is not None:
         page.approved = body.approved
+        page.approved_by = _.id if body.approved else None
 
     update_line_ids: list[str] | None = None
 

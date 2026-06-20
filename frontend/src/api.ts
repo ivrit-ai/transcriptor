@@ -93,6 +93,9 @@ export const api = {
   getAdminPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
     request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
 
+  getCurators: (): Promise<Array<{ user_id: string; email: string }> | null> =>
+    request<Array<{ user_id: string; email: string }>>('/api/admin/curators'),
+
   getCuratorCheck: (): Promise<{ ok: boolean } | null> =>
     request<{ ok: boolean }>('/api/admin/curator/check'),
 

@@ -22,6 +22,7 @@ export const queryKeys = {
     coverage: ['admin', 'coverage'] as const,
     queue: ['admin', 'queue'] as const,
     curatorCheck: ['admin', 'curatorCheck'] as const,
+    curators: ['admin', 'curators'] as const,
     importStatus: ['admin', 'importStatus'] as const,
     importLogs: (tail: number) => ['admin', 'importLogs', tail] as const,
     pages: (page: number, pageSize: number) => ['admin', 'pages', page, pageSize] as const,

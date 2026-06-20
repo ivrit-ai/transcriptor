@@ -109,34 +109,50 @@
 .colPageId,
 .colBatchId,
 .colExternalId,
-.colApproved {
+.colApproved,
+.colApprovedBy,
+.colUpdatedAt {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .colPageId {
-  flex: 1 1 120px;
+  flex: 0 0 100px;
   min-width: 0;
   font-family: var(--font-mono, monospace);
   font-size: 12px;
 }
 
 .colBatchId {
-  flex: 1 1 120px;
+  flex: 0 0 100px;
   min-width: 0;
   font-family: var(--font-mono, monospace);
   font-size: 12px;
 }
 
 .colExternalId {
-  flex: 2 1 200px;
+  flex: 0 0 120px;
   min-width: 0;
 }
 
 .colApproved {
-  flex: 0 0 48px;
+  flex: 0 0 56px;
   text-align: center;
+}
+
+.colApprovedBy {
+  flex: 0 0 100px;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.colUpdatedAt {
+  flex: 0 0 160px;
+  min-width: 0;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
 }
 
 .empty {

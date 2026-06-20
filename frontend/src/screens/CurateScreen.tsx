@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
@@ -11,6 +11,17 @@ const PAGE_SIZE = 20
 export function CurateScreen() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+
+  const { data: curators } = useQuery({
+    queryKey: queryKeys.admin.curators,
+    queryFn: () => api.getCurators(),
+    staleTime: 5 * 60_000,
+  })
+  const curatorMap = useMemo(() => {
+    const m = new Map<string, string>()
+    if (curators) for (const c of curators) m.set(c.user_id, c.email)
+    return m
+  }, [curators])
 
   const { data: pageData, isFetching } = useQuery({
     queryKey: queryKeys.curate.pages(page, PAGE_SIZE),
@@ -76,6 +87,8 @@ export function CurateScreen() {
             <span className={css.colBatchId}>Batch ID</span>
             <span className={css.colExternalId}>External ID</span>
             <span className={css.colApproved}>Approved?</span>
+            <span className={css.colApprovedBy}>Approved By</span>
+            <span className={css.colUpdatedAt}>Updated</span>
           </div>
           {rows.map((row, i) => (
             <button
@@ -88,6 +101,8 @@ export function CurateScreen() {
               <span className={css.colBatchId}>{row.batch_id}</span>
               <span className={css.colExternalId}>{row.page_external_id}</span>
               <span className={css.colApproved}>{row.approved ? '✓' : '—'}</span>
+              <span className={css.colApprovedBy}>{curatorMap.get(row.approved_by ?? '') ?? row.approved_by ?? '—'}</span>
+              <span className={css.colUpdatedAt}>{row.updated_at ?? '—'}</span>
             </button>
           ))}
           {rows.length === 0 && (
