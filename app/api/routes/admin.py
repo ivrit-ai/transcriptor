@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
@@ -13,6 +14,7 @@ from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
 from app.services import import_runner
+from app.storage import resolve_image_url
 
 router = APIRouter()
 
@@ -162,6 +164,98 @@ def admin_coverage(
         }
         for r in rows
     ]
+
+
+@router.get("/pages")
+def admin_pages(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    """
+    Flat paginated list of manuscript pages ordered by (batch, page).
+    Each item carries its batch info for display.
+    """
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    offset = (page - 1) * page_size
+
+    total: int = db.execute(select(func.count(Page.id))).scalar_one()
+
+    rows = db.execute(
+        select(
+            Page.id,
+            Page.external_id,
+            Page.image_path,
+            Batch.id.label("batch_id"),
+            Batch.external_id.label("batch_external_id"),
+            Batch.source,
+        )
+        .join(Batch, Batch.id == Page.batch_id)
+        .order_by(Batch.external_id, Page.external_id)
+        .offset(offset)
+        .limit(page_size)
+    ).mappings().all()
+
+    items = [
+        {
+            "page_id": str(r["id"]),
+            "page_external_id": r["external_id"],
+            "image_path": r["image_path"],
+            "batch_id": str(r["batch_id"]),
+            "batch_external_id": r["batch_external_id"],
+            "source": r["source"],
+        }
+        for r in rows
+    ]
+
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": (total + page_size - 1) // page_size if page_size else 0,
+    }
+
+
+@router.get("/page_lines")
+def admin_page_lines(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+    page_id: str,
+) -> dict:
+    try:
+        pid = uuid.UUID(page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid page_id") from e
+
+    page = db.get(Page, pid)
+    if page is None:
+        raise HTTPException(status_code=404, detail="page not found")
+
+    lines = db.execute(
+        select(Line)
+        .where(Line.page_id == page.id)
+        .order_by(Line.line_index)
+    ).scalars().all()
+
+    return {
+        "page_id": str(page.id),
+        "external_id": page.external_id,
+        "image_url": resolve_image_url(page.image_path),
+        "width_px": page.width_px,
+        "height_px": page.height_px,
+        "lines": [
+            {
+                "id": str(line.id),
+                "line_index": line.line_index,
+                "bbox": line.bbox,
+                "transcription_count": line.transcription_count,
+            }
+            for line in lines
+        ],
+    }
 
 
 @router.get("/queue")

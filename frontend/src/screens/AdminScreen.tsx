@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../api'
 import type { AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportMode } from '../types'
+import { DatasetTab } from './DatasetTab'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
 const dateStr = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-type Tab = 'overview' | 'users' | 'coverage' | 'import'
+type Tab = 'overview' | 'users' | 'dataset' | 'coverage' | 'import'
 type SortDir = 'asc' | 'desc'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -630,6 +631,7 @@ export function AdminScreen() {
   const TABS: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: `Users${users.length ? ` (${users.length})` : ''}` },
+    { id: 'dataset', label: 'Dataset' },
     { id: 'coverage', label: 'Coverage & Queue' },
     { id: 'import', label: 'Import' },
   ]
@@ -660,6 +662,9 @@ export function AdminScreen() {
         )}
         {!loading && tab === 'users' && (
           <UsersTab users={users} />
+        )}
+        {tab === 'dataset' && (
+          <DatasetTab />
         )}
         {!loading && tab === 'coverage' && queue && (
           <CoverageTab coverage={coverage} queue={queue} />

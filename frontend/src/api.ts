@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO } from './types'
 
 const BASE = ''
 
@@ -86,4 +86,10 @@ export const api = {
 
   startImport: (body: ImportStartBody): Promise<ImportStatusDTO | null> =>
     request<ImportStatusDTO>('/api/admin/import', { method: 'POST', body: JSON.stringify(body) }),
+
+  getAdminPages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
+    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
+
+  getAdminPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
+    request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
 }

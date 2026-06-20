@@ -82,6 +82,41 @@ export interface AdminQueueDTO {
   batches_complete: number
 }
 
+// ── Dataset (admin page browser) DTOs ────────────────────────────────────────
+
+export interface AdminDatasetRowDTO {
+  page_id: string
+  page_external_id: string
+  image_path: string
+  batch_id: string
+  batch_external_id: string
+  source: string
+}
+
+export interface AdminDatasetDTO {
+  items: AdminDatasetRowDTO[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
+
+export interface AdminPageLineDTO {
+  id: string
+  line_index: number
+  bbox: BBox
+  transcription_count: number
+}
+
+export interface AdminPageLinesDTO {
+  page_id: string
+  external_id: string
+  image_url: string
+  width_px: number
+  height_px: number
+  lines: AdminPageLineDTO[]
+}
+
 // ── Import DTOs ───────────────────────────────────────────────────────────────
 
 export type ImportMode = 'local-folder' | 'default-s3' | 'custom-s3'
