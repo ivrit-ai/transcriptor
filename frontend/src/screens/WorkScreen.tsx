@@ -340,8 +340,37 @@ export function WorkScreen() {
     try { wrapRef.current?.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
   }
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); L.submit() }
+  const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
+  const canGoNext = nextEligibleIdx !== -1
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit: Shift+Enter
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault()
+      L.submit()
+      return
+    }
+    // Skip to next eligible line: Alt+ArrowDown
+    if (e.key === 'ArrowDown' && e.altKey) {
+      e.preventDefault()
+      if (canGoNext) L.goTo(nextEligibleIdx)
+      return
+    }
+    // Go back to previous annotated line: Alt+ArrowUp
+    if (e.key === 'ArrowUp' && e.altKey) {
+      e.preventDefault()
+      if (canGoBack) L.goTo(prevDoneIdx)
+      return
+    }
+    // Flag shortcuts: Ctrl+1 … Ctrl+4
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+      const digit = parseInt(e.key)
+      if (digit >= 1 && digit <= L.FLAG_REASONS.length) {
+        e.preventDefault()
+        L.flag(L.FLAG_REASONS[digit - 1].kind)
+        return
+      }
+    }
   }
 
   const isDragging = !!drag.current
@@ -556,18 +585,33 @@ export function WorkScreen() {
           className="tl-reason-inline"
           onClick={() => L.goTo(prevDoneIdx)}
           disabled={!canGoBack}
-          title="חזרה לשורה הקודמת"
+          title="חזרה לשורה הקודמת (Alt+↑)"
           style={{ opacity: canGoBack ? 1 : 0.35 }}
         >
           <Icon name="back" size={13} color="var(--tl-muted)" />
         </button>
-        {L.FLAG_REASONS.map((r) => (
+        {canGoNext && (
+          <button
+            className="tl-reason-inline"
+            onClick={() => L.goTo(nextEligibleIdx)}
+            title="דלג לשורה הבאה (Alt+↓)"
+            style={{ opacity: 0.7 }}
+          >
+            <Icon name="forward" size={13} color="var(--tl-muted)" />
+          </button>
+        )}
+        {L.FLAG_REASONS.map((r, i) => (
           <button
             key={r.kind}
             className="tl-reason-inline"
             onClick={() => L.flag(r.kind)}
+            title={`${r.label} (Ctrl+${i + 1})`}
           >
             {r.label}
+            <span style={{
+              marginRight: 5, fontSize: 10, opacity: 0.55,
+              fontFamily: 'var(--font-ui)', letterSpacing: 0,
+            }}>^{i + 1}</span>
           </button>
         ))}
       </div>
@@ -581,7 +625,7 @@ export function WorkScreen() {
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
-          <span className="tl-kbd">Enter</span>
+          <span className="tl-kbd">⇧ Enter</span>
         </button>
       </div>
     </div>
