@@ -518,21 +518,13 @@ export function WorkScreen() {
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
         fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
       }}>
-        {L.editing ? (
+        {L.editing && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600,
             color: 'oklch(0.5 0.08 250)',
             background: 'oklch(0.6 0.08 250 / 0.12)',
             padding: '2px 9px', borderRadius: 999,
           }}>עריכת השורה שלך</span>
-        ) : (
-          <span>
-            תמלול{' '}
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>
-              {L.current?.transcription_count ?? 0}
-            </span>{' '}מתוך{' '}
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>3</span>
-          </span>
         )}
       </label>
 

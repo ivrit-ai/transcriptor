@@ -34,12 +34,6 @@ export function LineStrip({ line, pageDims, imageUrl, role, displayHeight }: Lin
         role="img"
         aria-label={`שורה ${line.line_index + 1}`}
       />
-      {role === 'active' && (
-        <div className={styles.label}>
-          תמלול <span dir="ltr">{line.transcription_count}</span> מתוך{' '}
-          <span dir="ltr">3</span>
-        </div>
-      )}
     </div>
   )
 }
