@@ -164,6 +164,77 @@ function Skeleton({ top, sideM, pageH }: { top: number; sideM: number; pageH: nu
   )
 }
 
+// ── Navigation confirm dialog ─────────────────────────────────────────────────
+function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel }: {
+  onSubmitAndMove: () => void
+  onMoveOnly: () => void
+  onCancel: () => void
+}) {
+  const firstRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { firstRef.current?.focus() }, [])
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-label="מעבר לשורה"
+      onClick={onCancel}
+      style={{
+        position: 'absolute', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(30,22,12,0.45)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--tl-surface)',
+          border: '0.5px solid var(--tl-border)',
+          borderRadius: 16,
+          boxShadow: '0 12px 40px rgba(30,22,12,0.22)',
+          padding: '22px 24px 18px',
+          maxWidth: 320, width: '90%',
+          fontFamily: 'var(--font-ui)',
+          textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+        }}
+      >
+        <div style={{ fontSize: 14, color: 'var(--tl-ink)', fontWeight: 500, lineHeight: 1.5 }}>
+          יש טקסט בתיבה — מה לעשות לפני המעבר?
+        </div>
+        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          <button
+            ref={firstRef}
+            onClick={onSubmitAndMove}
+            style={{
+              flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+              color: '#fff', background: 'var(--tl-accent)',
+            }}
+          >שלח ועבור</button>
+          <button
+            onClick={onMoveOnly}
+            style={{
+              flex: 1, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+              color: 'var(--tl-ink)',
+              background: 'var(--tl-muted-fill)',
+              border: '0.5px solid var(--tl-border)',
+            }}
+          >עבור בלי לשלוח</button>
+        </div>
+        <button
+          onClick={onCancel}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
+          }}
+        >ביטול</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export function WorkScreen() {
   const navigate = useNavigate()
@@ -182,6 +253,7 @@ export function WorkScreen() {
   // Track full viewport width separately — box.w measures the image column in wide mode,
   // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
+  const [pendingNavIdx, setPendingNavIdx] = useState<number | null>(null)
 
   const wide = viewportW >= 960
 
@@ -343,6 +415,29 @@ export function WorkScreen() {
   const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   const canGoNext = nextEligibleIdx !== -1
 
+  const handleLineClick = useCallback((i: number) => {
+    if (i === L.cursor) return
+    if (L.input.trim()) {
+      setPendingNavIdx(i)
+    } else {
+      L.goTo(i)
+    }
+  }, [L.cursor, L.input, L.goTo])
+
+  const confirmSubmitAndNav = useCallback(() => {
+    if (pendingNavIdx === null) return
+    const target = pendingNavIdx
+    setPendingNavIdx(null)
+    L.submit()
+    L.goTo(target)
+  }, [pendingNavIdx, L.submit, L.goTo])
+
+  const confirmMoveOnly = useCallback(() => {
+    if (pendingNavIdx === null) return
+    L.goTo(pendingNavIdx)
+    setPendingNavIdx(null)
+  }, [pendingNavIdx, L.goTo])
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Shift+Enter
     if (e.key === 'Enter' && e.shiftKey) {
@@ -422,15 +517,22 @@ export function WorkScreen() {
           const oh = line.bbox.h * displayScale
           const done = line.status === 'done_by_you' || line.status === 'flagged'
           return (
-            <div key={line.id} style={{
-              position: 'absolute', left: ox, top: oy, width: ow, height: oh,
-              border: done
-                ? '1.5px solid rgba(80,210,130,0.7)'
-                : '1.5px solid rgba(255,210,120,0.6)',
-              borderRadius: 2,
-              pointerEvents: 'none',
-              transition: spotTransition,
-            }} />
+            <div
+              key={line.id}
+              onClick={(e) => { e.stopPropagation(); handleLineClick(i) }}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={`שורה ${i + 1}`}
+              style={{
+                position: 'absolute', left: ox, top: oy, width: ow, height: oh,
+                border: done
+                  ? '1.5px solid rgba(80,210,130,0.7)'
+                  : '1.5px solid rgba(255,210,120,0.6)',
+                borderRadius: 2,
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                transition: spotTransition,
+              }}
+            />
           )
         })}
 
@@ -681,6 +783,13 @@ export function WorkScreen() {
       <SaveToastBadge toast={L.toast} />
       {L.finished && (
         <FinishedOverlay daily={L.daily} done={L.done} onContinue={L.reset} />
+      )}
+      {pendingNavIdx !== null && (
+        <NavConfirmDialog
+          onSubmitAndMove={confirmSubmitAndNav}
+          onMoveOnly={confirmMoveOnly}
+          onCancel={() => setPendingNavIdx(null)}
+        />
       )}
     </div>
   )
