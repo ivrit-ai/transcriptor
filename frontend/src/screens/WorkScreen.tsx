@@ -178,6 +178,7 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel }: {
       aria-modal
       aria-label="מעבר לשורה"
       onClick={onCancel}
+      onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
       style={{
         position: 'absolute', inset: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -415,7 +416,7 @@ export function WorkScreen() {
   const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   const canGoNext = nextEligibleIdx !== -1
 
-  const handleLineClick = useCallback((i: number) => {
+  const navigateTo = useCallback((i: number) => {
     if (i === L.cursor) return
     if (L.input.trim()) {
       setPendingNavIdx(i)
@@ -428,9 +429,9 @@ export function WorkScreen() {
     if (pendingNavIdx === null) return
     const target = pendingNavIdx
     setPendingNavIdx(null)
-    L.submit()
+    if (L.input.trim()) L.submit()
     L.goTo(target)
-  }, [pendingNavIdx, L.submit, L.goTo])
+  }, [pendingNavIdx, L.input, L.submit, L.goTo])
 
   const confirmMoveOnly = useCallback(() => {
     if (pendingNavIdx === null) return
@@ -448,18 +449,19 @@ export function WorkScreen() {
     // Skip to next eligible line: Alt+ArrowDown
     if (e.key === 'ArrowDown' && e.altKey) {
       e.preventDefault()
-      if (canGoNext) L.goTo(nextEligibleIdx)
+      if (canGoNext) navigateTo(nextEligibleIdx)
       return
     }
     // Go back to previous annotated line: Alt+ArrowUp
     if (e.key === 'ArrowUp' && e.altKey) {
       e.preventDefault()
-      if (canGoBack) L.goTo(prevDoneIdx)
+      if (canGoBack) navigateTo(prevDoneIdx)
       return
     }
-    // Flag shortcuts: Ctrl+1 … Ctrl+4
+    // Flag shortcuts: Ctrl+1 … Ctrl+4 (main keyboard and numpad)
     if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
-      const digit = parseInt(e.key)
+      const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)
+      const digit = m ? parseInt(m[1], 10) : NaN
       if (digit >= 1 && digit <= L.FLAG_REASONS.length) {
         e.preventDefault()
         L.flag(L.FLAG_REASONS[digit - 1].kind)
@@ -519,8 +521,8 @@ export function WorkScreen() {
           return (
             <div
               key={line.id}
-              onClick={(e) => { e.stopPropagation(); handleLineClick(i) }}
-              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); navigateTo(i) }}
+              onPointerDown={(e) => { if (e.pointerType !== 'touch') e.stopPropagation() }}
               title={`שורה ${i + 1}`}
               style={{
                 position: 'absolute', left: ox, top: oy, width: ow, height: oh,
@@ -588,7 +590,7 @@ export function WorkScreen() {
         <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
-        <ImmTicks lines={L.lines} cursor={L.cursor} onJump={L.goTo} />
+        <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ZoomControls zoom={zoom} onChange={changeZoom} />
           <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
@@ -685,7 +687,7 @@ export function WorkScreen() {
         {/* Go back to last annotated line */}
         <button
           className="tl-reason-inline"
-          onClick={() => L.goTo(prevDoneIdx)}
+          onClick={() => navigateTo(prevDoneIdx)}
           disabled={!canGoBack}
           title="חזרה לשורה הקודמת (Alt+↑)"
           style={{ opacity: canGoBack ? 1 : 0.35 }}
@@ -695,7 +697,7 @@ export function WorkScreen() {
         {canGoNext && (
           <button
             className="tl-reason-inline"
-            onClick={() => L.goTo(nextEligibleIdx)}
+            onClick={() => navigateTo(nextEligibleIdx)}
             title="דלג לשורה הבאה (Alt+↓)"
             style={{ opacity: 0.7 }}
           >
@@ -710,7 +712,7 @@ export function WorkScreen() {
             title={`${r.label} (Ctrl+${i + 1})`}
           >
             {r.label}
-            <span style={{
+            <span dir="ltr" style={{
               marginRight: 5, fontSize: 10, opacity: 0.55,
               fontFamily: 'var(--font-ui)', letterSpacing: 0,
             }}>^{i + 1}</span>

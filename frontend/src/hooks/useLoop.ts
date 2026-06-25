@@ -242,6 +242,7 @@ export function useLoop(): LoopState {
   const goTo = useCallback((i: number) => {
     const current = linesRef.current
     if (i < 0 || i >= current.length) return
+    setFinished(false)
     setCursor(i)
     const l = current[i]
     setInput(l.status === 'done_by_you' ? (l.your_text ?? '') : '')
