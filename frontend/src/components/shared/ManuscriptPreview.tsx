@@ -15,26 +15,50 @@ interface ManuscriptPreviewProps {
   lineIndex?: number
   tilt?: boolean
   customBbox?: BBox
+  // Real-folio overrides — when omitted, falls back to the bundled sample page.
+  imageUrl?: string
+  pageWidthPx?: number
+  pageHeightPx?: number
+  rotation?: number
 }
 
-export function ManuscriptPreview({ width = 460, tilt = true, customBbox }: ManuscriptPreviewProps) {
-  const scale = width / SAMPLE_PAGE.width_px
+export function ManuscriptPreview({
+  width = 460,
+  tilt = true,
+  customBbox,
+  imageUrl,
+  pageWidthPx,
+  pageHeightPx,
+  rotation = 0,
+}: ManuscriptPreviewProps) {
+  const src = imageUrl ?? SAMPLE_PAGE.image_url
+  const pageWidth = pageWidthPx ?? SAMPLE_PAGE.width_px
+  const pageHeight = pageHeightPx ?? SAMPLE_PAGE.height_px
+  const scale = width / pageWidth
+  // The dimmed folio height is derived from the source aspect ratio so that the
+  // bbox overlay (in page-pixel space) lines up regardless of page proportions.
+  const height = pageHeight * scale
   const b = customBbox ?? SPOTLIGHT_BBOX
+
+  const tiltDeg = tilt ? -1.4 : 0
+  const transform = `rotate(${tiltDeg + rotation}deg)`
 
   return (
     <div style={{
       position: 'relative',
       width,
-      transform: tilt ? 'rotate(-1.4deg)' : 'none',
+      transform,
       flexShrink: 0,
     }}>
       {/* Dimmed full folio */}
       <img
-        src={SAMPLE_PAGE.image_url}
+        src={src}
         alt=""
         draggable={false}
         style={{
           width,
+          height,
+          objectFit: 'cover',
           display: 'block',
           borderRadius: 8,
           boxShadow: '0 18px 50px rgba(40,30,20,0.26)',
@@ -54,7 +78,7 @@ export function ManuscriptPreview({ width = 460, tilt = true, customBbox }: Manu
         boxShadow: '0 0 0 2.5px var(--tl-spotlight), 0 0 24px 3px var(--tl-spotlight-glow)',
       }}>
         <img
-          src={SAMPLE_PAGE.image_url}
+          src={src}
           alt=""
           draggable={false}
           style={{
@@ -62,6 +86,8 @@ export function ManuscriptPreview({ width = 460, tilt = true, customBbox }: Manu
             left: -b.x * scale,
             top: -b.y * scale,
             width,
+            height,
+            objectFit: 'cover',
             maxWidth: 'none',
             display: 'block',
           }}

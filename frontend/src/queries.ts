@@ -14,7 +14,7 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   whoami: ['auth', 'whoami'] as const,
   session: { next: ['session', 'next'] as const },
-  profile: { me: ['profile', 'me'] as const },
+  profile: { me: ['profile', 'me'] as const, documents: ['profile', 'documents'] as const },
   community: { stats: ['community', 'stats'] as const },
   admin: {
     stats: ['admin', 'stats'] as const,

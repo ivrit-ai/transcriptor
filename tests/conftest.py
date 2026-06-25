@@ -105,9 +105,11 @@ def make_batch(session, external_id="batch-1", source="src", license_="cc0"):
     return b
 
 
-def make_page(session, batch, external_id="page-1", image_path="p1.jpg", w=800, h=1200):
+def make_page(session, batch, external_id="page-1", image_path="p1.jpg", w=800, h=1200,
+              document_name=None):
     p = Page(batch_id=batch.id, external_id=external_id, image_path=image_path,
-             width_px=w, height_px=h)
+             width_px=w, height_px=h,
+             document_name=document_name or external_id.split(":")[0])
     session.add(p)
     session.flush()
     return p

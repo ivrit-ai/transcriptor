@@ -7,7 +7,10 @@ import type { ProfileDTO } from '../api'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
-const FALLBACK: ProfileDTO = { name: '', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0 }
+const FALLBACK: ProfileDTO = {
+  name: '', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0,
+  documents: 0, joined_at: new Date().toISOString(), daily: [],
+}
 
 function CaughtUpStats({ isMobile, profile }: { isMobile?: boolean; profile: ProfileDTO }) {
   const items = [
