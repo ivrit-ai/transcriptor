@@ -306,6 +306,28 @@ body {
 .tl-reason-inline:hover { background: var(--tl-muted-fill); color: var(--tl-ink); }
 .tl-reason-inline:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
 
+/* ── Zoom buttons (header bar) ── */
+.tl-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--tl-muted);
+  font-family: var(--font-ui);
+  min-width: 32px;
+  min-height: 32px;
+  transition: background 0.12s, color 0.12s;
+}
+.tl-zoom-btn:hover { background: var(--tl-muted-fill); color: var(--tl-ink); }
+.tl-zoom-btn:active { background: color-mix(in srgb, var(--tl-muted-fill) 70%, var(--tl-border)); }
+.tl-zoom-btn:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 2px; }
+
 /* ── Animations ── */
 @keyframes tlpulse {
   0%, 100% { opacity: 1; }

@@ -44,28 +44,23 @@ function ImmTicks({ lines, cursor, onJump }: {
 function ZoomControls({ zoom, onChange }: { zoom: number; onChange: (z: number) => void }) {
   const pct = Math.round(zoom * 100)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 1 }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       <button
+        className="tl-zoom-btn"
         onClick={() => onChange(Math.max(MIN_ZOOM, zoom - 0.25))}
-        title="התקרב פחות"
-        style={{
-          border: 'none', background: 'transparent', cursor: 'pointer',
-          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
-          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
-        }}
+        title="הקטן תצוגה  •  Ctrl + גלגל למטה"
       >−</button>
       <span style={{
         fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
-        minWidth: 34, textAlign: 'center',
+        minWidth: 34, textAlign: 'center', userSelect: 'none',
       }}>{pct}%</span>
       <button
+        className="tl-zoom-btn"
         onClick={() => onChange(Math.min(MAX_ZOOM, zoom + 0.25))}
-        title="התקרב יותר"
-        style={{
-          border: 'none', background: 'transparent', cursor: 'pointer',
-          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
-          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
-        }}
+        title="הגדל תצוגה  •  Ctrl + גלגל למעלה"
       >+</button>
     </div>
   )
