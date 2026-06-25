@@ -44,8 +44,12 @@ def _query_leaderboard(session: Session, since: datetime | None = None) -> list[
 
 
 def _compute_streak(active_days: set[date], today: date) -> int:
+    # For the hall of fame, a streak is still alive if the user was active
+    # yesterday but hasn't transcribed yet today (it's only broken once they
+    # miss a full calendar day).
+    start = today if today in active_days else today - timedelta(days=1)
     streak = 0
-    cursor = today
+    cursor = start
     while cursor in active_days:
         streak += 1
         cursor -= timedelta(days=1)

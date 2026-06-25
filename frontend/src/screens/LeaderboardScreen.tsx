@@ -81,7 +81,7 @@ function RankList({ period }: { period: Period }) {
     <div style={{ borderRadius: 14, border: '0.5px solid var(--tl-border)', overflow: 'hidden', background: 'var(--tl-surface)' }}>
       {visible.map((entry, i) => (
         <div
-          key={entry.display_name}
+          key={i}
           style={{
             display: 'flex', alignItems: 'center', gap: 14,
             padding: '14px 18px',
@@ -159,9 +159,9 @@ function StreakHallOfFame() {
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {entries.map((entry) => (
+          {entries.map((entry, i) => (
             <div
-              key={entry.display_name}
+              key={i}
               style={{
                 background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
                 borderRadius: 14, padding: '16px 18px', minWidth: 130,
@@ -216,7 +216,7 @@ export function LeaderboardScreen() {
           מצטיינים
         </h1>
         <p style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', margin: '0 0 28px' }}>
-          מי תרגם הכי הרבה שורות מכתב יד
+          מי תעתק הכי הרבה שורות מכתב יד
         </p>
 
         {/* Period toggle */}

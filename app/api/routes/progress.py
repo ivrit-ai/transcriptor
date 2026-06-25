@@ -14,7 +14,7 @@ from app.storage import resolve_image_url
 
 router = APIRouter()
 
-_DAILY_GOAL = 150  # placeholder until per-user goals are stored
+_DAILY_GOAL = 30  # placeholder until per-user goals are stored
 _DAILY_WINDOW_DAYS = 70  # ≈10 weeks of heatmap history
 _DOCUMENTS_LIMIT = 60
 
