@@ -1,7 +1,7 @@
 """add approved column to pages (datasource curation)
 
-Revision ID: 0005
-Revises: 0004
+Revision ID: 0005b
+Revises: 0005
 Create Date: 2026-06-20 00:00:00.000000
 
 """
@@ -10,8 +10,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0005"
-down_revision: Union[str, None] = "0004"
+revision: str = "0005b"
+down_revision: Union[str, None] = "0005"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
