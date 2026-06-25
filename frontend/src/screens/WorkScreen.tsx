@@ -299,13 +299,12 @@ export function WorkScreen() {
   // Close "אחר" input when moving to a new line
   useEffect(() => { setOtherOpen(false); setOtherText('') }, [L.cursor])
 
-  // ── Go-back: find the last line this user annotated before the current cursor ─
+  // ── Go-back: find the last annotated line before cursor (for Alt+↑ shortcut) ─
   let prevDoneIdx = -1
   for (let i = L.cursor - 1; i >= 0; i--) {
     const s = L.lines[i]?.status
     if (s === 'done_by_you' || s === 'flagged') { prevDoneIdx = i; break }
   }
-  const canGoBack = prevDoneIdx >= 0
 
   // ── Layout math ──────────────────────────────────────────────────────────────
   const sideM = window.innerWidth < 768 ? 14 : 26
@@ -422,7 +421,11 @@ export function WorkScreen() {
     : null
 
   const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
-  const canGoNext = nextEligibleIdx !== -1
+  // Buttons navigate to any adjacent line; keyboard shortcuts skip to eligible/annotated
+  const prevIdx = L.cursor - 1
+  const nextIdx = L.cursor + 1
+  const canGoBack = prevIdx >= 0
+  const canGoNext = nextIdx < L.lines.length
 
   const inputChanged = L.input.trim() !== (L.current?.your_text ?? '').trim()
 
@@ -703,9 +706,9 @@ export function WorkScreen() {
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
           <button
             className="tl-reason-inline"
-            onClick={() => navigateTo(prevDoneIdx)}
+            onClick={() => navigateTo(prevIdx)}
             disabled={!canGoBack}
-            title="חזרה לשורה הקודמת (Alt+↑)"
+            title="שורה קודמת (Alt+↑)"
             style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
             <Icon name="back" size={13} color="var(--tl-muted)" />
@@ -713,9 +716,9 @@ export function WorkScreen() {
           </button>
           <button
             className="tl-reason-inline"
-            onClick={() => navigateTo(nextEligibleIdx)}
+            onClick={() => navigateTo(nextIdx)}
             disabled={!canGoNext}
-            title="דלג לשורה הבאה (Alt+↓)"
+            title="שורה הבאה (Alt+↓)"
             style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
           >
             הבא
