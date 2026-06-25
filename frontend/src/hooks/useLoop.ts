@@ -14,6 +14,7 @@ export interface LoopLine {
   status: LoopLineStatus
   transcription_count: number
   your_text?: string
+  prior_kind?: string
 }
 
 export interface LoopPage {
@@ -29,14 +30,14 @@ export type SaveToastKind = 'retry' | 'error'
 export interface SaveToast { kind: SaveToastKind }
 
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
-  { kind: 'bad_crop',   label: 'תמונה חתוכה'       },
-  { kind: 'not_hebrew', label: 'לא עברית'           },
-  { kind: 'not_text',   label: 'לא טקסט'            },
-  { kind: 'cant_read',  label: 'לא מצליח לקרוא'    },
+  { kind: 'cant_read', label: 'טקסט לא ברור'  },
+  { kind: 'not_text',  label: 'לא טקסט'       },
+  { kind: 'bad_crop',  label: 'התמונה חתוכה'  },
+  { kind: 'other',     label: 'אחר'           },
 ]
 
 function linesFromDTO(dto: SessionDTO): LoopLine[] {
-  return dto.lines.map((l) => ({ ...l }))
+  return dto.lines.map((l) => ({ ...l, your_text: l.prior_text }))
 }
 
 function firstEligibleIdx(lines: LoopLine[]): number {
@@ -65,7 +66,7 @@ export interface LoopState {
   input: string
   setInput: (v: string) => void
   submit: () => void
-  flag: (kind: FlagKind) => void
+  flag: (kind: FlagKind, text?: string) => void
   goTo: (i: number) => void
   reset: () => void
   daily: number
@@ -166,7 +167,7 @@ export function useLoop(): LoopState {
 
     const idx = cursor
     const line = linesRef.current[idx]
-    if (!line) return
+    if (!line || line.status === 'full') return
 
     const isEdit = line.status === 'done_by_you'
 
@@ -193,17 +194,17 @@ export function useLoop(): LoopState {
   }, [input, cursor, submitMutation, advance])
 
   const flag = useCallback(
-    (kind: FlagKind) => {
+    (kind: FlagKind, text?: string) => {
       const idx = cursor
       const line = linesRef.current[idx]
-      if (!line) return
+      if (!line || line.status === 'full') return
 
       setLines((ls) =>
-        ls.map((l, i) => (i === idx ? { ...l, status: 'flagged' } : l))
+        ls.map((l, i) => (i === idx ? { ...l, status: 'flagged', prior_kind: kind } : l))
       )
       setDone((d) => d + 1)
 
-      submitMutation.mutate({ lineId: line.id, body: { kind } })
+      submitMutation.mutate({ lineId: line.id, body: { kind, text } })
       advance(idx)
     },
     [cursor, submitMutation, advance]
@@ -212,6 +213,7 @@ export function useLoop(): LoopState {
   const goTo = useCallback((i: number) => {
     const current = linesRef.current
     if (i < 0 || i >= current.length) return
+    setFinished(false)
     setCursor(i)
     const l = current[i]
     setInput(l.status === 'done_by_you' ? (l.your_text ?? '') : '')

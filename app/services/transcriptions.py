@@ -23,6 +23,8 @@ def _validate_kind_text(kind: TranscriptionKind, text: str | None) -> None:
     if kind == TranscriptionKind.text:
         if not text or not text.strip():
             raise ValueError("kind=text requires non-empty text")
+    elif kind == TranscriptionKind.other:
+        pass  # text is optional — annotator may supply a freeform reason
     else:
         if text:
             raise ValueError(f"kind={kind.value} must have no text")

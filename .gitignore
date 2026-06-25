@@ -1,5 +1,6 @@
 # Environment
 .env
+frontend/.env.local
 
 # Logs
 *.log

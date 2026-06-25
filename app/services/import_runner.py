@@ -22,13 +22,35 @@ as best-effort (it may be cleaned up by the OS at any time).
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import subprocess
 import tempfile
 import threading
 from dataclasses import dataclass
+
+try:
+    import fcntl as _fcntl
+
+    def _lock_acquire(fd) -> None:
+        _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+
+    def _lock_release(fd) -> None:
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+
+except ImportError:
+    # Windows fallback: use a process-level threading lock (good enough for local dev)
+    _win_lock = threading.Lock()
+
+    def _lock_acquire(fd) -> None:  # type: ignore[misc]
+        if not _win_lock.acquire(blocking=False):
+            raise BlockingIOError("lock held")
+
+    def _lock_release(fd) -> None:  # type: ignore[misc]
+        try:
+            _win_lock.release()
+        except RuntimeError:
+            pass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -361,7 +383,7 @@ def start_import(
     lock_fd = open(LOCK_PATH, "w")
     try:
         try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _lock_acquire(lock_fd)
         except BlockingIOError:
             raise ImportAlreadyRunning(
                 "An import is already running (lock held)"
@@ -416,5 +438,5 @@ def start_import(
     finally:
         # Release the lock and close the fd.  The lock is only needed during
         # check-and-spawn; the subprocess runs freely afterwards.
-        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        _lock_release(lock_fd)
         lock_fd.close()

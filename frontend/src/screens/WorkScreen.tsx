@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
-import { Icon } from '../components/shared'
+import { Icon, TopNav } from '../components/shared'
 
 const EASE = 'cubic-bezier(.3,.8,.3,1)'
 const MIN_ZOOM = 0.5
@@ -44,28 +44,23 @@ function ImmTicks({ lines, cursor, onJump }: {
 function ZoomControls({ zoom, onChange }: { zoom: number; onChange: (z: number) => void }) {
   const pct = Math.round(zoom * 100)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 1 }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       <button
+        className="tl-zoom-btn"
         onClick={() => onChange(Math.max(MIN_ZOOM, zoom - 0.25))}
-        title="התקרב פחות"
-        style={{
-          border: 'none', background: 'transparent', cursor: 'pointer',
-          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
-          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
-        }}
+        title="הקטן תצוגה  •  Ctrl + גלגל למטה"
       >−</button>
       <span style={{
         fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
-        minWidth: 34, textAlign: 'center',
+        minWidth: 34, textAlign: 'center', userSelect: 'none',
       }}>{pct}%</span>
       <button
+        className="tl-zoom-btn"
         onClick={() => onChange(Math.min(MAX_ZOOM, zoom + 0.25))}
-        title="התקרב יותר"
-        style={{
-          border: 'none', background: 'transparent', cursor: 'pointer',
-          padding: '4px 7px', borderRadius: 6, fontSize: 16, lineHeight: 1,
-          color: 'var(--tl-muted)', fontFamily: 'var(--font-ui)',
-        }}
+        title="הגדל תצוגה  •  Ctrl + גלגל למעלה"
       >+</button>
     </div>
   )
@@ -164,6 +159,79 @@ function Skeleton({ top, sideM, pageH }: { top: number; sideM: number; pageH: nu
   )
 }
 
+// ── Navigation confirm dialog ─────────────────────────────────────────────────
+function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
+  onSubmitAndMove: () => void
+  onMoveOnly: () => void
+  onCancel: () => void
+  message?: string
+}) {
+  const firstRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { firstRef.current?.focus() }, [])
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-label="מעבר לשורה"
+      onClick={onCancel}
+      onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
+      style={{
+        position: 'absolute', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(30,22,12,0.45)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--tl-surface)',
+          border: '0.5px solid var(--tl-border)',
+          borderRadius: 16,
+          boxShadow: '0 12px 40px rgba(30,22,12,0.22)',
+          padding: '22px 24px 18px',
+          maxWidth: 320, width: '90%',
+          fontFamily: 'var(--font-ui)',
+          textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+        }}
+      >
+        <div style={{ fontSize: 14, color: 'var(--tl-ink)', fontWeight: 500, lineHeight: 1.5 }}>
+          {message ?? 'יש טקסט בתיבה — מה לעשות לפני המעבר?'}
+        </div>
+        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          <button
+            ref={firstRef}
+            onClick={onSubmitAndMove}
+            style={{
+              flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+              color: '#fff', background: 'var(--tl-accent)',
+            }}
+          >שלח ועבור</button>
+          <button
+            onClick={onMoveOnly}
+            style={{
+              flex: 1, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+              color: 'var(--tl-ink)',
+              background: 'var(--tl-muted-fill)',
+              border: '0.5px solid var(--tl-border)',
+            }}
+          >עבור בלי לשלוח</button>
+        </div>
+        <button
+          onClick={onCancel}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
+          }}
+        >ביטול</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export function WorkScreen() {
   const navigate = useNavigate()
@@ -182,6 +250,11 @@ export function WorkScreen() {
   // Track full viewport width separately — box.w measures the image column in wide mode,
   // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
+  const [pendingNavIdx, setPendingNavIdx] = useState<number | null>(null)
+  const [skipPagePending, setSkipPagePending] = useState(false)
+  const [otherOpen, setOtherOpen] = useState(false)
+  const [otherText, setOtherText] = useState('')
+  const otherInputRef = useRef<HTMLInputElement>(null)
 
   const wide = viewportW >= 960
 
@@ -220,17 +293,20 @@ export function WorkScreen() {
       taRef.current?.focus()
     }
   }, [L.cursor, L.finished, L.loading])
+  // Auto-focus the "אחר" input when it opens
+  useEffect(() => { if (otherOpen) otherInputRef.current?.focus() }, [otherOpen])
 
   // Snap back to line (reset pan) when cursor advances
   useEffect(() => { setPeek(0); setOffsetX(0) }, [L.cursor])
+  // Close "אחר" input when moving to a new line
+  useEffect(() => { setOtherOpen(false); setOtherText('') }, [L.cursor])
 
-  // ── Go-back: find the last line this user annotated before the current cursor ─
+  // ── Go-back: find the last annotated line before cursor (for Alt+↑ shortcut) ─
   let prevDoneIdx = -1
   for (let i = L.cursor - 1; i >= 0; i--) {
     const s = L.lines[i]?.status
     if (s === 'done_by_you' || s === 'flagged') { prevDoneIdx = i; break }
   }
-  const canGoBack = prevDoneIdx >= 0
 
   // ── Layout math ──────────────────────────────────────────────────────────────
   const sideM = window.innerWidth < 768 ? 14 : 26
@@ -357,8 +433,92 @@ export function WorkScreen() {
     try { wrapRef.current?.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
   }
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); L.submit() }
+  // Which flag (if any) was previously applied to the current line
+  const activeFlagKind = (L.current?.status === 'flagged' || L.current?.status === 'done_by_you')
+    && L.current?.prior_kind && L.current.prior_kind !== 'text'
+    ? L.current.prior_kind
+    : null
+
+  const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
+  // Buttons navigate to any adjacent line; keyboard shortcuts skip to eligible/annotated
+  const prevIdx = L.cursor - 1
+  const nextIdx = L.cursor + 1
+  const canGoBack = prevIdx >= 0
+  const canGoNext = nextIdx < L.lines.length
+
+  // Refs so navigateTo/handleSkipPage don't reconstruct on every keystroke
+  const inputRef = useRef(L.input)
+  const currentRef = useRef(L.current)
+  inputRef.current = L.input
+  currentRef.current = L.current
+
+  const navigateTo = useCallback((i: number) => {
+    if (i === L.cursor) return
+    const changed = inputRef.current.trim() !== (currentRef.current?.your_text ?? '').trim()
+    if (changed) {
+      setPendingNavIdx(i)
+    } else {
+      L.goTo(i)
+    }
+  }, [L.cursor, L.goTo])
+
+  const confirmSubmitAndNav = useCallback(() => {
+    if (pendingNavIdx === null) return
+    const target = pendingNavIdx
+    setPendingNavIdx(null)
+    if (inputRef.current.trim()) L.submit()
+    L.goTo(target)
+  }, [pendingNavIdx, L.submit, L.goTo])
+
+  const confirmMoveOnly = useCallback(() => {
+    if (pendingNavIdx === null) return
+    L.goTo(pendingNavIdx)
+    setPendingNavIdx(null)
+  }, [pendingNavIdx, L.goTo])
+
+  const handleSkipPage = useCallback(() => {
+    const changed = inputRef.current.trim() !== (currentRef.current?.your_text ?? '').trim()
+    if (changed && inputRef.current.trim()) {
+      setSkipPagePending(true)
+    } else {
+      L.reset()
+    }
+  }, [L.reset])
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit: Shift+Enter
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault()
+      L.submit()
+      return
+    }
+    // Skip to next eligible line: Alt+ArrowDown
+    if (e.key === 'ArrowDown' && e.altKey) {
+      e.preventDefault()
+      if (nextEligibleIdx !== -1) navigateTo(nextEligibleIdx)
+      return
+    }
+    // Go back to previous annotated line: Alt+ArrowUp
+    if (e.key === 'ArrowUp' && e.altKey) {
+      e.preventDefault()
+      if (prevDoneIdx !== -1) navigateTo(prevDoneIdx)
+      return
+    }
+    // Flag shortcuts: Ctrl+1 … Ctrl+4 (main keyboard and numpad)
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+      const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)
+      const digit = m ? parseInt(m[1], 10) : NaN
+      if (digit >= 1 && digit <= L.FLAG_REASONS.length) {
+        e.preventDefault()
+        const reason = L.FLAG_REASONS[digit - 1]
+        if (reason.kind === 'other') {
+          setOtherOpen(o => !o)
+        } else {
+          L.flag(reason.kind)
+        }
+        return
+      }
+    }
   }
 
   const isDragging = !!drag.current
@@ -425,15 +585,22 @@ export function WorkScreen() {
             const oh = line.bbox.h * displayScale
             const done = line.status === 'done_by_you' || line.status === 'flagged'
             return (
-              <div key={line.id} style={{
-                position: 'absolute', left: ox, top: oy, width: ow, height: oh,
-                border: done
-                  ? '1.5px solid rgba(80,210,130,0.7)'
-                  : '1.5px solid rgba(255,210,120,0.6)',
-                borderRadius: 2,
-                pointerEvents: 'none',
-                transition: spotTransition,
-              }} />
+              <div
+                key={line.id}
+                onClick={(e) => { e.stopPropagation(); navigateTo(i) }}
+                onPointerDown={(e) => { if (e.pointerType !== 'touch') e.stopPropagation() }}
+                title={`שורה ${i + 1}`}
+                style={{
+                  position: 'absolute', left: ox, top: oy, width: ow, height: oh,
+                  border: done
+                    ? '1.5px solid rgba(80,210,130,0.7)'
+                    : '1.5px solid rgba(255,210,120,0.6)',
+                  borderRadius: 2,
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  transition: spotTransition,
+                }}
+              />
             )
           })}
 
@@ -511,10 +678,12 @@ export function WorkScreen() {
         <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
-        <ImmTicks lines={L.lines} cursor={L.cursor} onJump={L.goTo} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <ZoomControls zoom={zoom} onChange={changeZoom} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap' }}>
             <span style={{ direction: 'ltr', display: 'inline-block' }}>
               {new Intl.NumberFormat('en-US').format(L.daily)}
             </span>{' '}היום
@@ -572,21 +741,13 @@ export function WorkScreen() {
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
         fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
       }}>
-        {L.editing ? (
+        {L.editing && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600,
             color: 'oklch(0.5 0.08 250)',
             background: 'oklch(0.6 0.08 250 / 0.12)',
             padding: '2px 9px', borderRadius: 999,
           }}>עריכת השורה שלך</span>
-        ) : (
-          <span>
-            תמלול{' '}
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>
-              {L.current?.transcription_count ?? 0}
-            </span>{' '}מתוך{' '}
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>3</span>
-          </span>
         )}
       </label>
 
@@ -608,34 +769,132 @@ export function WorkScreen() {
         }}
       />
 
-      {/* Flag pills + go-back button */}
+      {/* Nav arrows + flags — two groups separated by a divider */}
       <div style={{
-        display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+        display: 'flex', alignItems: 'center', gap: 0,
         marginTop: 10, marginBottom: 4,
       }}>
-        {/* Go back to last annotated line */}
-        <button
-          className="tl-reason-inline"
-          onClick={() => L.goTo(prevDoneIdx)}
-          disabled={!canGoBack}
-          title="חזרה לשורה הקודמת"
-          style={{ opacity: canGoBack ? 1 : 0.35 }}
-        >
-          <Icon name="back" size={13} color="var(--tl-muted)" />
-        </button>
-        {L.FLAG_REASONS.map((r) => (
+        {/* Navigation: prev / next */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
           <button
-            key={r.kind}
             className="tl-reason-inline"
-            onClick={() => L.flag(r.kind)}
+            onClick={() => navigateTo(prevIdx)}
+            disabled={!canGoBack}
+            title="שורה קודמת (Alt+↑)"
+            style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
-            {r.label}
+            <Icon name="back" size={13} color="var(--tl-muted)" />
+            הקודם
           </button>
-        ))}
+          <button
+            className="tl-reason-inline"
+            onClick={() => navigateTo(nextIdx)}
+            disabled={!canGoNext}
+            title="שורה הבאה (Alt+↓)"
+            style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
+          >
+            הבא
+            <Icon name="forward" size={13} color="var(--tl-muted)" />
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{
+          width: 1, height: 18, margin: '0 10px',
+          background: 'var(--tl-border)', flexShrink: 0,
+        }} />
+
+        {/* Flags */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
+          {L.FLAG_REASONS.map((r, i) =>
+            r.kind === 'other' ? (
+              <button
+                key={r.kind}
+                className="tl-reason-inline"
+                onClick={() => setOtherOpen(o => !o)}
+                title="אחר — פתח תיבת הסבר (Ctrl+4)"
+                style={activeFlagKind === 'other' || otherOpen ? {
+                  background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
+                  color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
+                  borderColor: activeFlagKind === 'other' ? 'oklch(0.72 0.1 15)' : undefined,
+                } : undefined}
+              >
+                {r.label}
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+              </button>
+            ) : (
+              <button
+                key={r.kind}
+                className="tl-reason-inline"
+                onClick={() => L.flag(r.kind)}
+                title={`${r.label} (Ctrl+${i + 1})`}
+                style={activeFlagKind === r.kind ? {
+                  background: 'oklch(0.96 0.03 15)',
+                  color: 'oklch(0.42 0.14 15)',
+                  borderColor: 'oklch(0.72 0.1 15)',
+                } : undefined}
+              >
+                {r.label}
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+              </button>
+            )
+          )}
+        </div>
       </div>
 
-      {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+      {/* "אחר" freeform reason input */}
+      {otherOpen && (
+        <div style={{ display: 'flex', gap: 7, marginTop: 8, alignItems: 'center' }}>
+          <input
+            ref={otherInputRef}
+            value={otherText}
+            onChange={(e) => setOtherText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }
+              if (e.key === 'Escape') { setOtherOpen(false); setOtherText('') }
+            }}
+            placeholder="פרט את הסיבה…"
+            dir="rtl"
+            style={{
+              flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13,
+              border: '0.5px solid var(--tl-border)', borderRadius: 999,
+              padding: '6px 13px', background: 'var(--tl-surface)',
+              color: 'var(--tl-ink)', outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }}
+            disabled={!otherText.trim()}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              padding: '6px 14px', borderRadius: 999, border: 'none',
+              cursor: otherText.trim() ? 'pointer' : 'default',
+              background: otherText.trim() ? 'var(--tl-accent)' : 'var(--tl-muted-fill)',
+              color: otherText.trim() ? '#fff' : 'var(--tl-muted)',
+              transition: 'background 0.12s, color 0.12s',
+              flexShrink: 0,
+            }}
+          >שלח</button>
+        </div>
+      )}
+
+      {/* Submit + skip-page row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+        <button
+          onClick={handleSkipPage}
+          style={{
+            background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer',
+            fontFamily: 'var(--font-ui)', fontSize: 12,
+            color: 'var(--tl-muted)', display: 'inline-flex', alignItems: 'center', gap: 5,
+            transition: 'color 0.12s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tl-ink)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--tl-muted)')}
+        >
+          <Icon name="back" size={13} color="currentColor" />
+          עבור לעמוד אחר
+        </button>
         <button
           className="tl-submit"
           onClick={L.submit}
@@ -643,7 +902,7 @@ export function WorkScreen() {
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
-          <span className="tl-kbd">Enter</span>
+          <span className="tl-kbd">⇧ Enter</span>
         </button>
       </div>
     </div>
@@ -683,8 +942,9 @@ export function WorkScreen() {
   return (
     <div dir="rtl" lang="he" style={{
       height: '100vh', background: 'var(--tl-page)',
-      position: 'relative', display: 'flex', flexDirection: 'column',
+      position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
+      <TopNav active="work" />
       {innerContent}
 
       {/* page-fill progress bar (fills RTL) */}
@@ -699,6 +959,21 @@ export function WorkScreen() {
       <SaveToastBadge toast={L.toast} />
       {L.finished && (
         <FinishedOverlay daily={L.daily} done={L.done} onContinue={L.reset} />
+      )}
+      {pendingNavIdx !== null && (
+        <NavConfirmDialog
+          onSubmitAndMove={confirmSubmitAndNav}
+          onMoveOnly={confirmMoveOnly}
+          onCancel={() => setPendingNavIdx(null)}
+        />
+      )}
+      {skipPagePending && (
+        <NavConfirmDialog
+          message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
+          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.reset() }}
+          onMoveOnly={() => { setSkipPagePending(false); L.reset() }}
+          onCancel={() => setSkipPagePending(false)}
+        />
       )}
     </div>
   )
