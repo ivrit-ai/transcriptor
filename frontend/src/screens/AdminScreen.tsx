@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useMemo } from 'react'
+import { useQueries, useQuery, useMutation } from '@tanstack/react-query'
+import { queryKeys, queryClient } from '../queries'
 import { api } from '../api'
-import type { AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportMode } from '../types'
+import type { AdminStatsDTO, AdminCoverageDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
+import { DatasetTab } from './DatasetTab'
+import { UsersTab } from './UsersTab'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
-const dateStr = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-type Tab = 'overview' | 'users' | 'coverage' | 'import'
-type SortDir = 'asc' | 'desc'
+type Tab = 'overview' | 'users' | 'dataset' | 'coverage' | 'import'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -18,19 +20,6 @@ function StatCard({ value, label, accent }: { value: string | number; label: str
       <div className={css.statValue} style={accent ? { color: accent } : undefined}>{value}</div>
       <div className={css.statLabel}>{label}</div>
     </div>
-  )
-}
-
-function SortTh({
-  col, label, sort, dir, onSort,
-}: {
-  col: string; label: string; sort: string; dir: SortDir; onSort: (c: string) => void
-}) {
-  const active = sort === col
-  return (
-    <th className={`${css.sortable}`} onClick={() => onSort(col)}>
-      {label} {active ? (dir === 'desc' ? '↓' : '↑') : ''}
-    </th>
   )
 }
 
@@ -100,64 +89,6 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
         <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" />
       </div>
     </>
-  )
-}
-
-// ── Users Tab ─────────────────────────────────────────────────────────────────
-
-function UsersTab({ users }: { users: AdminUserDTO[] }) {
-  const [sort, setSort] = useState('text_count')
-  const [dir, setDir] = useState<SortDir>('desc')
-
-  const sorted = useMemo(() => {
-    const key = sort as keyof AdminUserDTO
-    return [...users].sort((a, b) => {
-      const av = a[key] ?? ''
-      const bv = b[key] ?? ''
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0
-      return dir === 'desc' ? -cmp : cmp
-    })
-  }, [users, sort, dir])
-
-  const onSort = (col: string) => {
-    if (sort === col) setDir(d => d === 'desc' ? 'asc' : 'desc')
-    else { setSort(col); setDir('desc') }
-  }
-
-  return (
-    <div className={css.tableWrap}>
-      <table className={css.table}>
-        <thead>
-          <tr>
-            <SortTh col="display_name" label="Name" sort={sort} dir={dir} onSort={onSort} />
-            <th>Email</th>
-            <SortTh col="text_count" label="Text ↓" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="total_submissions" label="Total" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="cant_read_count" label="Can't read" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="flag_count" label="Flags" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="joined_at" label="Joined" sort={sort} dir={dir} onSort={onSort} />
-            <SortTh col="last_active" label="Last active" sort={sort} dir={dir} onSort={onSort} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(u => (
-            <tr key={u.user_id}>
-              <td style={{ fontWeight: 500 }}>{u.display_name}</td>
-              <td className={css.muted}>{u.email}</td>
-              <td style={{ fontWeight: 600, color: 'oklch(0.58 0.1 150)' }}>{fmt(u.text_count)}</td>
-              <td>{fmt(u.total_submissions)}</td>
-              <td className={css.muted}>{fmt(u.cant_read_count)}</td>
-              <td className={css.muted}>{fmt(u.flag_count)}</td>
-              <td className={css.muted}>{dateStr(u.joined_at)}</td>
-              <td className={css.muted}>{dateStr(u.last_active)}</td>
-            </tr>
-          ))}
-          {sorted.length === 0 && (
-            <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>No users yet</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
   )
 }
 
@@ -247,8 +178,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 function ImportTab() {
-  const [importStatus, setImportStatus] = useState<ImportStatusDTO | null>(null)
-  const [logs, setLogs] = useState<string>('')
   const [mode, setMode] = useState<ImportMode>('local-folder')
   const [source, setSource] = useState('handwriting_form')
   const [license, setLicense] = useState('CC-BY-4.0')
@@ -257,44 +186,40 @@ function ImportTab() {
   const [s3Key, setS3Key] = useState('')
   const [s3Secret, setS3Secret] = useState('')
   const [s3Region, setS3Region] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchStatus = () => api.getImportStatus().then(s => { if (s) setImportStatus(s) })
-  const fetchLogs = () => api.getImportLogs(500).then(r => { if (r) setLogs(r.logs) })
+  const { data: importStatus } = useQuery({
+    queryKey: queryKeys.admin.importStatus,
+    queryFn: () => api.getImportStatus(),
+    refetchInterval: (query) => query.state.data?.status === 'running' ? 2000 : false,
+    staleTime: 0,
+  })
 
-  // Initial load
-  useEffect(() => {
-    fetchStatus()
-    fetchLogs()
-  }, [])
+  const { data: logsData, refetch: refetchLogs } = useQuery({
+    queryKey: queryKeys.admin.importLogs(500),
+    queryFn: () => api.getImportLogs(500),
+    refetchInterval: importStatus?.status === 'running' ? 2000 : false,
+    staleTime: 0,
+  })
 
-  // Polling while running
-  useEffect(() => {
-    const isRunning = importStatus?.status === 'running'
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        fetchStatus()
-        fetchLogs()
-      }, 2000)
-    } else {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-    return () => {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-  }, [importStatus?.status])
-
+  const logs = logsData?.logs ?? ''
   const isRunning = importStatus?.status === 'running'
+  const defaultS3Available = importStatus?.default_s3_available ?? false
 
-  // Determine if required fields are filled for the chosen mode
+  const startImportMutation = useMutation({
+    mutationFn: (body: ImportStartBody) => api.startImport(body),
+    onSuccess: (result) => {
+      if (result) {
+        queryClient.setQueryData(queryKeys.admin.importStatus, result)
+      }
+      refetchLogs()
+    },
+    onError: (err) => {
+      const code = err instanceof Error ? err.message : 'unknown'
+      setError(`Failed to start import (HTTP ${code})`)
+    },
+  })
+
   const canSubmit = useMemo(() => {
     if (!source.trim() || !license.trim()) return false
     if (mode === 'local-folder' && !dataPath.trim()) return false
@@ -304,40 +229,21 @@ function ImportTab() {
     return true
   }, [mode, source, license, dataPath, s3Key, s3Secret, s3Region])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSubmitting(true)
-    try {
-      const body = {
-        mode,
-        source: source.trim(),
-        license: license.trim(),
-        clear_existing: clearExisting,
-        data_path: mode === 'default-s3' && !dataPath.trim() ? null : dataPath.trim() || null,
-        ...(mode === 'custom-s3' ? {
-          s3_key: s3Key.trim(),
-          s3_secret: s3Secret.trim(),
-          s3_region: s3Region.trim(),
-        } : {
-          s3_key: null,
-          s3_secret: null,
-          s3_region: null,
-        }),
-      }
-      const result = await api.startImport(body)
-      if (result) setImportStatus(result)
-      // Refresh logs right after starting
-      fetchLogs()
-    } catch (err) {
-      const code = err instanceof Error ? err.message : 'unknown'
-      setError(`Failed to start import (HTTP ${code})`)
-    } finally {
-      setSubmitting(false)
+    const body: ImportStartBody = {
+      mode,
+      source: source.trim(),
+      license: license.trim(),
+      clear_existing: clearExisting,
+      data_path: mode === 'default-s3' && !dataPath.trim() ? null : dataPath.trim() || null,
+      ...(mode === 'custom-s3'
+        ? { s3_key: s3Key.trim(), s3_secret: s3Secret.trim(), s3_region: s3Region.trim() }
+        : { s3_key: null, s3_secret: null, s3_region: null }),
     }
+    startImportMutation.mutate(body)
   }
-
-  const defaultS3Available = importStatus?.default_s3_available ?? false
 
   const dataPathLabel =
     mode === 'local-folder' ? 'Server folder path (required)' :
@@ -352,7 +258,6 @@ function ImportTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* ── Status panel ── */}
       {importStatus && (
         <div>
           <div className={css.sectionTitle}>Current Import Status</div>
@@ -398,13 +303,11 @@ function ImportTab() {
         </div>
       )}
 
-      {/* ── Start import form ── */}
       <div>
         <div className={css.sectionTitle}>Start New Import</div>
         <div className={css.queueBarWrap}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Mode selector */}
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)', marginBottom: 8 }}>MODE</div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -432,7 +335,6 @@ function ImportTab() {
               </div>
             </div>
 
-            {/* Source + License */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>SOURCE (required)</span>
@@ -456,7 +358,6 @@ function ImportTab() {
               </label>
             </div>
 
-            {/* Source path */}
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>
                 {dataPathLabel.toUpperCase()}
@@ -470,7 +371,6 @@ function ImportTab() {
               />
             </label>
 
-            {/* Custom S3 credentials */}
             {mode === 'custom-s3' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', background: 'var(--tl-page)', borderRadius: 10, border: '0.5px solid var(--tl-border)' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>CUSTOM S3 CREDENTIALS</div>
@@ -509,7 +409,6 @@ function ImportTab() {
               </div>
             )}
 
-            {/* Clear existing */}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -519,43 +418,40 @@ function ImportTab() {
               Clear existing submissions in manifest before import
             </label>
 
-            {/* Error */}
             {error && (
               <div style={{ fontSize: 13, color: STATUS_COLORS.failed, padding: '8px 12px', background: 'oklch(0.97 0.02 25)', border: '0.5px solid oklch(0.85 0.08 25)', borderRadius: 8 }}>
                 {error}
               </div>
             )}
 
-            {/* Submit */}
             <div>
               <button
                 type="submit"
-                disabled={!canSubmit || isRunning || submitting}
+                disabled={!canSubmit || isRunning || startImportMutation.isPending}
                 style={{
                   padding: '9px 22px',
                   fontSize: 13,
                   fontWeight: 600,
                   borderRadius: 8,
                   border: 'none',
-                  background: !canSubmit || isRunning || submitting ? 'var(--tl-muted-fill)' : 'var(--tl-accent)',
-                  color: !canSubmit || isRunning || submitting ? 'var(--tl-muted)' : '#fff',
-                  cursor: !canSubmit || isRunning || submitting ? 'not-allowed' : 'pointer',
+                  background: !canSubmit || isRunning || startImportMutation.isPending ? 'var(--tl-muted-fill)' : 'var(--tl-accent)',
+                  color: !canSubmit || isRunning || startImportMutation.isPending ? 'var(--tl-muted)' : '#fff',
+                  cursor: !canSubmit || isRunning || startImportMutation.isPending ? 'not-allowed' : 'pointer',
                   transition: 'background 0.15s',
                 }}
               >
-                {submitting ? 'Starting…' : isRunning ? 'Import running…' : 'Start import'}
+                {startImportMutation.isPending ? 'Starting…' : isRunning ? 'Import running…' : 'Start import'}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* ── Logs viewer ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
           <div className={css.sectionTitle} style={{ margin: 0 }}>Import Logs</div>
           <button
-            onClick={() => { fetchLogs() }}
+            onClick={() => { refetchLogs() }}
             style={{
               padding: '4px 12px',
               fontSize: 12,
@@ -607,29 +503,26 @@ const inputStyle: React.CSSProperties = {
 
 export function AdminScreen() {
   const [tab, setTab] = useState<Tab>('overview')
-  const [stats, setStats] = useState<AdminStatsDTO | null>(null)
-  const [users, setUsers] = useState<AdminUserDTO[]>([])
-  const [coverage, setCoverage] = useState<AdminCoverageDTO[]>([])
-  const [queue, setQueue] = useState<AdminQueueDTO | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    Promise.all([
-      api.getAdminStats(),
-      api.getAdminUsers(),
-      api.getAdminCoverage(),
-      api.getAdminQueue(),
-    ]).then(([s, u, c, q]) => {
-      if (s) setStats(s)
-      if (u) setUsers(u)
-      if (c) setCoverage(c)
-      if (q) setQueue(q)
-    }).finally(() => setLoading(false))
-  }, [])
+  const [statsQuery, usersQuery, coverageQuery, queueQuery] = useQueries({
+    queries: [
+      { queryKey: queryKeys.admin.stats, queryFn: () => api.getAdminStats(), staleTime: 30_000 },
+      { queryKey: queryKeys.admin.users, queryFn: () => api.getAdminUsers(), staleTime: 30_000 },
+      { queryKey: queryKeys.admin.coverage, queryFn: () => api.getAdminCoverage(), staleTime: 30_000 },
+      { queryKey: queryKeys.admin.queue, queryFn: () => api.getAdminQueue(), staleTime: 30_000 },
+    ],
+  })
+
+  const loading = [statsQuery, usersQuery, coverageQuery, queueQuery].some(q => q.isLoading)
+  const stats = statsQuery.data ?? null
+  const users = usersQuery.data ?? []
+  const coverage = coverageQuery.data ?? []
+  const queue = queueQuery.data ?? null
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: `Users${users.length ? ` (${users.length})` : ''}` },
+    { id: 'dataset', label: 'Dataset' },
     { id: 'coverage', label: 'Coverage & Queue' },
     { id: 'import', label: 'Import' },
   ]
@@ -660,6 +553,9 @@ export function AdminScreen() {
         )}
         {!loading && tab === 'users' && (
           <UsersTab users={users} />
+        )}
+        {tab === 'dataset' && (
+          <DatasetTab />
         )}
         {!loading && tab === 'coverage' && queue && (
           <CoverageTab coverage={coverage} queue={queue} />

@@ -1,0 +1,234 @@
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ── List column ─────────────────────────────────────────────────────────── */
+
+.listCol {
+  flex: 1;
+  min-width: 0;
+  outline: none;
+}
+
+.listHeader {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tl-ink);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.listHeaderHint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tl-muted);
+}
+
+.loading {
+  color: var(--tl-muted);
+  font-size: 13px;
+}
+
+/* ── Flat row list ───────────────────────────────────────────────────────── */
+
+.rowList {
+  background: var(--tl-surface);
+  border: 0.5px solid var(--tl-border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  color: var(--tl-ink);
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 0.5px solid var(--tl-border);
+  text-align: left;
+  width: 100%;
+  transition: background 0.1s;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: var(--tl-muted-fill);
+}
+
+.rowActive {
+  background: color-mix(in srgb, var(--tl-accent) 12%, transparent);
+  outline: 2px solid var(--tl-accent);
+  outline-offset: -2px;
+}
+
+.rowActive:hover {
+  background: color-mix(in srgb, var(--tl-accent) 18%, transparent);
+}
+
+.rowId {
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.rowBatch {
+  font-size: 11.5px;
+  color: var(--tl-muted);
+  flex-shrink: 0;
+  padding: 1px 6px;
+  background: var(--tl-muted-fill);
+  border-radius: 4px;
+}
+
+.rowPath {
+  margin-left: auto;
+  color: var(--tl-muted);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+  text-align: right;
+}
+
+.empty {
+  color: var(--tl-muted);
+  font-size: 13px;
+  padding: 20px 16px;
+}
+
+/* ── Pager ───────────────────────────────────────────────────────────────── */
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.pagerBtn {
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  border-radius: 7px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  color: var(--tl-ink);
+  cursor: pointer;
+}
+
+.pagerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagerInfo {
+  font-size: 13px;
+  color: var(--tl-muted);
+}
+
+/* ── Preview panel ───────────────────────────────────────────────────────── */
+
+.preview {
+  flex: 0 0 460px;
+  position: sticky;
+  top: 24px;
+  align-self: flex-start;
+  background: var(--tl-surface);
+  border: 0.5px solid var(--tl-border);
+  border-radius: 14px;
+  padding: 16px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.previewHeader {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tl-ink);
+  margin-bottom: 10px;
+}
+
+.previewMeta {
+  font-size: 12px;
+  color: var(--tl-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.previewMetaBatch {
+  font-size: 11px;
+  padding: 1px 6px;
+  background: var(--tl-muted-fill);
+  border-radius: 4px;
+  color: var(--tl-muted);
+}
+
+.previewEmpty {
+  color: var(--tl-muted);
+  font-size: 13px;
+  padding: 40px 0;
+  text-align: center;
+}
+
+/* ── Line list (below image) ─────────────────────────────────────────────── */
+
+.lineList {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--tl-page);
+  border: 0.5px solid var(--tl-border);
+}
+
+.lineIdx {
+  color: var(--tl-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  flex-shrink: 0;
+}
+
+.lineCount {
+  color: var(--tl-ink);
+}
+
+/* ── Approved badge ──────────────────────────────────────────────────────── */
+
+.approvedDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 25%, transparent);
+  title: "Approved";
+}

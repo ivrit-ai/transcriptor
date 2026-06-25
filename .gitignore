@@ -15,9 +15,11 @@ dist/
 # Node
 frontend/node_modules/
 frontend/dist/
+node-compile-cache/
 
-# Claude internal
+# coding assistants
 .claude/
+opencode.jsonc
 
 # OS
 .DS_Store

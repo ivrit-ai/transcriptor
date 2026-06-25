@@ -29,6 +29,8 @@ class SessionDTO:
     image_url: str
     width_px: int
     height_px: int
+    image_rotation: int
+    page_label: str | None
     lines: list[SessionLineDTO]
 
 
@@ -65,7 +67,7 @@ def get_next_session(
 
     page = session.execute(
         select(Page)
-        .where(has_eligible)
+        .where(Page.approved.is_(True), has_eligible)
         .order_by(eligible_count_subq.desc())
         .limit(1)
     ).scalar_one_or_none()
@@ -108,6 +110,8 @@ def get_next_session(
         image_url=resolve_image_url(page.image_path),
         width_px=page.width_px,
         height_px=page.height_px,
+        image_rotation=page.image_rotation,
+        page_label=page.external_id,
         lines=[
             SessionLineDTO(
                 id=item["id"],

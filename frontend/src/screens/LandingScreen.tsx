@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { TopNav, ManuscriptPreview, PrimaryBtn, GhostBtn, Icon } from '../components/shared'
 import { api } from '../api'
 
@@ -56,24 +58,27 @@ export function LandingScreen() {
     return () => window.removeEventListener('resize', h)
   }, [])
   const isMobile = viewportW < 768
-  const [communityItems, setCommunityItems] = useState(COMMUNITY_FALLBACK)
 
-  useEffect(() => {
-    api.getCommunityStats().then((data) => {
-      if (!data) return
-      setCommunityItems([
-        { v: fmt(data.lines),       l: 'שורות תועתקו' },
-        { v: fmt(data.pages),       l: 'עמודים הושלמו' },
-        { v: fmt(data.volunteers),  l: 'מתנדבים' },
-        { v: fmt(data.manuscripts), l: 'כתבי יד' },
-      ])
-    }).catch(() => { /* keep fallback */ })
-  }, [])
+  const { data: communityData } = useQuery({
+    queryKey: queryKeys.community.stats,
+    queryFn: () => api.getCommunityStats(),
+    staleTime: 'static',
+    retry: 1,
+  })
+
+  const communityItems = useMemo(() => {
+    if (!communityData) return COMMUNITY_FALLBACK
+    return [
+      { v: fmt(communityData.lines),       l: 'שורות תועתקו' },
+      { v: fmt(communityData.pages),       l: 'עמודים הושלמו' },
+      { v: fmt(communityData.volunteers),  l: 'מתנדבים' },
+      { v: fmt(communityData.manuscripts), l: 'כתבי יד' },
+    ]
+  }, [communityData])
 
   const onStart = () => navigate('/auth')
   const onLearn = () => navigate('/guidelines')
 
-  // ── mobile ──
   if (isMobile) {
     return (
       <div dir="rtl" lang="he" style={{
@@ -132,7 +137,6 @@ export function LandingScreen() {
     )
   }
 
-  // ── desktop ──
   return (
     <div dir="rtl" lang="he" style={{
       minHeight: '100vh',

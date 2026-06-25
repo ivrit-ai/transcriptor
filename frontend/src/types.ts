@@ -21,8 +21,9 @@ export interface SessionDTO {
   image_url: string
   width_px: number
   height_px: number
+  image_rotation: number
+  page_label?: string | number
   lines: SessionLine[]
-  page_label?: number
 }
 
 export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text'
@@ -50,10 +51,13 @@ export interface AdminStatsDTO {
   overall_completion_pct: number
 }
 
+export type UserRole = 'user' | 'curator' | 'admin'
+
 export interface AdminUserDTO {
   user_id: string
   display_name: string
   email: string
+  role: UserRole
   joined_at: string | null
   last_active: string | null
   total_submissions: number
@@ -80,6 +84,72 @@ export interface AdminQueueDTO {
   lines_complete: number
   pages_complete: number
   batches_complete: number
+}
+
+// ── Dataset (admin page browser) DTOs ────────────────────────────────────────
+
+export interface AdminDatasetRowDTO {
+  page_id: string
+  page_external_id: string
+  image_path: string
+  approved: boolean
+  approved_by: string | null
+  updated_at: string | null
+  batch_id: string
+  batch_external_id: string
+  source: string
+}
+
+export interface AdminDatasetDTO {
+  items: AdminDatasetRowDTO[]
+  page: number
+  page_size: number
+  total: number
+  approved_count: number
+  total_pages: number
+}
+
+export interface AdminPageLineDTO {
+  id: string
+  external_id?: string
+  line_index: number
+  bbox: BBox
+  polygon?: unknown
+  transcription_count: number
+  detection_confidence?: number | null
+}
+
+export interface AdminPageLinesDTO {
+  page_id: string
+  external_id: string
+  batch_external_id?: string
+  document_name?: string
+  image_url: string
+  width_px: number
+  height_px: number
+  image_rotation: number
+  approved: boolean
+  lines: AdminPageLineDTO[]
+}
+
+export interface UpdatePageLinesBody {
+  rotation?: number
+  lines?: Array<{
+    external_id: string
+    line_index: number
+    bbox: BBox
+    polygon?: unknown
+    detection_confidence?: number | null
+    transcription_count?: number
+  }>
+  approved?: boolean
+}
+
+export interface UpdatePageLinesResponse {
+  page_id: string
+  image_rotation: number
+  approved: boolean
+  line_ids: string[] | null
 }
 
 // ── Import DTOs ───────────────────────────────────────────────────────────────
