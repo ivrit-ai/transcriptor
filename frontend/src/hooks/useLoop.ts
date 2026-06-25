@@ -41,7 +41,7 @@ export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
 ]
 
 function linesFromDTO(dto: SessionDTO): LoopLine[] {
-  return dto.lines.map((l) => ({ ...l }))
+  return dto.lines.map((l) => ({ ...l, your_text: l.prior_text }))
 }
 
 function firstEligibleIdx(lines: LoopLine[]): number {
@@ -195,7 +195,7 @@ export function useLoop(): LoopState {
 
     const idx = cursor
     const line = linesRef.current[idx]
-    if (!line) return
+    if (!line || line.status === 'full') return
 
     const isEdit = line.status === 'done_by_you'
 
@@ -226,7 +226,7 @@ export function useLoop(): LoopState {
     (kind: FlagKind, text?: string) => {
       const idx = cursor
       const line = linesRef.current[idx]
-      if (!line) return
+      if (!line || line.status === 'full') return
 
       setLines((ls) =>
         ls.map((l, i) => (i === idx ? { ...l, status: 'flagged', prior_kind: kind } : l))

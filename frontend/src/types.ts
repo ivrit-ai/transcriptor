@@ -14,6 +14,7 @@ export interface SessionLine {
   status: LineStatus
   transcription_count: number
   your_text?: string
+  prior_text?: string  // backend field name for the user's prior submission text
   prior_kind?: string
 }
 
@@ -26,6 +27,7 @@ export interface SessionDTO {
   page_label?: number
 }
 
+// 'not_hebrew' is kept for backend/DB compatibility; no UI path produces it anymore
 export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text' | 'other'
 export type SubmitKind = 'text' | FlagKind
 

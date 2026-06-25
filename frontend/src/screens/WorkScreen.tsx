@@ -160,10 +160,11 @@ function Skeleton({ top, sideM, pageH }: { top: number; sideM: number; pageH: nu
 }
 
 // ── Navigation confirm dialog ─────────────────────────────────────────────────
-function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel }: {
+function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
   onSubmitAndMove: () => void
   onMoveOnly: () => void
   onCancel: () => void
+  message?: string
 }) {
   const firstRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { firstRef.current?.focus() }, [])
@@ -196,7 +197,7 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel }: {
         }}
       >
         <div style={{ fontSize: 14, color: 'var(--tl-ink)', fontWeight: 500, lineHeight: 1.5 }}>
-          יש טקסט בתיבה — מה לעשות לפני המעבר?
+          {message ?? 'יש טקסט בתיבה — מה לעשות לפני המעבר?'}
         </div>
         <div style={{ display: 'flex', gap: 8, width: '100%' }}>
           <button
@@ -428,24 +429,29 @@ export function WorkScreen() {
   const canGoBack = prevIdx >= 0
   const canGoNext = nextIdx < L.lines.length
 
-  const inputChanged = L.input.trim() !== (L.current?.your_text ?? '').trim()
+  // Refs so navigateTo/handleSkipPage don't reconstruct on every keystroke
+  const inputRef = useRef(L.input)
+  const currentRef = useRef(L.current)
+  inputRef.current = L.input
+  currentRef.current = L.current
 
   const navigateTo = useCallback((i: number) => {
     if (i === L.cursor) return
-    if (inputChanged) {
+    const changed = inputRef.current.trim() !== (currentRef.current?.your_text ?? '').trim()
+    if (changed) {
       setPendingNavIdx(i)
     } else {
       L.goTo(i)
     }
-  }, [L.cursor, inputChanged, L.goTo])
+  }, [L.cursor, L.goTo])
 
   const confirmSubmitAndNav = useCallback(() => {
     if (pendingNavIdx === null) return
     const target = pendingNavIdx
     setPendingNavIdx(null)
-    if (inputChanged && L.input.trim()) L.submit()
+    if (inputRef.current.trim()) L.submit()
     L.goTo(target)
-  }, [pendingNavIdx, inputChanged, L.input, L.submit, L.goTo])
+  }, [pendingNavIdx, L.submit, L.goTo])
 
   const confirmMoveOnly = useCallback(() => {
     if (pendingNavIdx === null) return
@@ -454,12 +460,13 @@ export function WorkScreen() {
   }, [pendingNavIdx, L.goTo])
 
   const handleSkipPage = useCallback(() => {
-    if (inputChanged && L.input.trim()) {
+    const changed = inputRef.current.trim() !== (currentRef.current?.your_text ?? '').trim()
+    if (changed && inputRef.current.trim()) {
       setSkipPagePending(true)
     } else {
       L.reset()
     }
-  }, [inputChanged, L.input, L.reset])
+  }, [L.reset])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Shift+Enter
@@ -471,13 +478,13 @@ export function WorkScreen() {
     // Skip to next eligible line: Alt+ArrowDown
     if (e.key === 'ArrowDown' && e.altKey) {
       e.preventDefault()
-      if (canGoNext) navigateTo(nextEligibleIdx)
+      if (nextEligibleIdx !== -1) navigateTo(nextEligibleIdx)
       return
     }
     // Go back to previous annotated line: Alt+ArrowUp
     if (e.key === 'ArrowUp' && e.altKey) {
       e.preventDefault()
-      if (canGoBack) navigateTo(prevDoneIdx)
+      if (prevDoneIdx !== -1) navigateTo(prevDoneIdx)
       return
     }
     // Flag shortcuts: Ctrl+1 … Ctrl+4 (main keyboard and numpad)
@@ -788,7 +795,7 @@ export function WorkScreen() {
             value={otherText}
             onChange={(e) => setOtherText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false); setOtherText('') } }
+              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }
               if (e.key === 'Escape') { setOtherOpen(false); setOtherText('') }
             }}
             placeholder="פרט את הסיבה…"
@@ -801,7 +808,7 @@ export function WorkScreen() {
             }}
           />
           <button
-            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false); setOtherText('') } }}
+            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }}
             disabled={!otherText.trim()}
             style={{
               fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
@@ -905,6 +912,7 @@ export function WorkScreen() {
       )}
       {skipPagePending && (
         <NavConfirmDialog
+          message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
           onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.reset() }}
           onMoveOnly={() => { setSkipPagePending(false); L.reset() }}
           onCancel={() => setSkipPagePending(false)}
