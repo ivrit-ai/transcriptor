@@ -2,6 +2,22 @@ import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO
 
 const BASE = ''
 
+// ── Dev mock session (only active when VITE_DEV_SKIP_AUTH=true) ───────────────
+const DEV_SESSION: SessionDTO = {
+  page_id: 'dev-page-1',
+  image_url: 'https://placehold.co/474x900/f5efe0/8b7355?text=Dev+Page',
+  width_px: 474,
+  height_px: 900,
+  page_label: 1,
+  lines: Array.from({ length: 8 }, (_, i) => ({
+    id: `dev-line-${i}`,
+    line_index: i,
+    bbox: { x: 24, y: 60 + i * 100, w: 426, h: 72 },
+    status: 'eligible' as const,
+    transcription_count: 0,
+  })),
+}
+
 export const CONSENT_VERSION = '1.0'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T | null> {
@@ -40,16 +56,20 @@ export interface CommunityDTO {
 
 export const api = {
   nextSession: (): Promise<SessionDTO | null> =>
-    request<SessionDTO>('/api/next-session'),
+    import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
+      ? Promise.resolve(DEV_SESSION)
+      : request<SessionDTO>('/api/next-session'),
 
   submitResponse: (
     lineId: string,
     body: { kind: SubmitKind; text?: string }
   ): Promise<LineStatusDTO | null> =>
-    request<LineStatusDTO>(`/api/lines/${lineId}/response`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+    import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
+      ? Promise.resolve(null)
+      : request<LineStatusDTO>(`/api/lines/${lineId}/response`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
 
   postConsent: (body: { consent_type: string; version: string }): Promise<null> =>
     request<null>('/api/consent', {

@@ -38,6 +38,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [currentSession, setCurrentSession] = useState<SessionDTO | null>(null)
 
   useEffect(() => {
+    if (import.meta.env.VITE_DEV_SKIP_AUTH === 'true') {
+      setWhoami({ logged_in: true, sub: 'dev', email: 'dev@local', name: 'Dev' })
+      setConsentGivenState(true)
+      setIsLoading(false)
+      return
+    }
     fetch('/xhost-auth/whoami')
       .then(r => r.json())
       .then((data: WhoAmI) => {
