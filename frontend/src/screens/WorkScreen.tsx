@@ -614,25 +614,9 @@ export function WorkScreen() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: `0 ${sideM}px`, fontFamily: 'var(--font-ui)',
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <span style={{ fontSize: 13, color: 'var(--tl-muted)', lineHeight: 1 }}>
-            עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
-          </span>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleSkipPage() }}
-            style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontFamily: 'var(--font-ui)', fontSize: 11,
-              color: 'var(--tl-muted)', textDecoration: 'underline',
-              textDecorationStyle: 'dotted', textUnderlineOffset: 2,
-              opacity: 0.7, lineHeight: 1,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
-          >עבור לעמוד אחר</button>
-        </div>
+        <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
+          עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
+        </span>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ZoomControls zoom={zoom} onChange={changeZoom} />
@@ -643,6 +627,37 @@ export function WorkScreen() {
           </span>
         </div>
       </div>
+
+      {/* skip-page button — bottom-left corner, above console */}
+      <button
+        onClick={(e) => { e.stopPropagation(); handleSkipPage() }}
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          bottom: effectiveCardH + 14,
+          left: sideM,
+          zIndex: 7,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+          color: 'var(--tl-muted)',
+          background: 'var(--tl-surface)',
+          border: '0.5px solid var(--tl-border)',
+          borderRadius: 999, padding: '7px 14px', cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(40,30,20,0.12)',
+          transition: 'color 0.15s, background 0.15s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--tl-ink)'
+          e.currentTarget.style.background = 'var(--tl-muted-fill)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--tl-muted)'
+          e.currentTarget.style.background = 'var(--tl-surface)'
+        }}
+      >
+        <Icon name="back" size={14} color="currentColor" />
+        עבור לעמוד אחר
+      </button>
 
       {/* return-to-line pill */}
       <button
