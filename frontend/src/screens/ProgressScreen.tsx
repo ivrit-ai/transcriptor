@@ -272,7 +272,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
         direction: 'rtl',
         ...(isMobile
           ? { overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' as const }
-          : { flexWrap: 'wrap' as const }),
+          : { flexWrap: 'wrap' as const, justifyContent: 'center' as const }),
       }}>
         {docs.map((doc) => (
           <DocFolio key={doc.page_id} doc={doc} thumbWidth={thumbWidth} />
@@ -328,7 +328,7 @@ export function ProgressScreen() {
           </p>
         )}
       </div>
-      <StreakBadge days={ME.streak} big={!isMobile} />
+      {ME.streak > 0 && <StreakBadge days={ME.streak} big={!isMobile} />}
     </div>
   )
 
@@ -349,9 +349,11 @@ export function ProgressScreen() {
       <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
         הפעילות שלך
       </div>
-      <ContribGrid daily={ME.daily} weeks={isMobile ? 6 : 7} cell={isMobile ? 14 : 16} />
+      <div style={{ display: 'flex', justifyContent: isMobile ? 'flex-start' : 'center' }}>
+        <ContribGrid daily={ME.daily} weeks={isMobile ? 6 : 7} cell={isMobile ? 14 : 16} />
+      </div>
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6,
+        display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-end' : 'center', gap: 6,
         marginTop: 12, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
       }}>
         <span>שורות: פחות</span>
