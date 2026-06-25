@@ -628,37 +628,6 @@ export function WorkScreen() {
         </div>
       </div>
 
-      {/* skip-page button — bottom-left corner, above console */}
-      <button
-        onClick={(e) => { e.stopPropagation(); handleSkipPage() }}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          bottom: effectiveCardH + 14,
-          left: sideM,
-          zIndex: 7,
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
-          color: 'var(--tl-muted)',
-          background: 'var(--tl-surface)',
-          border: '0.5px solid var(--tl-border)',
-          borderRadius: 999, padding: '7px 14px', cursor: 'pointer',
-          boxShadow: '0 2px 10px rgba(40,30,20,0.12)',
-          transition: 'color 0.15s, background 0.15s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--tl-ink)'
-          e.currentTarget.style.background = 'var(--tl-muted-fill)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--tl-muted)'
-          e.currentTarget.style.background = 'var(--tl-surface)'
-        }}
-      >
-        <Icon name="back" size={14} color="currentColor" />
-        עבור לעמוד אחר
-      </button>
-
       {/* return-to-line pill */}
       <button
         onClick={(e) => { e.stopPropagation(); setPeek(0); setOffsetX(0) }}
@@ -847,8 +816,22 @@ export function WorkScreen() {
         </div>
       )}
 
-      {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+      {/* Submit + skip-page row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+        <button
+          onClick={handleSkipPage}
+          style={{
+            background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer',
+            fontFamily: 'var(--font-ui)', fontSize: 12,
+            color: 'var(--tl-muted)', display: 'inline-flex', alignItems: 'center', gap: 5,
+            transition: 'color 0.12s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tl-ink)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--tl-muted)')}
+        >
+          <Icon name="back" size={13} color="currentColor" />
+          עבור לעמוד אחר
+        </button>
         <button
           className="tl-submit"
           onClick={L.submit}
