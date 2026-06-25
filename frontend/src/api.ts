@@ -52,6 +52,7 @@ export interface ProfileDTO {
 export interface DocumentDTO {
   page_id: string
   document_name: string
+  page_label: string
   image_url: string
   width_px: number
   height_px: number

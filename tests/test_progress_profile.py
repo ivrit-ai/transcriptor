@@ -78,6 +78,7 @@ def test_my_documents_shape_and_order(client, db_session, consented_user):
     body = client.get("/api/me/documents").json()
     assert [d["document_name"] for d in body] == ["new-doc", "old-doc"]
     new_doc = body[0]
+    assert new_doc["page_label"] == "p-new"
     assert new_doc["lines_done"] == 1
     assert new_doc["total_lines"] == 2
     assert new_doc["spotlight_bbox"] == {"x": 5, "y": 6, "w": 7, "h": 8}

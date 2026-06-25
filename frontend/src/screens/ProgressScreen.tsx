@@ -227,7 +227,13 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
         color: 'var(--tl-ink)', marginTop: 10,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>{doc.document_name}</div>
-      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)', marginTop: 2 }}>
+      <div style={{
+        fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)', marginTop: 2,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {doc.page_label && doc.page_label !== doc.document_name && (
+          <>עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.page_label}</span> · </>
+        )}
         <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.lines_done}</span> שורות
       </div>
     </div>

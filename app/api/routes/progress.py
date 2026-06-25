@@ -202,6 +202,7 @@ def my_documents(
             {
                 "page_id": str(page.id),
                 "document_name": page.document_name,
+                "page_label": page.external_id,
                 "image_url": resolve_image_url(page.image_path),
                 "width_px": page.width_px,
                 "height_px": page.height_px,
