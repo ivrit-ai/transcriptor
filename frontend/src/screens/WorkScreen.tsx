@@ -250,6 +250,7 @@ export function WorkScreen() {
   // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
   const [pendingNavIdx, setPendingNavIdx] = useState<number | null>(null)
+  const [skipPagePending, setSkipPagePending] = useState(false)
   const [otherOpen, setOtherOpen] = useState(false)
   const [otherText, setOtherText] = useState('')
   const otherInputRef = useRef<HTMLInputElement>(null)
@@ -452,6 +453,14 @@ export function WorkScreen() {
     setPendingNavIdx(null)
   }, [pendingNavIdx, L.goTo])
 
+  const handleSkipPage = useCallback(() => {
+    if (inputChanged && L.input.trim()) {
+      setSkipPagePending(true)
+    } else {
+      L.reset()
+    }
+  }, [inputChanged, L.input, L.reset])
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Shift+Enter
     if (e.key === 'Enter' && e.shiftKey) {
@@ -605,9 +614,25 @@ export function WorkScreen() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: `0 ${sideM}px`, fontFamily: 'var(--font-ui)',
       }}>
-        <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
-          עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span style={{ fontSize: 13, color: 'var(--tl-muted)', lineHeight: 1 }}>
+            עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleSkipPage() }}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 11,
+              color: 'var(--tl-muted)', textDecoration: 'underline',
+              textDecorationStyle: 'dotted', textUnderlineOffset: 2,
+              opacity: 0.7, lineHeight: 1,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+          >עבור לעמוד אחר</button>
+        </div>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ZoomControls zoom={zoom} onChange={changeZoom} />
@@ -878,6 +903,13 @@ export function WorkScreen() {
           onSubmitAndMove={confirmSubmitAndNav}
           onMoveOnly={confirmMoveOnly}
           onCancel={() => setPendingNavIdx(null)}
+        />
+      )}
+      {skipPagePending && (
+        <NavConfirmDialog
+          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.reset() }}
+          onMoveOnly={() => { setSkipPagePending(false); L.reset() }}
+          onCancel={() => setSkipPagePending(false)}
         />
       )}
     </div>
