@@ -693,17 +693,19 @@ export function WorkScreen() {
             onClick={() => navigateTo(prevDoneIdx)}
             disabled={!canGoBack}
             title="חזרה לשורה הקודמת (Alt+↑)"
-            style={{ opacity: canGoBack ? 1 : 0.3 }}
+            style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
             <Icon name="back" size={13} color="var(--tl-muted)" />
+            הקודם
           </button>
           <button
             className="tl-reason-inline"
             onClick={() => navigateTo(nextEligibleIdx)}
             disabled={!canGoNext}
             title="דלג לשורה הבאה (Alt+↓)"
-            style={{ opacity: canGoNext ? 1 : 0.3 }}
+            style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
           >
+            הבא
             <Icon name="forward" size={13} color="var(--tl-muted)" />
           </button>
         </div>
