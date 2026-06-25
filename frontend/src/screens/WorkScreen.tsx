@@ -416,22 +416,24 @@ export function WorkScreen() {
   const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   const canGoNext = nextEligibleIdx !== -1
 
+  const inputChanged = L.input.trim() !== (L.current?.your_text ?? '').trim()
+
   const navigateTo = useCallback((i: number) => {
     if (i === L.cursor) return
-    if (L.input.trim()) {
+    if (inputChanged) {
       setPendingNavIdx(i)
     } else {
       L.goTo(i)
     }
-  }, [L.cursor, L.input, L.goTo])
+  }, [L.cursor, inputChanged, L.goTo])
 
   const confirmSubmitAndNav = useCallback(() => {
     if (pendingNavIdx === null) return
     const target = pendingNavIdx
     setPendingNavIdx(null)
-    if (L.input.trim()) L.submit()
+    if (inputChanged && L.input.trim()) L.submit()
     L.goTo(target)
-  }, [pendingNavIdx, L.input, L.submit, L.goTo])
+  }, [pendingNavIdx, inputChanged, L.input, L.submit, L.goTo])
 
   const confirmMoveOnly = useCallback(() => {
     if (pendingNavIdx === null) return
@@ -679,45 +681,56 @@ export function WorkScreen() {
         }}
       />
 
-      {/* Flag pills + go-back button */}
+      {/* Nav arrows + flags — two groups separated by a divider */}
       <div style={{
-        display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+        display: 'flex', alignItems: 'center', gap: 0,
         marginTop: 10, marginBottom: 4,
       }}>
-        {/* Go back to last annotated line */}
-        <button
-          className="tl-reason-inline"
-          onClick={() => navigateTo(prevDoneIdx)}
-          disabled={!canGoBack}
-          title="חזרה לשורה הקודמת (Alt+↑)"
-          style={{ opacity: canGoBack ? 1 : 0.35 }}
-        >
-          <Icon name="back" size={13} color="var(--tl-muted)" />
-        </button>
-        {canGoNext && (
+        {/* Navigation: prev / next */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="tl-reason-inline"
+            onClick={() => navigateTo(prevDoneIdx)}
+            disabled={!canGoBack}
+            title="חזרה לשורה הקודמת (Alt+↑)"
+            style={{ opacity: canGoBack ? 1 : 0.3 }}
+          >
+            <Icon name="back" size={13} color="var(--tl-muted)" />
+          </button>
           <button
             className="tl-reason-inline"
             onClick={() => navigateTo(nextEligibleIdx)}
+            disabled={!canGoNext}
             title="דלג לשורה הבאה (Alt+↓)"
-            style={{ opacity: 0.7 }}
+            style={{ opacity: canGoNext ? 1 : 0.3 }}
           >
             <Icon name="forward" size={13} color="var(--tl-muted)" />
           </button>
-        )}
-        {L.FLAG_REASONS.map((r, i) => (
-          <button
-            key={r.kind}
-            className="tl-reason-inline"
-            onClick={() => L.flag(r.kind)}
-            title={`${r.label} (Ctrl+${i + 1})`}
-          >
-            {r.label}
-            <span dir="ltr" style={{
-              marginRight: 5, fontSize: 10, opacity: 0.55,
-              fontFamily: 'var(--font-ui)', letterSpacing: 0,
-            }}>^{i + 1}</span>
-          </button>
-        ))}
+        </div>
+
+        {/* Divider */}
+        <div style={{
+          width: 1, height: 18, margin: '0 10px',
+          background: 'var(--tl-border)', flexShrink: 0,
+        }} />
+
+        {/* Flags */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+          {L.FLAG_REASONS.map((r, i) => (
+            <button
+              key={r.kind}
+              className="tl-reason-inline"
+              onClick={() => L.flag(r.kind)}
+              title={`${r.label} (Ctrl+${i + 1})`}
+            >
+              {r.label}
+              <span dir="ltr" style={{
+                marginRight: 5, fontSize: 10, opacity: 0.5,
+                fontFamily: 'var(--font-ui)',
+              }}>^{i + 1}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Submit */}
