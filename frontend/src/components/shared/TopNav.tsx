@@ -3,12 +3,13 @@ import { BrandMark } from './BrandMark'
 import { PrimaryBtn } from './PrimaryBtn'
 import { useSession } from '../../contexts/SessionContext'
 
-type NavId = 'work' | 'guide' | 'progress'
+type NavId = 'work' | 'guide' | 'progress' | 'leaderboard'
 
 const NAV_LINKS: { id: NavId; label: string; path: string }[] = [
-  { id: 'work',     label: 'תעתוק',           path: '/work'       },
-  { id: 'guide',    label: 'מדריך',            path: '/guidelines' },
-  { id: 'progress', label: 'ההתקדמות שלי',   path: '/me'         },
+  { id: 'work',        label: 'תעתוק',          path: '/work'         },
+  { id: 'guide',       label: 'מדריך',           path: '/guidelines'   },
+  { id: 'progress',    label: 'ההתקדמות שלי',  path: '/me'           },
+  { id: 'leaderboard', label: 'לוח דירוג',      path: '/leaderboard'  },
 ]
 
 interface TopNavProps {

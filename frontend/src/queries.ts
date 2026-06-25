@@ -35,4 +35,9 @@ export const queryKeys = {
     pages: (page: number, pageSize: number) => ['curate', 'pages', page, pageSize] as const,
     pageLines: (pageId: string) => ['curate', 'pageLines', pageId] as const,
   },
+  leaderboard: {
+    allTime: ['leaderboard', 'allTime'] as const,
+    week:    ['leaderboard', 'week']    as const,
+    streaks: ['leaderboard', 'streaks'] as const,
+  },
 }

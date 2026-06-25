@@ -111,8 +111,14 @@ export const api = {
   getCommunityStats: (): Promise<CommunityDTO | null> =>
     request<CommunityDTO>('/api/community'),
 
-  getLeaderboard: (): Promise<Array<{ display_name: string; text_count: number }> | null> =>
-    request<Array<{ display_name: string; text_count: number }>>('/api/leaderboard'),
+  getLeaderboard: (): Promise<Array<{ display_name: string; count: number }> | null> =>
+    request<Array<{ display_name: string; count: number }>>('/api/leaderboard'),
+
+  getLeaderboardWeek: (): Promise<Array<{ display_name: string; count: number }> | null> =>
+    request<Array<{ display_name: string; count: number }>>('/api/leaderboard?period=week'),
+
+  getStreakLeaders: (): Promise<Array<{ display_name: string; streak: number }> | null> =>
+    request<Array<{ display_name: string; streak: number }>>('/api/leaderboard/streaks'),
 
   getAdminStats: (): Promise<AdminStatsDTO | null> =>
     request<AdminStatsDTO>('/api/admin/stats'),
