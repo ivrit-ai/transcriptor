@@ -78,6 +78,12 @@ export const api = {
       ? Promise.resolve(DEV_SESSION)
       : request<SessionDTO>('/api/next-session'),
 
+  // Open a specific page (e.g. from the profile gallery). Always hits the
+  // backend — dev mode bypasses auth/consent server-side — so a re-opened page
+  // loads its real lines in review/edit mode.
+  getSession: (pageId: string): Promise<SessionDTO | null> =>
+    request<SessionDTO>(`/api/sessions/${pageId}`),
+
   submitResponse: (
     lineId: string,
     body: { kind: SubmitKind; text?: string }

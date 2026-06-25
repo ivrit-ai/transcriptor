@@ -29,6 +29,7 @@ export default function App() {
 
             {/* Protected */}
             <Route path="/work" element={<AuthGuard><WorkScreen /></AuthGuard>} />
+            <Route path="/work/:pageId" element={<AuthGuard><WorkScreen /></AuthGuard>} />
             <Route path="/done" element={<AuthGuard><AllCaughtUpScreen /></AuthGuard>} />
             <Route path="/me" element={<AuthGuard><ProgressScreen /></AuthGuard>} />
             <Route path="/admin" element={<AdminGuard><AdminScreen /></AdminGuard>} />

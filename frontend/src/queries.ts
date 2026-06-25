@@ -13,7 +13,10 @@ export const queryClient = new QueryClient({
 
 export const queryKeys = {
   whoami: ['auth', 'whoami'] as const,
-  session: { next: ['session', 'next'] as const },
+  session: {
+    next: ['session', 'next'] as const,
+    forPage: (pageId: string) => ['session', 'page', pageId] as const,
+  },
   profile: { me: ['profile', 'me'] as const, documents: ['profile', 'documents'] as const },
   community: { stats: ['community', 'stats'] as const },
   admin: {

@@ -75,6 +75,34 @@ def get_next_session(
     if page is None:
         return None
 
+    return _build_session_dto(session, user, page, target)
+
+
+def get_session_for_page(
+    session: Session,
+    user: User,
+    page_id: uuid.UUID,
+    target: int = 3,
+) -> SessionDTO | None:
+    """Build a session for a specific page, regardless of how much work is left.
+
+    Used to re-open a page the user has already contributed to (e.g. from their
+    profile gallery). Lines they've completed come back as ``done_by_you`` so the
+    work view opens in review/edit mode when nothing eligible remains.
+    """
+    page = session.get(Page, page_id)
+    if page is None:
+        return None
+
+    return _build_session_dto(session, user, page, target)
+
+
+def _build_session_dto(
+    session: Session,
+    user: User,
+    page: Page,
+    target: int = 3,
+) -> SessionDTO:
     lines = session.execute(
         select(Line)
         .where(Line.page_id == page.id)

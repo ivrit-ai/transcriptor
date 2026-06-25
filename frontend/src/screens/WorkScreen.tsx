@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
@@ -235,7 +235,17 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
 // ── Main screen ───────────────────────────────────────────────────────────────
 export function WorkScreen() {
   const navigate = useNavigate()
-  const L = useLoop()
+  // When opened as /work/:pageId (e.g. from the profile gallery), load that
+  // specific page; otherwise the loop auto-picks the next page.
+  const { pageId } = useParams()
+  const L = useLoop(pageId)
+
+  // "Next page" / "skip to another page": from a specific page, hand back to the
+  // general auto-dispatch flow; otherwise just refetch the next session.
+  const goNextPage = useCallback(() => {
+    if (pageId) navigate('/work', { replace: true })
+    else L.reset()
+  }, [pageId, navigate, L.reset])
   const taRef = useRef<HTMLTextAreaElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -481,9 +491,9 @@ export function WorkScreen() {
     if (changed && inputRef.current.trim()) {
       setSkipPagePending(true)
     } else {
-      L.reset()
+      goNextPage()
     }
-  }, [L.reset])
+  }, [goNextPage])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Shift+Enter
@@ -958,7 +968,7 @@ export function WorkScreen() {
 
       <SaveToastBadge toast={L.toast} />
       {L.finished && (
-        <FinishedOverlay daily={L.daily} done={L.done} onContinue={L.reset} />
+        <FinishedOverlay daily={L.daily} done={L.done} onContinue={goNextPage} />
       )}
       {pendingNavIdx !== null && (
         <NavConfirmDialog
@@ -970,8 +980,8 @@ export function WorkScreen() {
       {skipPagePending && (
         <NavConfirmDialog
           message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
-          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.reset() }}
-          onMoveOnly={() => { setSkipPagePending(false); L.reset() }}
+          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); goNextPage() }}
+          onMoveOnly={() => { setSkipPagePending(false); goNextPage() }}
           onCancel={() => setSkipPagePending(false)}
         />
       )}

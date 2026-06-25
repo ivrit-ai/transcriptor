@@ -186,9 +186,17 @@ function ContribGrid({
   )
 }
 
-function DocFolio({ doc, thumbWidth }: { doc: DocumentDTO; thumbWidth: number }) {
+function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: number; onOpen: () => void }) {
   return (
-    <div style={{ width: thumbWidth, flexShrink: 0 }}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      title="המשך לעבוד על העמוד הזה"
+      className="pg-folio"
+      style={{ width: thumbWidth, flexShrink: 0, cursor: 'pointer', borderRadius: 10 }}
+    >
       <div style={{ position: 'relative', paddingTop: 8 }}>
         <ManuscriptPreview
           width={thumbWidth}
@@ -227,6 +235,7 @@ function DocFolio({ doc, thumbWidth }: { doc: DocumentDTO; thumbWidth: number })
 }
 
 function DocumentGallery({ isMobile }: { isMobile: boolean }) {
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.profile.documents,
     queryFn: () => api.getMyDocuments(),
@@ -275,7 +284,12 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
           : { flexWrap: 'wrap' as const, justifyContent: 'center' as const }),
       }}>
         {docs.map((doc) => (
-          <DocFolio key={doc.page_id} doc={doc} thumbWidth={thumbWidth} />
+          <DocFolio
+            key={doc.page_id}
+            doc={doc}
+            thumbWidth={thumbWidth}
+            onOpen={() => navigate(`/work/${doc.page_id}`)}
+          />
         ))}
       </div>
     )
