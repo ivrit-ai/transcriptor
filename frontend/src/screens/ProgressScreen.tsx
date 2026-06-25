@@ -247,7 +247,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
 
   const header = (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
-      כתבי היד שתיעדת
+      כתבי היד שתעתקת
     </div>
   )
 
