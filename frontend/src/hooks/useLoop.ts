@@ -81,7 +81,7 @@ export interface LoopState {
   FLAG_REASONS: typeof FLAG_REASONS
 }
 
-export function useLoop(): LoopState {
+export function useLoop(pageId?: string): LoopState {
   const [page, setPage] = useState<LoopPage | null>(null)
   const [lines, setLines] = useState<LoopLine[]>([])
   const [cursor, setCursor] = useState(0)
@@ -99,8 +99,8 @@ export function useLoop(): LoopState {
   linesRef.current = lines
 
   const { data: session, isLoading, isFetching, refetch } = useQuery({
-    queryKey: queryKeys.session.next,
-    queryFn: () => api.nextSession(),
+    queryKey: pageId ? queryKeys.session.forPage(pageId) : queryKeys.session.next,
+    queryFn: () => (pageId ? api.getSession(pageId) : api.nextSession()),
     staleTime: Infinity,
     retry: 2,
   })

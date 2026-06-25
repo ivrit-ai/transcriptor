@@ -8,6 +8,7 @@ const DEV_SESSION: SessionDTO = {
   image_url: 'https://placehold.co/474x900/f5efe0/8b7355?text=Dev+Page',
   width_px: 474,
   height_px: 900,
+  image_rotation: 0,
   page_label: 1,
   image_rotation: 0,
   lines: Array.from({ length: 8 }, (_, i) => ({
@@ -44,6 +45,24 @@ export interface ProfileDTO {
   week: number
   total: number
   pages: number
+  documents: number
+  joined_at: string
+  daily: { date: string; count: number }[]
+}
+
+export interface DocumentDTO {
+  page_id: string
+  document_name: string
+  page_label: string
+  image_url: string
+  width_px: number
+  height_px: number
+  image_rotation: number
+  lines_done: number
+  total_lines: number
+  last_at: string
+  approved: boolean
+  spotlight_bbox: { x: number; y: number; w: number; h: number } | null
 }
 
 export interface CommunityDTO {
@@ -60,6 +79,12 @@ export const api = {
     import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
       ? Promise.resolve(DEV_SESSION)
       : request<SessionDTO>('/api/next-session'),
+
+  // Open a specific page (e.g. from the profile gallery). Always hits the
+  // backend — dev mode bypasses auth/consent server-side — so a re-opened page
+  // loads its real lines in review/edit mode.
+  getSession: (pageId: string): Promise<SessionDTO | null> =>
+    request<SessionDTO>(`/api/sessions/${pageId}`),
 
   submitResponse: (
     lineId: string,
@@ -81,11 +106,20 @@ export const api = {
   getProfile: (): Promise<ProfileDTO | null> =>
     request<ProfileDTO>('/api/me/profile'),
 
+  getMyDocuments: (): Promise<DocumentDTO[] | null> =>
+    request<DocumentDTO[]>('/api/me/documents'),
+
   getCommunityStats: (): Promise<CommunityDTO | null> =>
     request<CommunityDTO>('/api/community'),
 
-  getLeaderboard: (): Promise<Array<{ display_name: string; text_count: number }> | null> =>
-    request<Array<{ display_name: string; text_count: number }>>('/api/leaderboard'),
+  getLeaderboard: (): Promise<Array<{ display_name: string; count: number }> | null> =>
+    request<Array<{ display_name: string; count: number }>>('/api/leaderboard'),
+
+  getLeaderboardWeek: (): Promise<Array<{ display_name: string; count: number }> | null> =>
+    request<Array<{ display_name: string; count: number }>>('/api/leaderboard?period=week'),
+
+  getStreakLeaders: (): Promise<Array<{ display_name: string; streak: number }> | null> =>
+    request<Array<{ display_name: string; streak: number }>>('/api/leaderboard/streaks'),
 
   getAdminStats: (): Promise<AdminStatsDTO | null> =>
     request<AdminStatsDTO>('/api/admin/stats'),
