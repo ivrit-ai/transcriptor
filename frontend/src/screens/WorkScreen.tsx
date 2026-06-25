@@ -718,6 +718,7 @@ export function WorkScreen() {
 
         {/* Flags */}
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
           {L.FLAG_REASONS.map((r, i) => (
             <button
               key={r.kind}
