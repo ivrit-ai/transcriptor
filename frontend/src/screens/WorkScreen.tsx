@@ -255,6 +255,9 @@ export function WorkScreen() {
   // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
   const [pendingNavIdx, setPendingNavIdx] = useState<number | null>(null)
+  const [otherOpen, setOtherOpen] = useState(false)
+  const [otherText, setOtherText] = useState('')
+  const otherInputRef = useRef<HTMLInputElement>(null)
 
   const wide = viewportW >= 960
 
@@ -293,9 +296,13 @@ export function WorkScreen() {
       taRef.current?.focus()
     }
   }, [L.cursor, L.finished, L.loading])
+  // Auto-focus the "אחר" input when it opens
+  useEffect(() => { if (otherOpen) otherInputRef.current?.focus() }, [otherOpen])
 
   // Snap back to line (reset pan) when cursor advances
   useEffect(() => { setPeek(0); setOffsetX(0) }, [L.cursor])
+  // Close "אחר" input when moving to a new line
+  useEffect(() => { setOtherOpen(false); setOtherText('') }, [L.cursor])
 
   // ── Go-back: find the last line this user annotated before the current cursor ─
   let prevDoneIdx = -1
@@ -466,7 +473,12 @@ export function WorkScreen() {
       const digit = m ? parseInt(m[1], 10) : NaN
       if (digit >= 1 && digit <= L.FLAG_REASONS.length) {
         e.preventDefault()
-        L.flag(L.FLAG_REASONS[digit - 1].kind)
+        const reason = L.FLAG_REASONS[digit - 1]
+        if (reason.kind === 'other') {
+          setOtherOpen(o => !o)
+        } else {
+          L.flag(reason.kind)
+        }
         return
       }
     }
@@ -719,22 +731,68 @@ export function WorkScreen() {
         {/* Flags */}
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
-          {L.FLAG_REASONS.map((r, i) => (
-            <button
-              key={r.kind}
-              className="tl-reason-inline"
-              onClick={() => L.flag(r.kind)}
-              title={`${r.label} (Ctrl+${i + 1})`}
-            >
-              {r.label}
-              <span dir="ltr" style={{
-                marginRight: 5, fontSize: 10, opacity: 0.5,
-                fontFamily: 'var(--font-ui)',
-              }}>^{i + 1}</span>
-            </button>
-          ))}
+          {L.FLAG_REASONS.map((r, i) =>
+            r.kind === 'other' ? (
+              <button
+                key={r.kind}
+                className="tl-reason-inline"
+                onClick={() => setOtherOpen(o => !o)}
+                title="אחר — פתח תיבת הסבר (Ctrl+4)"
+                style={otherOpen ? { background: 'var(--tl-muted-fill)', color: 'var(--tl-ink)' } : undefined}
+              >
+                {r.label}
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+              </button>
+            ) : (
+              <button
+                key={r.kind}
+                className="tl-reason-inline"
+                onClick={() => L.flag(r.kind)}
+                title={`${r.label} (Ctrl+${i + 1})`}
+              >
+                {r.label}
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+              </button>
+            )
+          )}
         </div>
       </div>
+
+      {/* "אחר" freeform reason input */}
+      {otherOpen && (
+        <div style={{ display: 'flex', gap: 7, marginTop: 8, alignItems: 'center' }}>
+          <input
+            ref={otherInputRef}
+            value={otherText}
+            onChange={(e) => setOtherText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false); setOtherText('') } }
+              if (e.key === 'Escape') { setOtherOpen(false); setOtherText('') }
+            }}
+            placeholder="פרט את הסיבה…"
+            dir="rtl"
+            style={{
+              flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13,
+              border: '0.5px solid var(--tl-border)', borderRadius: 999,
+              padding: '6px 13px', background: 'var(--tl-surface)',
+              color: 'var(--tl-ink)', outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false); setOtherText('') } }}
+            disabled={!otherText.trim()}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              padding: '6px 14px', borderRadius: 999, border: 'none',
+              cursor: otherText.trim() ? 'pointer' : 'default',
+              background: otherText.trim() ? 'var(--tl-accent)' : 'var(--tl-muted-fill)',
+              color: otherText.trim() ? '#fff' : 'var(--tl-muted)',
+              transition: 'background 0.12s, color 0.12s',
+              flexShrink: 0,
+            }}
+          >שלח</button>
+        </div>
+      )}
 
       {/* Submit */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>

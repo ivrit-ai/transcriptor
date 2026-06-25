@@ -33,10 +33,10 @@ interface SaveItem {
 }
 
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
-  { kind: 'bad_crop',   label: 'תמונה חתוכה'       },
-  { kind: 'not_hebrew', label: 'לא עברית'           },
-  { kind: 'not_text',   label: 'לא טקסט'            },
-  { kind: 'cant_read',  label: 'לא מצליח לקרוא'    },
+  { kind: 'cant_read', label: 'טקסט לא ברור'  },
+  { kind: 'not_text',  label: 'לא טקסט'       },
+  { kind: 'bad_crop',  label: 'התמונה חתוכה'  },
+  { kind: 'other',     label: 'אחר'           },
 ]
 
 function linesFromDTO(dto: SessionDTO): LoopLine[] {
@@ -73,7 +73,7 @@ export interface LoopState {
   setInput: (v: string) => void
   // Actions
   submit: () => void
-  flag: (kind: FlagKind) => void
+  flag: (kind: FlagKind, text?: string) => void
   goTo: (i: number) => void
   reset: () => void
   // Progress
@@ -222,7 +222,7 @@ export function useLoop(): LoopState {
   }, [input, cursor, fireSave, advance])
 
   const flag = useCallback(
-    (kind: FlagKind) => {
+    (kind: FlagKind, text?: string) => {
       const idx = cursor
       const line = linesRef.current[idx]
       if (!line) return
@@ -232,7 +232,7 @@ export function useLoop(): LoopState {
       )
       setDone((d) => d + 1)
 
-      void fireSave(line.id, { kind })
+      void fireSave(line.id, { kind, text })
       advance(idx)
     },
     [cursor, fireSave, advance]

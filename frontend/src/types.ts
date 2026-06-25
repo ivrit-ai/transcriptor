@@ -25,7 +25,7 @@ export interface SessionDTO {
   page_label?: number
 }
 
-export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text'
+export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text' | 'other'
 export type SubmitKind = 'text' | FlagKind
 
 export interface LineStatusDTO {

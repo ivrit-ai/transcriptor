@@ -18,6 +18,7 @@ class TranscriptionKind(str, enum.Enum):
     bad_crop = "bad_crop"
     not_hebrew = "not_hebrew"
     not_text = "not_text"
+    other = "other"
 
 
 class Transcription(Base):
