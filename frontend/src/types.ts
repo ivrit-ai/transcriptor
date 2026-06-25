@@ -14,6 +14,7 @@ export interface SessionLine {
   status: LineStatus
   transcription_count: number
   your_text?: string
+  prior_kind?: string
 }
 
 export interface SessionDTO {

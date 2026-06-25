@@ -420,6 +420,12 @@ export function WorkScreen() {
     try { wrapRef.current?.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
   }
 
+  // Which flag (if any) was previously applied to the current line
+  const activeFlagKind = (L.current?.status === 'flagged' || L.current?.status === 'done_by_you')
+    && L.current?.prior_kind && L.current.prior_kind !== 'text'
+    ? L.current.prior_kind
+    : null
+
   const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   const canGoNext = nextEligibleIdx !== -1
 
@@ -738,7 +744,11 @@ export function WorkScreen() {
                 className="tl-reason-inline"
                 onClick={() => setOtherOpen(o => !o)}
                 title="אחר — פתח תיבת הסבר (Ctrl+4)"
-                style={otherOpen ? { background: 'var(--tl-muted-fill)', color: 'var(--tl-ink)' } : undefined}
+                style={activeFlagKind === 'other' || otherOpen ? {
+                  background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
+                  color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
+                  borderColor: activeFlagKind === 'other' ? 'oklch(0.72 0.1 15)' : undefined,
+                } : undefined}
               >
                 {r.label}
                 <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
@@ -749,6 +759,11 @@ export function WorkScreen() {
                 className="tl-reason-inline"
                 onClick={() => L.flag(r.kind)}
                 title={`${r.label} (Ctrl+${i + 1})`}
+                style={activeFlagKind === r.kind ? {
+                  background: 'oklch(0.96 0.03 15)',
+                  color: 'oklch(0.42 0.14 15)',
+                  borderColor: 'oklch(0.72 0.1 15)',
+                } : undefined}
               >
                 {r.label}
                 <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>

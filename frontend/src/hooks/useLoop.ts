@@ -13,6 +13,7 @@ export interface LoopLine {
   status: LoopLineStatus
   transcription_count: number
   your_text?: string
+  prior_kind?: string
 }
 
 export interface LoopPage {
@@ -228,7 +229,7 @@ export function useLoop(): LoopState {
       if (!line) return
 
       setLines((ls) =>
-        ls.map((l, i) => (i === idx ? { ...l, status: 'flagged' } : l))
+        ls.map((l, i) => (i === idx ? { ...l, status: 'flagged', prior_kind: kind } : l))
       )
       setDone((d) => d + 1)
 
