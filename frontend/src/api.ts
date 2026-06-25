@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse } from './types'
 
 const BASE = ''
 
@@ -106,4 +106,34 @@ export const api = {
 
   startImport: (body: ImportStartBody): Promise<ImportStatusDTO | null> =>
     request<ImportStatusDTO>('/api/admin/import', { method: 'POST', body: JSON.stringify(body) }),
+
+  getAdminPages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
+    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
+
+  getAdminPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
+    request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
+
+  getCurators: (): Promise<Array<{ user_id: string; email: string }> | null> =>
+    request<Array<{ user_id: string; email: string }>>('/api/admin/curators'),
+
+  getCuratorCheck: (): Promise<{ ok: boolean } | null> =>
+    request<{ ok: boolean }>('/api/admin/curator/check'),
+
+  updateUserRole: (userId: string, role: string): Promise<{ user_id: string; role: string } | null> =>
+    request<{ user_id: string; role: string }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  getCuratePages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
+    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
+
+  getCuratePageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
+    request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
+
+  updateCuratePageLines: (pageId: string, body: UpdatePageLinesBody): Promise<UpdatePageLinesResponse | null> =>
+    request<UpdatePageLinesResponse>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 }

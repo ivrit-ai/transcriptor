@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
@@ -6,17 +7,37 @@ from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_admin
+from app.api.deps import get_db, require_admin, require_curator
 from app.models.batch import Batch
 from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
 from app.services import import_runner
+from app.storage import resolve_image_url
 
 router = APIRouter()
 
 _COMPLETION_TARGET = 3
+
+
+@router.get("/curators")
+def curator_list(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict]:
+    rows = db.execute(
+        select(User.id, User.email).where(User.role.in_(["curator", "admin"]))
+    ).mappings().all()
+    return [{"user_id": str(r["id"]), "email": r["email"]} for r in rows]
+
+
+@router.get("/curator/check")
+def curator_check(
+    _: Annotated[User, Depends(require_curator)],
+) -> dict:
+    """Lightweight endpoint the frontend uses to verify curator access."""
+    return {"ok": True}
 
 
 @router.get("/stats")
@@ -79,6 +100,7 @@ def admin_users(
             User.id,
             User.display_name,
             User.email,
+            User.role,
             User.created_at,
             func.max(Transcription.updated_at).label("last_active"),
             func.count(Transcription.id).label("total_submissions"),
@@ -100,7 +122,7 @@ def admin_users(
             ).label("flag_count"),
         )
         .outerjoin(Transcription, Transcription.user_id == User.id)
-        .group_by(User.id, User.display_name, User.email, User.created_at)
+        .group_by(User.id, User.display_name, User.email, User.role, User.created_at)
         .order_by(func.count(
             case((Transcription.kind == TranscriptionKind.text, Transcription.id))
         ).desc())
@@ -111,6 +133,7 @@ def admin_users(
             "user_id": str(r["id"]),
             "display_name": r["display_name"],
             "email": r["email"],
+            "role": r["role"],
             "joined_at": r["created_at"].isoformat() if r["created_at"] else None,
             "last_active": r["last_active"].isoformat() if r["last_active"] else None,
             "total_submissions": r["total_submissions"],
@@ -120,6 +143,39 @@ def admin_users(
         }
         for r in rows
     ]
+
+
+_VALID_ROLES = {"user", "curator", "admin"}
+
+
+class UpdateUserRequest(BaseModel):
+    role: str
+
+
+@router.patch("/users/{user_id}")
+def admin_update_user(
+    user_id: str,
+    body: UpdateUserRequest,
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    if body.role not in _VALID_ROLES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid role. Must be one of: {', '.join(sorted(_VALID_ROLES))}",
+        )
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid user_id") from e
+
+    target = db.get(User, uid)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target.role = body.role
+    db.commit()
+    return {"user_id": str(target.id), "role": target.role}
 
 
 @router.get("/coverage")
@@ -162,6 +218,188 @@ def admin_coverage(
         }
         for r in rows
     ]
+
+
+@router.get("/pages")
+def admin_pages(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    """
+    Flat paginated list of manuscript pages ordered by (batch, page).
+    Each item carries its batch info for display.
+    """
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    offset = (page - 1) * page_size
+
+    total: int = db.execute(select(func.count(Page.id))).scalar_one()
+    approved_count: int = db.execute(
+        select(func.count(Page.id)).where(Page.approved.is_(True))
+    ).scalar_one()
+
+    rows = db.execute(
+        select(
+            Page.id,
+            Page.external_id,
+            Page.image_path,
+            Page.approved,
+            Page.approved_by,
+            Page.updated_at,
+            Batch.id.label("batch_id"),
+            Batch.external_id.label("batch_external_id"),
+            Batch.source,
+        )
+        .join(Batch, Batch.id == Page.batch_id)
+        .order_by(Batch.external_id, Page.external_id)
+        .offset(offset)
+        .limit(page_size)
+    ).mappings().all()
+
+    items = [
+        {
+            "page_id": str(r["id"]),
+            "page_external_id": r["external_id"],
+            "image_path": r["image_path"],
+            "approved": r["approved"],
+            "approved_by": str(r["approved_by"]) if r["approved_by"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+            "batch_id": str(r["batch_id"]),
+            "batch_external_id": r["batch_external_id"],
+            "source": r["source"],
+        }
+        for r in rows
+    ]
+
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "approved_count": approved_count,
+        "total_pages": (total + page_size - 1) // page_size if page_size else 0,
+    }
+
+
+@router.get("/page_lines")
+def admin_page_lines(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+    page_id: str,
+) -> dict:
+    try:
+        pid = uuid.UUID(page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid page_id") from e
+
+    page = db.get(Page, pid)
+    if page is None:
+        raise HTTPException(status_code=404, detail="page not found")
+
+    lines = db.execute(
+        select(Line)
+        .where(Line.page_id == page.id)
+        .order_by(Line.line_index)
+    ).scalars().all()
+
+    return {
+        "page_id": str(page.id),
+        "external_id": page.external_id,
+        "batch_external_id": page.batch.external_id,
+        "document_name": page.document_name,
+        "image_url": resolve_image_url(page.image_path),
+        "width_px": page.width_px,
+        "height_px": page.height_px,
+        "image_rotation": page.image_rotation,
+        "approved": page.approved,
+        "lines": [
+            {
+                "id": str(line.id),
+                "external_id": line.external_id,
+                "line_index": line.line_index,
+                "bbox": line.bbox,
+                "polygon": line.polygon,
+                "transcription_count": line.transcription_count,
+            }
+            for line in lines
+        ],
+    }
+
+
+# ── Curation save (update page lines, rotation, approval) ────────────────────
+
+
+class UpdatePageLinesRequest(BaseModel):
+    rotation: int | None = None
+    lines: list[dict] | None = None
+    approved: bool | None = None
+
+
+@router.put("/page_lines")
+def update_page_lines(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+    page_id: str,
+    body: UpdatePageLinesRequest,
+) -> dict:
+    if body.rotation is not None and body.lines is None:
+        raise HTTPException(
+            status_code=422,
+            detail="lines must be provided when rotation is specified",
+        )
+
+    try:
+        pid = uuid.UUID(page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid page_id") from e
+
+    page = db.get(Page, pid)
+    if page is None:
+        raise HTTPException(status_code=404, detail="page not found")
+
+    if body.rotation is not None:
+        page.image_rotation = body.rotation
+
+    if body.approved is not None:
+        page.approved = body.approved
+        page.approved_by = _.id if body.approved else None
+
+    update_line_ids: list[str] | None = None
+
+    if body.lines is not None:
+        db.query(Line).filter(Line.page_id == page.id).delete()
+        new_lines = []
+        # Sort lines by visual flow: top-to-bottom (y asc), right-to-left (x+w desc)
+        sorted_lines = sorted(
+            body.lines,
+            key=lambda ld: (ld["bbox"]["y"], -(ld["bbox"]["x"] + ld["bbox"]["w"])),
+        )
+        for idx, line_data in enumerate(sorted_lines):
+            new_line = Line(
+                page_id=page.id,
+                line_index=idx,
+                bbox=line_data["bbox"],
+                polygon=line_data.get("polygon"),
+                detection_confidence=line_data.get("detection_confidence"),
+                external_id=line_data["external_id"],
+                transcription_count=line_data.get("transcription_count", 0),
+            )
+            db.add(new_line)
+            new_lines.append(new_line)
+        db.flush()
+        update_line_ids = [str(l.id) for l in new_lines]
+
+    db.commit()
+    db.refresh(page)
+
+    return {
+        "page_id": str(page.id),
+        "image_rotation": page.image_rotation,
+        "approved": page.approved,
+        "line_ids": update_line_ids,
+    }
 
 
 @router.get("/queue")

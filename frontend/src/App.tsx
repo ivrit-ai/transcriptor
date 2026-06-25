@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { SessionProvider } from './contexts/SessionContext'
 import { AuthGuard } from './guards/AuthGuard'
 import { AdminGuard } from './guards/AdminGuard'
+import { CuratorGuard } from './guards/CuratorGuard'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LandingScreen } from './screens/LandingScreen'
 import { AuthScreen } from './screens/AuthScreen'
@@ -10,6 +11,8 @@ import { WorkScreen } from './screens/WorkScreen'
 import { AllCaughtUpScreen } from './screens/AllCaughtUpScreen'
 import { ProgressScreen } from './screens/ProgressScreen'
 import { AdminScreen } from './screens/AdminScreen'
+import { CurateScreen } from './screens/CurateScreen'
+import { CuratePageScreen } from './screens/CuratePageScreen'
 
 export default function App() {
   return (
@@ -29,6 +32,8 @@ export default function App() {
             <Route path="/done" element={<AuthGuard><AllCaughtUpScreen /></AuthGuard>} />
             <Route path="/me" element={<AuthGuard><ProgressScreen /></AuthGuard>} />
             <Route path="/admin" element={<AdminGuard><AdminScreen /></AdminGuard>} />
+            <Route path="/curate" element={<CuratorGuard><CurateScreen /></CuratorGuard>} />
+            <Route path="/curate/:pageId" element={<CuratorGuard><CuratePageScreen /></CuratorGuard>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

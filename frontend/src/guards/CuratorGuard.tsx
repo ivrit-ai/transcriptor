@@ -5,11 +5,11 @@ import { queryKeys } from '../queries'
 import { useSession } from '../contexts/SessionContext'
 import { api } from '../api'
 
-export function AdminGuard({ children }: { children: ReactNode }) {
+export function CuratorGuard({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useSession()
   const { isLoading, isError } = useQuery({
-    queryKey: queryKeys.admin.stats,
-    queryFn: () => api.getAdminStats(),
+    queryKey: queryKeys.admin.curatorCheck,
+    queryFn: () => api.getCuratorCheck(),
     staleTime: Infinity,
     retry: false,
     enabled: isAuthenticated && !authLoading,
@@ -38,7 +38,9 @@ export function AdminGuard({ children }: { children: ReactNode }) {
       }}>
         <div style={{ fontSize: 48 }}>🔒</div>
         <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--tl-ink)' }}>Access Denied</div>
-        <div style={{ color: 'var(--tl-muted)', fontSize: 14 }}>Your account does not have admin privileges.</div>
+        <div style={{ color: 'var(--tl-muted)', fontSize: 14 }}>
+          Your account does not have curator privileges.
+        </div>
       </div>
     )
   }

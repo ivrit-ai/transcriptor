@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { TopNav, Icon } from '../components/shared'
 import { api } from '../api'
 import type { ProfileDTO } from '../api'
@@ -45,12 +47,7 @@ function CaughtUpStats({ isMobile, profile }: { isMobile?: boolean; profile: Pro
 }
 
 export function AllCaughtUpScreen() {
-  const [profile, setProfile] = useState<ProfileDTO>(FALLBACK)
   const [viewportW, setViewportW] = useState(window.innerWidth)
-
-  useEffect(() => {
-    api.getProfile().then(d => { if (d) setProfile(d) }).catch(() => {})
-  }, [])
 
   useEffect(() => {
     const h = () => setViewportW(window.innerWidth)
@@ -60,6 +57,14 @@ export function AllCaughtUpScreen() {
 
   const isMobile = viewportW < 768
 
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.profile.me,
+    queryFn: () => api.getProfile(),
+    staleTime: 30_000,
+  })
+
+  const profile = profileData ?? FALLBACK
+
   const body = (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -67,7 +72,6 @@ export function AllCaughtUpScreen() {
       maxWidth: isMobile ? 340 : 480,
       padding: isMobile ? '0 24px' : 0,
     }}>
-      {/* green seal */}
       <div style={{ position: 'relative', width: 88, height: 88, marginBottom: 26 }}>
         <div style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
@@ -105,7 +109,6 @@ export function AllCaughtUpScreen() {
       }}>
         <CaughtUpStats isMobile={isMobile} profile={profile} />
       </div>
-
     </div>
   )
 

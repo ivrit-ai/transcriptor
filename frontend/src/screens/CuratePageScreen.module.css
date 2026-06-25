@@ -1,0 +1,262 @@
+.page {
+  direction: ltr;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Left panel ────────────────────────────────────────────────────────── */
+
+.leftPanel {
+  flex: 0 0 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-right: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  overflow-y: auto;
+}
+
+.details {
+  padding: 20px 20px 16px;
+  border-bottom: 0.5px solid var(--tl-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.detailLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tl-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detailValue {
+  font-size: 13px;
+  color: var(--tl-ink);
+  word-break: break-all;
+}
+
+.actions {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.actionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actionsTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tl-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btnRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  border-radius: 7px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-page);
+  color: var(--tl-ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.actionBtn:hover:not(:disabled) {
+  background: var(--tl-muted-fill);
+}
+
+.actionBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.keyHint {
+  font-size: 10px;
+  color: var(--tl-muted);
+  margin-left: 4px;
+}
+
+.saveBtn {
+  background: var(--tl-accent);
+  color: #fff;
+  border-color: var(--tl-accent);
+  font-weight: 600;
+}
+
+.saveBtn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.saveBtn:disabled {
+  background: var(--tl-muted-fill);
+  color: var(--tl-muted);
+  border-color: var(--tl-border);
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--tl-ink);
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.checkLabel input[type="checkbox"] {
+  accent-color: var(--tl-accent);
+}
+
+.backBtn {
+  composes: actionBtn;
+  width: 100%;
+}
+
+/* ── Lines panel (middle) ─────────────────────────────────────────────── */
+
+.linesPanel {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  border-right: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.linesPanelHeader {
+  padding: 12px 14px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tl-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 0.5px solid var(--tl-border);
+  position: sticky;
+  top: 0;
+  background: var(--tl-surface);
+  z-index: 1;
+}
+
+.linesPanelList {
+  display: flex;
+  flex-direction: column;
+}
+
+.linesPanelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  color: var(--tl-ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 0.5px solid var(--tl-border);
+}
+
+.linesPanelRow:hover,
+.linesPanelRowActive {
+  background: rgba(255, 255, 0, 0.12);
+}
+
+.linesPanelIndex {
+  font-weight: 600;
+  min-width: 24px;
+  color: var(--tl-muted);
+}
+
+.linesPanelConf {
+  color: var(--tl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Line box highlight ──────────────────────────────────────────────── */
+
+.lineBoxHighlighted {
+  border-color: yellow !important;
+  background: rgba(255, 255, 0, 0.12);
+}
+
+/* ── Right panel ───────────────────────────────────────────────────────── */
+
+.rightPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tl-page);
+  overflow: hidden;
+  position: relative;
+}
+
+.status {
+  color: var(--tl-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.imageArea {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.imageFrame {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.imageLayer {
+  position: absolute;
+  transform-origin: center center;
+}
+
+.pageImage {
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+}
+
+.linesLayer {
+  position: absolute;
+  inset: 0;
+}
+
+.lineBox {
+  position: absolute;
+  border: 1.5px solid cyan;
+  border-radius: 2px;
+  box-sizing: border-box;
+  pointer-events: none;
+}

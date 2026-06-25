@@ -318,12 +318,29 @@ export function WorkScreen() {
 
   const pagePxW = page?.width_px ?? 474
   const pagePxH = page?.height_px ?? 218
-  const baseScale = pageDispW / pagePxW
-  const displayScale = baseScale * zoom
-  const zoomedW = pagePxW * displayScale
-  const zoomedH = pagePxH * displayScale
+  const rotation = ((page?.image_rotation ?? 0) % 360 + 360) % 360
 
-  const b = L.current?.bbox ?? { x: 0, y: 0, w: pagePxW, h: 30 }
+  // Display dimensions: swap W/H when rotated 90 or 270 degrees
+  const displayPageW = rotation % 180 === 0 ? pagePxW : pagePxH
+  const displayPageH = rotation % 180 === 0 ? pagePxH : pagePxW
+
+  // Scale is based on the displayed (possibly swapped) width
+  const baseScale = pageDispW / displayPageW
+  const displayScale = baseScale * zoom
+
+  // The visual frame of the page (after rotation)
+  const zoomedW = displayPageW * displayScale   // frame width
+  const zoomedH = displayPageH * displayScale   // frame height
+
+  // The raw image layer dimensions (unrotated, then CSS-rotated)
+  const rawImageW = pagePxW * displayScale
+  const rawImageH = pagePxH * displayScale
+  // Offsets to center the raw image layer inside the rotated frame
+  const imageLayerLeft = (zoomedW - rawImageW) / 2
+  const imageLayerTop  = (zoomedH - rawImageH) / 2
+
+  // Line bboxes are already in the displayed (rotated) coordinate system — use as-is
+  const b = L.current?.bbox ?? { x: 0, y: 0, w: displayPageW, h: 30 }
   const lx = b.x * displayScale
   const ly = b.y * displayScale
   const lw = b.w * displayScale
@@ -527,86 +544,123 @@ export function WorkScreen() {
 
       {/* page + spotlight */}
       <div style={{
-        position: 'absolute', left: sideM, top: pageTop0, width: zoomedW,
+        position: 'absolute', left: sideM, top: pageTop0, width: zoomedW, height: zoomedH,
         transform: `translate(${finalTx}px, ${ty}px)`,
         transition,
         willChange: 'transform',
       }}>
-        {/* dimmed sheet */}
-        <img
-          src={page?.image_url}
-          alt=""
-          draggable={false}
-          style={{
-            width: zoomedW, display: 'block', borderRadius: 6,
-            boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
-            filter: 'brightness(0.64) saturate(0.82) contrast(0.98)',
-            pointerEvents: 'none',
-          }}
-        />
-        {/* Faint outlines for all line boxes — subtle spatial context */}
-        {L.lines.map((line, i) => {
-          if (i === L.cursor) return null
-          const ox = line.bbox.x * displayScale
-          const oy = line.bbox.y * displayScale
-          const ow = line.bbox.w * displayScale
-          const oh = line.bbox.h * displayScale
-          const done = line.status === 'done_by_you' || line.status === 'flagged'
-          return (
-            <div
-              key={line.id}
-              onClick={(e) => { e.stopPropagation(); navigateTo(i) }}
-              onPointerDown={(e) => { if (e.pointerType !== 'touch') e.stopPropagation() }}
-              title={`שורה ${i + 1}`}
-              style={{
-                position: 'absolute', left: ox, top: oy, width: ow, height: oh,
-                border: done
-                  ? '1.5px solid rgba(80,210,130,0.7)'
-                  : '1.5px solid rgba(255,210,120,0.6)',
-                borderRadius: 2,
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                transition: spotTransition,
-              }}
-            />
-          )
-        })}
+        {/* Raw image layer — sized to original px dimensions, CSS-rotated about its center */}
+        <div style={{
+          position: 'absolute',
+          left: imageLayerLeft, top: imageLayerTop,
+          width: rawImageW, height: rawImageH,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: 'center center',
+          borderRadius: 6,
+          boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
+          overflow: 'hidden',
+          pointerEvents: 'none',
+        }}>
+          {/* dimmed sheet */}
+          <img
+            src={page?.image_url}
+            alt=""
+            draggable={false}
+            style={{
+              width: rawImageW, height: rawImageH, display: 'block',
+              filter: 'brightness(0.64) saturate(0.82) contrast(0.98)',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
 
-        {/* spotlight cut-out */}
-        {L.current && (
-          <div style={{
-            position: 'absolute', left: lx, top: ly, width: lw, height: lh,
-            overflow: 'hidden', borderRadius: 4,
-            boxShadow: `0 0 0 2.5px var(--tl-spotlight), 0 0 24px 3px var(--tl-spotlight-glow), 0 6px 18px rgba(40,30,20,0.28)`,
-            transition: spotTransition,
-          }}>
-            <img
-              src={page?.image_url}
-              alt=""
-              draggable={false}
-              style={{
-                position: 'absolute', left: -lx, top: -ly,
-                width: zoomedW, maxWidth: 'none', display: 'block',
+        {/* Lines layer — non-rotated, sized to the display frame; bboxes are in display coords */}
+        <div style={{ position: 'absolute', left: 0, top: 0, width: zoomedW, height: zoomedH, pointerEvents: 'none' }}>
+          {/* Faint outlines for all line boxes — subtle spatial context */}
+          {L.lines.map((line, i) => {
+            if (i === L.cursor) return null
+            const ox = line.bbox.x * displayScale
+            const oy = line.bbox.y * displayScale
+            const ow = line.bbox.w * displayScale
+            const oh = line.bbox.h * displayScale
+            const done = line.status === 'done_by_you' || line.status === 'flagged'
+            return (
+              <div
+                key={line.id}
+                onClick={(e) => { e.stopPropagation(); navigateTo(i) }}
+                onPointerDown={(e) => { if (e.pointerType !== 'touch') e.stopPropagation() }}
+                title={`שורה ${i + 1}`}
+                style={{
+                  position: 'absolute', left: ox, top: oy, width: ow, height: oh,
+                  border: done
+                    ? '1.5px solid rgba(80,210,130,0.7)'
+                    : '1.5px solid rgba(255,210,120,0.6)',
+                  borderRadius: 2,
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  transition: spotTransition,
+                }}
+              />
+            )
+          })}
+
+          {/* spotlight cut-out — clipping box in display coords, rotated image inside */}
+          {L.current && (
+            <div style={{
+              position: 'absolute', left: lx, top: ly, width: lw, height: lh,
+              overflow: 'hidden', borderRadius: 4,
+              boxShadow: `0 0 0 2.5px var(--tl-spotlight), 0 0 24px 3px var(--tl-spotlight-glow), 0 6px 18px rgba(40,30,20,0.28)`,
+              transition: spotTransition,
+            }}>
+              <div style={{
+                position: 'absolute',
+                left: -lx,
+                top: -ly,
+                width: zoomedW,
+                height: zoomedH,
                 pointerEvents: 'none',
-              }}
-            />
-          </div>
-        )}
-        {/* RTL leading-edge caret */}
-        {L.current && (
-          <div style={{
-            position: 'absolute',
-            left: lx + lw, top: ly + lh / 2,
-            transform: 'translate(2px,-50%)',
-            width: 0, height: 0,
-            borderTop: '6px solid transparent',
-            borderBottom: '6px solid transparent',
-            borderRight: '7px solid var(--tl-spotlight)',
-            transition: spotTransition,
-            pointerEvents: 'none',
-          }} />
-        )}
-      </div>
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  left: imageLayerLeft,
+                  top: imageLayerTop,
+                  width: rawImageW,
+                  height: rawImageH,
+                  transform: `rotate(${rotation}deg)`,
+                  transformOrigin: 'center center',
+                  pointerEvents: 'none',
+                }}>
+                  <img
+                    src={page?.image_url}
+                    alt=""
+                    draggable={false}
+                    style={{
+                      width: rawImageW, height: rawImageH,
+                      maxWidth: 'none', display: 'block',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RTL leading-edge caret */}
+          {L.current && (
+            <div style={{
+              position: 'absolute',
+              left: lx + lw, top: ly + lh / 2,
+              transform: 'translate(2px,-50%)',
+              width: 0, height: 0,
+              borderTop: '6px solid transparent',
+              borderBottom: '6px solid transparent',
+              borderRight: '7px solid var(--tl-spotlight)',
+              transition: spotTransition,
+              pointerEvents: 'none',
+            }} />
+          )}
+        </div>{/* end lines layer */}
+      </div>{/* end page + spotlight */}
 
       {/* top scrim */}
       <div style={{

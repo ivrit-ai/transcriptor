@@ -38,13 +38,39 @@ def get_current_user(
     )
 
 
+def _effective_role(user: User) -> str:
+    """Return the effective role for a user.
+
+    A user listed in ``settings.admin_emails`` is treated as an admin
+    regardless of the role stored in the database.
+    """
+    if user.email in settings.admin_emails:
+        return "admin"
+    return user.role
+
+
 def require_admin(
     user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     if settings.dev_mode:
         return user
-    if user.email not in settings.admin_emails:
+    if _effective_role(user) != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+def require_curator(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Allow access to users with role 'curator' or 'admin'.
+
+    Users listed in ``settings.admin_emails`` are also granted access as they
+    are implicitly treated as admins.  In dev mode all users are allowed.
+    """
+    if settings.dev_mode:
+        return user
+    if _effective_role(user) not in ("curator", "admin"):
+        raise HTTPException(status_code=403, detail="Curator access required")
     return user
 
 
