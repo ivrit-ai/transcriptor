@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon } from '../components/shared'
@@ -625,25 +625,15 @@ export function WorkScreen() {
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
           <ZoomControls zoom={zoom} onChange={changeZoom} />
-          {/* vertical rule */}
-          <div style={{ width: 1, height: 14, background: 'var(--tl-border)', flexShrink: 0 }} />
           {window.innerWidth >= 480 && (<>
-            <button
-              onClick={() => navigate('/guidelines')}
-              className="tl-header-link"
-            >שאלות ותשובות</button>
-            <button
-              onClick={() => navigate('/me')}
-              className="tl-header-link"
-            >הפרופיל שלי</button>
-            {/* vertical rule */}
-            <div style={{ width: 1, height: 14, background: 'var(--tl-border)', flexShrink: 0 }} />
+            <Link to="/guidelines" className="tl-topnav-link">שאלות ותשובות</Link>
+            <Link to="/me" className="tl-topnav-link">הפרופיל שלי</Link>
           </>)}
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap', padding: '0 4px' }}>
             <span style={{ direction: 'ltr', display: 'inline-block' }}>
               {new Intl.NumberFormat('en-US').format(L.daily)}
             </span>{' '}היום
