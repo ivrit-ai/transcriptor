@@ -1,5 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
@@ -239,13 +241,21 @@ export function WorkScreen() {
   // specific page; otherwise the loop auto-picks the next page.
   const { pageId } = useParams()
   const L = useLoop(pageId)
+  const queryClient = useQueryClient()
 
   // "Next page" / "skip to another page": from a specific page, hand back to the
   // general auto-dispatch flow; otherwise just refetch the next session.
+  // Invalidate the cached next-session first so the general flow fetches a fresh
+  // page on mount (the loop query uses staleTime: Infinity and would otherwise
+  // serve whatever was cached from an earlier /work visit).
   const goNextPage = useCallback(() => {
-    if (pageId) navigate('/work', { replace: true })
-    else L.reset()
-  }, [pageId, navigate, L.reset])
+    if (pageId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.session.next })
+      navigate('/work', { replace: true })
+    } else {
+      L.reset()
+    }
+  }, [pageId, navigate, L.reset, queryClient])
   const taRef = useRef<HTMLTextAreaElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
