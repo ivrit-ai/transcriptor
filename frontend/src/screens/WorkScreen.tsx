@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
-import { Icon } from '../components/shared'
+import { Icon, TopNav } from '../components/shared'
 
 const EASE = 'cubic-bezier(.3,.8,.3,1)'
 const MIN_ZOOM = 0.5
@@ -625,15 +625,11 @@ export function WorkScreen() {
           עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
         </span>
         <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
           <ZoomControls zoom={zoom} onChange={changeZoom} />
-          {window.innerWidth >= 480 && (<>
-            <Link to="/guidelines" className="tl-topnav-link">שאלות ותשובות</Link>
-            <Link to="/me" className="tl-topnav-link">הפרופיל שלי</Link>
-          </>)}
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap', padding: '0 4px' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap' }}>
             <span style={{ direction: 'ltr', display: 'inline-block' }}>
               {new Intl.NumberFormat('en-US').format(L.daily)}
             </span>{' '}היום
@@ -892,8 +888,9 @@ export function WorkScreen() {
   return (
     <div dir="rtl" lang="he" style={{
       height: '100vh', background: 'var(--tl-page)',
-      position: 'relative', display: 'flex', flexDirection: 'column',
+      position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
+      <TopNav active="work" />
       {innerContent}
 
       {/* page-fill progress bar (fills RTL) */}
