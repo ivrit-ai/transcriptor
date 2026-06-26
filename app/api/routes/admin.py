@@ -321,6 +321,7 @@ def admin_page_lines(
                 "line_index": line.line_index,
                 "bbox": line.bbox,
                 "polygon": line.polygon,
+                "detection_confidence": line.detection_confidence,
                 "transcription_count": line.transcription_count,
             }
             for line in lines

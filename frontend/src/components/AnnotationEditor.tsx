@@ -226,8 +226,19 @@ export function AnnotationEditor({
     [editing, draftAnnotations],
   );
 
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
   const saveEdit = useCallback(() => {
-    onSaveAnnotations?.(draftAnnotations);
+    onSaveAnnotations?.(
+      draftAnnotations.map((a) => {
+        const pts = annotationPoints(a).map(round3);
+        return {
+          ...a,
+          polygon: pts,
+          bbox: computeBbox(pts),
+        };
+      }),
+    );
     exitEditState();
   }, [draftAnnotations, onSaveAnnotations, exitEditState]);
 
@@ -420,9 +431,9 @@ export function AnnotationEditor({
     }
 
     // 4-point box polygon (TL, TR, BR, BL), clockwise.
-    const polygon = [minX, minY, maxX, minY, maxX, maxY, minX, maxY];
+    const polygon = [minX, minY, maxX, minY, maxX, maxY, minX, maxY].map(round3);
     const newAnn: Annotation = {
-      bbox: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+      bbox: { x: round3(minX), y: round3(minY), w: round3(maxX - minX), h: round3(maxY - minY) },
       polygon,
       _status: "new",
     };
