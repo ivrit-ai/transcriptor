@@ -10,6 +10,7 @@ const DEV_SESSION: SessionDTO = {
   height_px: 900,
   image_rotation: 0,
   page_label: 1,
+  image_rotation: 0,
   lines: Array.from({ length: 8 }, (_, i) => ({
     id: `dev-line-${i}`,
     line_index: i,

@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys, queryClient } from '../queries'
 import { api } from '../api'
 import type { AdminDatasetDTO, AdminPageLinesDTO, BBox } from '../types'
+import { AnnotationEditor } from '../components/AnnotationEditor'
+import type { Annotation } from '../components/AnnotationEditor'
+import { TopNav } from '../components/shared'
 import css from './CuratePageScreen.module.css'
 
 // ── Rotation helpers ────────────────────────────────────────────────────────
@@ -78,10 +81,8 @@ export function CuratePageScreen() {
   const [localLines, setLocalLines] = useState<AdminPageLinesDTO['lines'] | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const imageAreaRef = useRef<HTMLDivElement>(null)
-  const imageFrameRef = useRef<HTMLDivElement>(null)
-  const [imageAreaSize, setImageAreaSize] = useState({ w: 0, h: 0 })
-  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null)
+  const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null)
+  const [annotationDirty, setAnnotationDirty] = useState(false)
 
   const { data: serverData, isLoading, isError } = useQuery({
     queryKey: queryKeys.curate.pageLines(pageId ?? ''),
@@ -119,28 +120,12 @@ export function CuratePageScreen() {
     effectiveListData?.items.findIndex(item => item.page_id === pageId) ?? -1
   )
 
-  useEffect(() => {
-    const el = imageAreaRef.current
-    if (!page || !el) return
-    const updateSize = () => {
-      const rect = el.getBoundingClientRect()
-      setImageAreaSize({ w: rect.width, h: rect.height })
-    }
-    updateSize()
-    const ro = new ResizeObserver(updateSize)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [page])
+  // ── Build annotations for AnnotationEditor ─────────────────────────────
 
-  const dispW = currentRotation % 180 === 0 ? imgW : imgH
-  const dispH = currentRotation % 180 === 0 ? imgH : imgW
-  const scale = imageAreaSize.w > 0 && imageAreaSize.h > 0
-    ? Math.min(imageAreaSize.w / dispW, imageAreaSize.h / dispH)
-    : 0
-  const imageLayerW = imgW * scale
-  const imageLayerH = imgH * scale
-  const imageFrameW = dispW * scale
-  const imageFrameH = dispH * scale
+  const annotations: Annotation[] = useMemo(
+    () => actualLines.map(line => ({ bbox: line.bbox, polygon: line.polygon })),
+    [actualLines],
+  )
 
   // ── Sorted lines for panel ────────────────────────────────────────────────
 
@@ -149,78 +134,62 @@ export function CuratePageScreen() {
     [actualLines],
   )
 
-  // ── Line hover via pointer intersection ────────────────────────────────────
+  // ── Annotation hover/click callbacks ────────────────────────────────────
 
-  const findLineAtPoint = useCallback((clientX: number, clientY: number) => {
-    if (!imageFrameRef.current || scale <= 0) return null
-    const rect = imageFrameRef.current.getBoundingClientRect()
-    const px = clientX - rect.left
-    const py = clientY - rect.top
-
-    const intersecting = actualLines.filter(l => {
-      const lx = l.bbox.x * scale
-      const ly = l.bbox.y * scale
-      const lw = Math.max(l.bbox.w * scale, 1)
-      const lh = Math.max(l.bbox.h * scale, 1)
-      return px >= lx && px <= lx + lw && py >= ly && py <= ly + lh
-    })
-
-    if (intersecting.length === 0) return null
-    if (intersecting.length === 1) return intersecting[0].id
-    return intersecting.reduce((a, b) =>
-      a.bbox.w * a.bbox.h < b.bbox.w * b.bbox.h ? a : b
-    ).id
-  }, [actualLines, scale])
-
-  const handleImagePointerMove = useCallback((e: React.PointerEvent) => {
-    const id = findLineAtPoint(e.clientX, e.clientY)
-    setHoveredLineId(id)
-  }, [findLineAtPoint])
-
-  const handleImagePointerLeave = useCallback(() => {
-    setHoveredLineId(null)
+  const handleAnnotationHover = useCallback((index: number | null) => {
+    setHoveredLineIndex(index)
   }, [])
 
-  // ── Rotation ──────────────────────────────────────────────────────────────
+  const handleAnnotationClick = useCallback((_index: number) => {
+    // Click handling can be extended later
+  }, [])
 
-  const rotateBy = useCallback((deltaRotation: number) => {
-    if (!page) return
-    const coordW = currentRotation % 180 === 0 ? imgW : imgH
-    const coordH = currentRotation % 180 === 0 ? imgH : imgW
-    setLocalLines(lines => lines
-      ? applyRotationToLines(lines, deltaRotation, coordW, coordH)
-      : lines
-    )
-    setCurrentRotation(r => ((r + deltaRotation) % 360 + 360) % 360)
-  }, [page, currentRotation, imgW, imgH])
-
-  const rotateLeft = useCallback(() => {
-    rotateBy(-90)
-  }, [rotateBy])
-
-  const rotateRight = useCallback(() => {
-    rotateBy(90)
-  }, [rotateBy])
-
-  const rotate180 = useCallback(() => {
-    rotateBy(180)
-  }, [rotateBy])
+  /**
+   * Normalize a polygon value from the editor (flat `[x1,y1,x2,y2,…]` array)
+   * to the `[[x,y],…]` tuple format that `rotatePolygon` expects.
+   * Already-tuple or object-format arrays pass through unchanged.
+   */
+  function normalizePolygon(poly: unknown): unknown {
+    if (!Array.isArray(poly) || poly.length === 0) return poly
+    // Already tuple format: [[x,y], ...]
+    if (Array.isArray(poly[0])) return poly
+    // Already object format: [{x,y}, ...]
+    if (poly[0] != null && typeof poly[0] === 'object' && 'x' in (poly[0] as object)) return poly
+    // Flat number array → convert to [[x,y], ...]
+    if (poly.every((v: unknown) => typeof v === 'number')) {
+      const tuples: number[][] = []
+      for (let k = 0; k + 1 < poly.length; k += 2) {
+        tuples.push([poly[k] as number, poly[k + 1] as number])
+      }
+      return tuples
+    }
+    return poly
+  }
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
-  const doSave = useCallback(async (opts: { approved: boolean; rotation: number }) => {
+  const doSave = useCallback(async (
+    opts: { approved: boolean; rotation: number },
+    explicitLines?: AdminPageLinesDTO['lines'],
+  ) => {
     if (!page || !pageId) return
     setSaving(true)
     try {
       const rotationChanged = opts.rotation !== page.image_rotation
       const approvedChanged = opts.approved !== page.approved
-      if (!rotationChanged && !approvedChanged) return
+      // Use explicit lines if provided (from annotation editor save),
+      // otherwise check whether localLines was set by editor/rotation.
+      const linesForSave = explicitLines ?? (localLines !== null ? actualLines : null)
+      const linesChanged = linesForSave !== null
+
+      if (!rotationChanged && !approvedChanged && !linesChanged) return
 
       const body: Parameters<typeof api.updateCuratePageLines>[1] = {}
 
-      if (rotationChanged) {
+      // Always send lines when rotation changed OR lines were edited.
+      if (rotationChanged || linesChanged) {
         body.rotation = opts.rotation
-        body.lines = actualLines.map(l => ({
+        body.lines = linesForSave!.map(l => ({
           external_id: l.external_id ?? l.id,
           line_index: l.line_index,
           bbox: l.bbox,
@@ -236,9 +205,9 @@ export function CuratePageScreen() {
 
       const result = await api.updateCuratePageLines(pageId, body)
       if (result) {
-        const nextLines = result.line_ids && result.line_ids.length === actualLines.length
-          ? actualLines.map((line, idx) => ({ ...line, id: result.line_ids![idx] }))
-          : actualLines
+        const nextLines = result.line_ids && result.line_ids.length === linesForSave!.length
+          ? linesForSave!.map((line, idx) => ({ ...line, id: result.line_ids![idx] }))
+          : linesForSave!
         setApproved(result.approved)
         setCurrentRotation(result.image_rotation)
         setLocalLines(nextLines)
@@ -265,11 +234,75 @@ export function CuratePageScreen() {
     } finally {
       setSaving(false)
     }
-  }, [page, pageId, actualLines, listPageNum])
+  }, [page, pageId, localLines, actualLines, listPageNum])
 
   const handleSave = useCallback(() => {
+    if (annotationDirty) return
     doSave({ approved, rotation: currentRotation })
-  }, [doSave, approved, currentRotation])
+  }, [doSave, approved, currentRotation, annotationDirty])
+
+  const handleSaveAnnotations = useCallback((saved: Annotation[]) => {
+    const nextLines: typeof actualLines = []
+
+    for (let i = 0; i < saved.length; i++) {
+      const a = saved[i]
+      const status = a._status ?? 'clean'
+
+      if (status === 'deleted') continue
+
+      if (status === 'new') {
+        // Created annotation → new line with confidence 1
+        nextLines.push({
+          id: `new-${Date.now()}-${i}`,
+          line_index: 0, // will be re-indexed below
+          bbox: a.bbox,
+          polygon: normalizePolygon(a.polygon),
+          transcription_count: 0,
+          detection_confidence: 1,
+        })
+      } else {
+        // 'clean' or 'dirty' → keep/update existing line
+        const origLine = actualLines[i]
+        if (origLine) {
+          nextLines.push(
+            status === 'dirty'
+              ? { ...origLine, bbox: a.bbox, polygon: normalizePolygon(a.polygon) }
+              : origLine,
+          )
+        }
+      }
+    }
+
+    // Re-index line_index sequentially
+    const reindexed = nextLines.map((line, i) => ({ ...line, line_index: i }))
+    setLocalLines(reindexed)
+    doSave({ approved, rotation: currentRotation }, reindexed)
+  }, [actualLines, doSave, approved, currentRotation])
+
+  // ── Rotation ──────────────────────────────────────────────────────────────
+
+  const rotateBy = useCallback((deltaRotation: number) => {
+    if (!page) return
+    const coordW = currentRotation % 180 === 0 ? imgW : imgH
+    const coordH = currentRotation % 180 === 0 ? imgH : imgW
+    setLocalLines(lines => lines
+      ? applyRotationToLines(lines, deltaRotation, coordW, coordH)
+      : lines
+    )
+    setCurrentRotation(r => ((r + deltaRotation) % 360 + 360) % 360)
+  }, [page, currentRotation, imgW, imgH])
+
+  const rotateLeft = useCallback(() => {
+    rotateBy(-90)
+  }, [rotateBy])
+
+  const rotateRight = useCallback(() => {
+    rotateBy(90)
+  }, [rotateBy])
+
+  const rotate180 = useCallback(() => {
+    rotateBy(180)
+  }, [rotateBy])
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -308,9 +341,10 @@ export function CuratePageScreen() {
   }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage])
 
   const approveSaveNext = useCallback(async () => {
+    if (annotationDirty) return
     await doSave({ approved: true, rotation: currentRotation })
     goNext()
-  }, [doSave, currentRotation, goNext])
+  }, [doSave, currentRotation, goNext, annotationDirty])
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
 
@@ -335,7 +369,7 @@ export function CuratePageScreen() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [rotateLeft, rotateRight, rotate180, handleSave, navigate, goPrev, goNext, approveSaveNext])
+  }, [rotateLeft, rotateRight, rotate180, handleSave, navigate, goPrev, goNext, approveSaveNext, annotationDirty])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -343,10 +377,16 @@ export function CuratePageScreen() {
     return <div className={css.page}>Invalid page ID</div>
   }
 
-  const hasChanges = currentRotation !== (page?.image_rotation ?? 0) || approved !== (page?.approved ?? false)
+  const hasChanges =
+    currentRotation !== (page?.image_rotation ?? 0) ||
+    approved !== (page?.approved ?? false) ||
+    localLines !== null ||
+    annotationDirty
 
   return (
-    <div className={css.page}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <TopNav active="curate" />
+      <div className={css.page} style={{ height: 'auto', flex: 1, minHeight: 0 }}>
       {/* ── Left panel ────────────────────────────────────────────────── */}
       <div className={css.leftPanel}>
         {page && (
@@ -407,14 +447,26 @@ export function CuratePageScreen() {
               type="button"
               className={`${css.actionBtn} ${css.saveBtn}`}
               onClick={handleSave}
-              disabled={!hasChanges || saving}
+              disabled={!hasChanges || saving || annotationDirty}
             >
               {saving ? 'Saving…' : 'Save'} <span className={css.keyHint}>S</span>
             </button>
           </div>
 
+          {annotationDirty && (
+            <div className={css.annotationDirtyWarning}>
+              Annotation editor has unsaved changes — save or cancel them before saving the page.
+            </div>
+          )}
+
           <div className={css.actionsSection}>
-            <button type="button" className={css.actionBtn} onClick={approveSaveNext} title="Approve, Save & Next  [Shift+Enter]">
+            <button
+              type="button"
+              className={css.actionBtn}
+              onClick={approveSaveNext}
+              disabled={annotationDirty}
+              title="Approve, Save & Next  [Shift+Enter]"
+            >
               Approve, Save & Next <span className={css.keyHint}>⇧⏎</span>
             </button>
           </div>
@@ -455,21 +507,24 @@ export function CuratePageScreen() {
       <div className={css.linesPanel}>
         <div className={css.linesPanelHeader}>Lines</div>
         <div className={css.linesPanelList}>
-          {sortedLines.map(line => (
-            <div
-              key={line.id}
-              className={`${css.linesPanelRow} ${hoveredLineId === line.id ? css.linesPanelRowActive : ''}`}
-              onMouseEnter={() => setHoveredLineId(line.id)}
-              onMouseLeave={() => setHoveredLineId(null)}
-            >
-              <span className={css.linesPanelIndex}>{line.line_index}</span>
-              <span className={css.linesPanelConf}>
-                {line.detection_confidence != null
-                  ? line.detection_confidence.toFixed(2)
-                  : '—'}
-              </span>
-            </div>
-          ))}
+          {sortedLines.map(line => {
+            const origIndex = actualLines.indexOf(line)
+            return (
+              <div
+                key={line.id}
+                className={`${css.linesPanelRow} ${hoveredLineIndex === origIndex ? css.linesPanelRowActive : ''}`}
+                onMouseEnter={() => setHoveredLineIndex(origIndex)}
+                onMouseLeave={() => setHoveredLineIndex(null)}
+              >
+                <span className={css.linesPanelIndex}>{line.line_index}</span>
+                <span className={css.linesPanelConf}>
+                  {line.detection_confidence != null
+                    ? line.detection_confidence.toFixed(2)
+                    : '—'}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -479,53 +534,21 @@ export function CuratePageScreen() {
         {isError && <div className={css.status}>Failed to load page data.</div>}
 
         {page && (
-          <div ref={imageAreaRef} className={css.imageArea}>
-            <div
-              ref={imageFrameRef}
-              className={css.imageFrame}
-              style={{
-                width: imageFrameW,
-                height: imageFrameH,
-              }}
-              onPointerMove={handleImagePointerMove}
-              onPointerLeave={handleImagePointerLeave}
-            >
-              <div
-                className={css.imageLayer}
-                style={{
-                  width: imageLayerW,
-                  height: imageLayerH,
-                  left: (imageFrameW - imageLayerW) / 2,
-                  top: (imageFrameH - imageLayerH) / 2,
-                  transform: `rotate(${currentRotation}deg)`,
-                }}
-              >
-                <img
-                  src={page.image_url}
-                  alt={`Page ${page.external_id}`}
-                  className={css.pageImage}
-                  draggable={false}
-                />
-              </div>
-
-              <div className={css.linesLayer}>
-                {scale > 0 && actualLines.map(line => (
-                  <div
-                    key={line.id}
-                    className={`${css.lineBox} ${hoveredLineId === line.id ? css.lineBoxHighlighted : ''}`}
-                    style={{
-                      left: line.bbox.x * scale,
-                      top: line.bbox.y * scale,
-                      width: Math.max(line.bbox.w * scale, 1),
-                      height: Math.max(line.bbox.h * scale, 1),
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+          <AnnotationEditor
+            imageUrl={page.image_url}
+            imageWidth={imgW}
+            imageHeight={imgH}
+            imageRotation={currentRotation}
+            annotations={annotations}
+            highlightedIndex={hoveredLineIndex}
+            onAnnotationHover={handleAnnotationHover}
+            onAnnotationClick={handleAnnotationClick}
+            onSaveAnnotations={handleSaveAnnotations}
+            onDirtyChanged={setAnnotationDirty}
+          />
         )}
       </div>
+    </div>
     </div>
   )
 }

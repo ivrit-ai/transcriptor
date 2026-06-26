@@ -2,15 +2,9 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { PrimaryBtn } from './PrimaryBtn'
 import { useSession } from '../../contexts/SessionContext'
+import { useIsCurator, useIsAdmin } from '../../guards/useGuardChecks'
 
-type NavId = 'work' | 'guide' | 'progress' | 'leaderboard'
-
-const NAV_LINKS: { id: NavId; label: string; path: string }[] = [
-  { id: 'work',        label: 'תעתוק',          path: '/work'         },
-  { id: 'guide',       label: 'מדריך',           path: '/guidelines'   },
-  { id: 'progress',    label: 'ההתקדמות שלי',  path: '/me'           },
-  { id: 'leaderboard', label: 'לוח דירוג',      path: '/leaderboard'  },
-]
+type NavId = 'work' | 'guide' | 'progress' | 'leaderboard' | 'curate' | 'admin'
 
 interface TopNavProps {
   active?: NavId
@@ -22,11 +16,23 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated } = useSession()
+  const isCurator = useIsCurator()
+  const isAdmin = useIsAdmin()
 
-  const currentId = active ?? (NAV_LINKS.find((l) => l.path === location.pathname)?.id)
+  const navLinks: { id: NavId; label: string; path: string }[] = [
+    { id: 'work',        label: 'תעתוק',          path: '/work'         },
+    { id: 'guide',       label: 'מדריך',           path: '/guidelines'   },
+    { id: 'progress',    label: 'ההתקדמות שלי',  path: '/me'           },
+    { id: 'leaderboard', label: 'לוח דירוג',      path: '/leaderboard'  },
+    ...(isCurator ? [{ id: 'curate' as const, label: 'אוֹצֵר', path: '/curate' }] : []),
+    ...(isAdmin ? [{ id: 'admin' as const, label: 'מנהל', path: '/admin' }] : []),
+  ]
+
+  const currentId = active ?? (navLinks.find((l) => l.path === location.pathname)?.id)
 
   return (
     <div style={{
+      direction: 'rtl',
       position: 'sticky',
       top: 0,
       zIndex: 20,
@@ -51,7 +57,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
 
           {!compact && (
             <nav style={{ display: 'flex', gap: 4, fontFamily: 'var(--font-ui)' }}>
-              {NAV_LINKS.map((l) => {
+              {navLinks.map((l) => {
                 const isActive = currentId === l.id
                 return (
                   <Link
@@ -109,7 +115,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
             borderTop: '0.5px solid var(--tl-border)',
             padding: '0 16px 2px',
           }}>
-            {NAV_LINKS.map((l) => {
+            {navLinks.map((l) => {
               const isActive = currentId === l.id
               return (
                 <Link

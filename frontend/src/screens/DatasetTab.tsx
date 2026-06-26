@@ -1,14 +1,19 @@
 import { useState, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { queryKeys } from '../queries'
 import { api } from '../api'
 import { PageLinesPreview } from '../components/shared'
 import css from './DatasetTab.module.css'
 
+const MAX_TRANSCRIPTIONS = 3
+
 const PAGE_SIZE = 20
 
 export function DatasetTab() {
+  const navigate = useNavigate()
   const [globalIdx, setGlobalIdx] = useState(0)
+  const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
 
   const listRef = useRef<HTMLDivElement>(null)
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -39,17 +44,17 @@ export function DatasetTab() {
 
   const clampedMax = Math.max(0, total - 1)
 
-  const navigate = useCallback((next: number) => {
+  const goTo = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(next, clampedMax))
     setGlobalIdx(clamped)
   }, [clampedMax])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown')  { e.preventDefault(); navigate(globalIdx + 1) }
-    else if (e.key === 'ArrowUp')   { e.preventDefault(); navigate(globalIdx - 1) }
-    else if (e.key === 'PageDown')  { e.preventDefault(); navigate(globalIdx + 10) }
-    else if (e.key === 'PageUp')    { e.preventDefault(); navigate(globalIdx - 10) }
-  }, [globalIdx, navigate])
+    if (e.key === 'ArrowDown')  { e.preventDefault(); goTo(globalIdx + 1) }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); goTo(globalIdx - 1) }
+    else if (e.key === 'PageDown')  { e.preventDefault(); goTo(globalIdx + 10) }
+    else if (e.key === 'PageUp')    { e.preventDefault(); goTo(globalIdx - 10) }
+  }, [globalIdx, goTo])
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
@@ -83,7 +88,7 @@ export function DatasetTab() {
                   ref={el => { rowRefs.current[i] = el }}
                   type="button"
                   className={`${css.row} ${isActive ? css.rowActive : ''}`}
-                  onClick={() => navigate((neededServerPage - 1) * PAGE_SIZE + i)}
+                  onClick={() => goTo((neededServerPage - 1) * PAGE_SIZE + i)}
                 >
                   {row.approved && (
                     <span className={css.approvedDot} title="Approved" aria-label="Approved" />
@@ -91,6 +96,18 @@ export function DatasetTab() {
                   <span className={css.rowId}>{row.page_external_id}</span>
                   <span className={css.rowBatch}>{row.batch_external_id}</span>
                   <span className={css.rowPath} title={row.image_path}>{row.image_path}</span>
+                  <button
+                    type="button"
+                    className={css.curateBtn}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/curate/${row.page_id}`, {
+                        state: { listPage: neededServerPage, listIdx: i, listData: pageData, unapprovedOnly: false },
+                      })
+                    }}
+                  >
+                    Curate
+                  </button>
                 </button>
               )
             })}
@@ -106,7 +123,7 @@ export function DatasetTab() {
               type="button"
               className={css.pagerBtn}
               disabled={globalIdx === 0}
-              onClick={() => navigate((neededServerPage - 2) * PAGE_SIZE)}
+              onClick={() => goTo((neededServerPage - 2) * PAGE_SIZE)}
             >
               ← Prev
             </button>
@@ -117,7 +134,7 @@ export function DatasetTab() {
               type="button"
               className={css.pagerBtn}
               disabled={neededServerPage >= totalPages}
-              onClick={() => navigate(neededServerPage * PAGE_SIZE)}
+              onClick={() => goTo(neededServerPage * PAGE_SIZE)}
             >
               Next →
             </button>
@@ -153,13 +170,20 @@ export function DatasetTab() {
               widthPx={preview.width_px}
               heightPx={preview.height_px}
               lines={preview.lines}
+              hoveredLineIndex={hoveredLineIdx}
             />
-            <div className={css.lineList}>
-              {preview.lines.map(l => (
-                <div key={l.id} className={css.lineRow}>
-                  <span className={css.lineIdx}>#{l.line_index}</span>
-                  <span className={css.lineCount}>{l.transcription_count}/3</span>
-                </div>
+            <div className={css.lineGrid}>
+              {preview.lines.map((l, i) => (
+                <div
+                  key={l.id}
+                  className={css.lineCell}
+                  style={{
+                    background: `color-mix(in srgb, var(--tl-accent) ${Math.min(l.transcription_count / MAX_TRANSCRIPTIONS, 1) * 100}%, transparent)`,
+                  }}
+                  title={`line no. ${l.line_index} (${l.transcription_count}/${MAX_TRANSCRIPTIONS})`}
+                  onMouseEnter={() => setHoveredLineIdx(i)}
+                  onMouseLeave={() => setHoveredLineIdx(null)}
+                />
               ))}
             </div>
           </>
