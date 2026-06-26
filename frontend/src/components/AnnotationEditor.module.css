@@ -1,0 +1,109 @@
+/* ── AnnotationEditor ─────────────────────────────────────────────────── */
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  min-height: 36px;
+}
+
+.toolbarBtn {
+  padding: 5px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  border-radius: 6px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-page);
+  color: var(--tl-ink);
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.toolbarBtn:hover:not(:disabled) {
+  background: var(--tl-muted-fill);
+}
+
+.toolbarBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolbarBtnPrimary {
+  background: var(--tl-accent);
+  color: #fff;
+  border-color: var(--tl-accent);
+  font-weight: 600;
+}
+
+.toolbarBtnPrimary:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.toolbarBtnPrimary:disabled {
+  background: var(--tl-muted-fill);
+  color: var(--tl-muted);
+  border-color: var(--tl-border);
+}
+
+.toolbarInfo {
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  color: var(--tl-ink);
+  font-weight: 600;
+}
+
+.toolbarHint {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--tl-muted);
+}
+
+.toolbarDeletedCount {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: #ff4444;
+  font-weight: 600;
+}
+
+.toolbarNewCount {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: #44bb44;
+  font-weight: 600;
+}
+
+.toolbarDirtyCount {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: #dd9900;
+  font-weight: 600;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── Canvas (Konva stage area) ───────────────────────────────────────── */
+
+.canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
