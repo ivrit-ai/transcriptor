@@ -159,7 +159,7 @@ export function AnnotationEditor({
   const stageRef = useRef<Konva.Stage>(null);
   const worldRef = useRef<Konva.Group>(null);
   const [rootSize, setRootSize] = useState({ w: 0, h: 0 });
-  const [image] = useImage(imageUrl, "anonymous");
+  const [image] = useImage(imageUrl);
 
   // ── Edit mode state ──────────────────────────────────────────────────────
 

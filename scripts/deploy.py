@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import http.client
 import json
 import os
 import subprocess
@@ -42,6 +41,8 @@ import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
+
+import httpx
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -218,25 +219,25 @@ def main() -> None:
 
     print(f"==> Triggering a deploy...")
     app_id = os.environ.get("XHOST_APP_ID")
-    channel_id = os.environ.get("XHOST_API_CHANNEL")
-    xhost_api_base = os.environ.get("XHOST_API_BASE", "api.xhostd.com")
+    channel_id = os.environ.get("XHOST_CHANNEL_ID")
+    xhost_api_base = os.environ.get("XHOST_API_BASE", "https://api.xhostd.com")
     if token and app_id and channel_id:
-        conn = http.client.HTTPSConnection(xhost_api_base)
-        payload = json.dumps({"sha": "HEAD"})
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": f"Bearer {token}",
-        }
-        conn.request(
-            "POST",
-            f"/apps/{app_id}/channels/{channel_id}/deploy",
-            payload,
-            headers,
+        url = (
+            f"{xhost_api_base.rstrip('/')}"
+            f"/apps/{app_id}/channels/{channel_id}/deploy"
         )
-        res = conn.getresponse()
-        data = res.read()
-        print(data.decode("utf-8"))
+        payload = {"sha": "HEAD"}
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = httpx.post(url, json=payload, headers=headers)
+        print(f"    HTTP {resp.status_code}")
+        print(f"    Response: {resp.text}")
+        if resp.status_code != 200:
+            err = resp.json()
+            sys.exit(f"error: deploy API returned {resp.status_code}: {err.get('code', 'unknown')}")
+        data = resp.json()
+        print(f"    Deploy ID: {data.get('deploy_id')}, status: {data.get('status')}")
+    else:
+        print("    Skipping API deploy notification (XHOST_APP_ID or XHOST_API_CHANNEL not set)")
 
     print("==> Deploy complete.")
 
