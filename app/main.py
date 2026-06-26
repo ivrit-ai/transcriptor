@@ -22,6 +22,9 @@ from app.storage import LOCAL_IMAGES_SERVE_ROOT_PATH
 
 log = logging.getLogger(__name__)
 
+_recent_errors: list[dict] = []  # temporary debug store, max 20 entries
+
+
 app = FastAPI(title="Transcriptor")
 
 
@@ -29,7 +32,16 @@ app = FastAPI(title="Transcriptor")
 async def unhandled_exception_handler(request: Request, exc: Exception):
     tb = traceback.format_exc()
     log.error("Unhandled exception on %s %s\n%s", request.method, request.url.path, tb)
-    return JSONResponse(status_code=500, content={"detail": tb})
+    entry = {
+        "path": str(request.url.path),
+        "user_sub": request.headers.get("x-xhost-user-sub", ""),
+        "user_email": request.headers.get("x-xhost-user-email", ""),
+        "traceback": tb,
+    }
+    _recent_errors.append(entry)
+    if len(_recent_errors) > 20:
+        _recent_errors.pop(0)
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 if settings.dev_mode:
     app.add_middleware(
