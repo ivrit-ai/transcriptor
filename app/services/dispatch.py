@@ -1,3 +1,4 @@
+import logging
 import uuid
 from dataclasses import dataclass
 
@@ -10,6 +11,8 @@ from app.models.transcription import Transcription
 from app.models.user import User
 from app.services.rules import SessionLine, order_session_lines
 from app.storage import resolve_image_url
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -73,6 +76,34 @@ def get_next_session(
     ).scalar_one_or_none()
 
     if page is None:
+        # Diagnose why there's no work for this user.
+        approved_total = session.execute(
+            select(func.count(Page.id)).where(Page.approved.is_(True))
+        ).scalar_one()
+
+        any_eligible_pages = session.execute(
+            select(func.count(Page.id)).where(
+                Page.approved.is_(True),
+                select(Line)
+                .where(Line.page_id == Page.id, Line.transcription_count < target)
+                .exists(),
+            )
+        ).scalar_one()
+
+        user_done_lines = session.execute(
+            select(func.count(Transcription.id)).where(Transcription.user_id == user.id)
+        ).scalar_one()
+
+        log.warning(
+            "dispatch: no work for user %s (%s) | approved_pages=%d"
+            " | pages_with_any_eligible_lines=%d | user_transcription_count=%d | target=%d",
+            user.id,
+            user.email,
+            approved_total,
+            any_eligible_pages,
+            user_done_lines,
+            target,
+        )
         return None
 
     return _build_session_dto(session, user, page, target)
