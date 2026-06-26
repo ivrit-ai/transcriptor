@@ -6,6 +6,7 @@ import { api } from '../api'
 import type { AdminDatasetDTO, AdminPageLinesDTO, BBox } from '../types'
 import { AnnotationEditor } from '../components/AnnotationEditor'
 import type { Annotation } from '../components/AnnotationEditor'
+import { TopNav } from '../components/shared'
 import css from './CuratePageScreen.module.css'
 
 // ── Rotation helpers ────────────────────────────────────────────────────────
@@ -383,7 +384,9 @@ export function CuratePageScreen() {
     annotationDirty
 
   return (
-    <div className={css.page}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <TopNav active="curate" />
+      <div className={css.page} style={{ height: 'auto', flex: 1, minHeight: 0 }}>
       {/* ── Left panel ────────────────────────────────────────────────── */}
       <div className={css.leftPanel}>
         {page && (
@@ -545,6 +548,7 @@ export function CuratePageScreen() {
           />
         )}
       </div>
+    </div>
     </div>
   )
 }

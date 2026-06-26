@@ -5,6 +5,7 @@ import { api } from '../api'
 import type { AdminStatsDTO, AdminCoverageDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
 import { DatasetTab } from './DatasetTab'
 import { UsersTab } from './UsersTab'
+import { TopNav } from '../components/shared'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
@@ -529,6 +530,7 @@ export function AdminScreen() {
 
   return (
     <div className={css.root}>
+      <TopNav active="admin" />
       <div className={css.header}>
         <div className={css.title}>Admin Dashboard</div>
         <div className={css.tabs}>

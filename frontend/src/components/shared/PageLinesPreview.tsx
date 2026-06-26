@@ -6,6 +6,7 @@ interface PageLinesPreviewProps {
   widthPx: number
   heightPx: number
   lines: AdminPageLineDTO[]
+  hoveredLineIndex?: number | null
 }
 
 /**
@@ -14,7 +15,7 @@ interface PageLinesPreviewProps {
  * WorkScreen folio stage (WorkScreen.tsx) but renders all lines equally for a
  * read-only admin preview.
  */
-export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines }: PageLinesPreviewProps) {
+export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLineIndex }: PageLinesPreviewProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [dispW, setDispW] = useState(0)
 
@@ -47,7 +48,9 @@ export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines }: PageLin
             boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
           }}
         />
-        {scale > 0 && lines.map((line) => (
+        {scale > 0 && lines.map((line, i) => {
+          const isHovered = i === hoveredLineIndex
+          return (
           <div
             key={line.id}
             title={`#${line.line_index} · ${line.transcription_count}/3`}
@@ -57,17 +60,21 @@ export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines }: PageLin
               top: line.bbox.y * scale,
               width: line.bbox.w * scale,
               height: line.bbox.h * scale,
-              border: line.transcription_count >= 3
-                ? '1.5px solid rgba(80,210,130,0.85)'
-                : line.transcription_count > 0
-                  ? '1.5px solid rgba(255,180,80,0.85)'
-                  : '1.5px solid rgba(120,150,255,0.7)',
+              border: isHovered
+                ? '2px solid #ffdd44'
+                : line.transcription_count >= 3
+                  ? '1.5px solid rgba(80,210,130,0.85)'
+                  : line.transcription_count > 0
+                    ? '1.5px solid rgba(255,180,80,0.85)'
+                    : '1.5px solid rgba(120,150,255,0.7)',
               borderRadius: 2,
               boxSizing: 'border-box',
               pointerEvents: 'none',
+              background: isHovered ? 'rgba(255,221,68,0.15)' : undefined,
             }}
           />
-        ))}
+          )
+        })}
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
 import type { AdminDatasetDTO } from '../types'
+import { TopNav } from '../components/shared'
 import css from './CurateScreen.module.css'
 
 const PAGE_SIZE = 20
@@ -43,7 +44,9 @@ export function CurateScreen() {
   }
 
   return (
-    <div className={css.page}>
+    <>
+      <TopNav active="curate" />
+      <div className={css.page}>
       <div className={css.header}>
         <div className={css.title}>
           Curate Pages
@@ -111,5 +114,6 @@ export function CurateScreen() {
         </div>
       )}
     </div>
+    </>
   )
 }
