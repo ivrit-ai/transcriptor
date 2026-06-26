@@ -1,8 +1,10 @@
+import logging
+import traceback
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
@@ -18,7 +20,16 @@ from app.api.routes import (
 from app.config import settings
 from app.storage import LOCAL_IMAGES_SERVE_ROOT_PATH
 
+log = logging.getLogger(__name__)
+
 app = FastAPI(title="Transcriptor")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    log.error("Unhandled exception on %s %s\n%s", request.method, request.url.path, tb)
+    return JSONResponse(status_code=500, content={"detail": tb})
 
 if settings.dev_mode:
     app.add_middleware(
