@@ -118,6 +118,17 @@
   border-color: var(--tl-border);
 }
 
+.annotationDirtyWarning {
+  font-size: 11.5px;
+  font-family: var(--font-ui);
+  color: #dd9900;
+  background: rgba(221, 153, 0, 0.1);
+  border: 0.5px solid rgba(221, 153, 0, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+
 .checkLabel {
   display: flex;
   align-items: center;

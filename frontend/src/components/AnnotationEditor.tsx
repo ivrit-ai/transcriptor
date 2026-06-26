@@ -45,6 +45,8 @@ export interface AnnotationEditorProps {
   onAnnotationClick?: (index: number) => void;
   /** Called when the user saves edited annotations (includes _status flags) */
   onSaveAnnotations?: (annotations: Annotation[]) => void;
+  /** Called when dirty state transitions (true = pending changes in edit mode, false = all clean or edit mode exited) */
+  onDirtyChanged?: (dirty: boolean) => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ export function AnnotationEditor({
   onAnnotationHover,
   onAnnotationClick,
   onSaveAnnotations,
+  onDirtyChanged,
 }: AnnotationEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -191,6 +194,8 @@ export function AnnotationEditor({
   const displayHighlight = editing ? draftHighlight : highlightedIndex;
   const sel = editing ? selectedIndex : null;
 
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
   const resetView = useCallback(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -225,6 +230,17 @@ export function AnnotationEditor({
     onSaveAnnotations?.(draftAnnotations);
     exitEditState();
   }, [draftAnnotations, onSaveAnnotations, exitEditState]);
+
+  // ── Fire onDirtyChanged on transition ───────────────────────────────────
+
+  const prevDirtyRef = useRef(false);
+  useEffect(() => {
+    const current = dirty && editing;
+    if (current !== prevDirtyRef.current) {
+      prevDirtyRef.current = current;
+      onDirtyChanged?.(current);
+    }
+  }, [dirty, editing, onDirtyChanged]);
 
   // ── Track container size ────────────────────────────────────────────────
 
@@ -564,9 +580,7 @@ export function AnnotationEditor({
   const handleStageDblClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (editing) return;
-      const onEmpty =
-        e.target === e.target.getStage() || e.target.name() === "page-image";
-      if (!onEmpty) return;
+      e.cancelBubble = true;
       enterEdit();
     },
     [editing, enterEdit],
@@ -669,6 +683,20 @@ export function AnnotationEditor({
     };
   }, []);
 
+  // ── Esc closes the shortcuts modal ──────────────────────────────────────
+
+  useEffect(() => {
+    if (!showShortcuts) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowShortcuts(false);
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [showShortcuts]);
+
   // ── Keyboard (Esc closes polygon / cancels edit) ─────────────────────────
 
   useEffect(() => {
@@ -715,9 +743,18 @@ export function AnnotationEditor({
     <div ref={rootRef} className={css.root}>
       <div className={css.toolbar}>
         {!editing ? (
-          <button type="button" className={css.toolbarBtn} onClick={enterEdit}>
-            Edit Annotations
-          </button>
+          <>
+            <button type="button" className={css.toolbarBtn} onClick={enterEdit}>
+              Edit Annotations
+            </button>
+            <button
+              type="button"
+              className={css.toolbarBtn}
+              onClick={() => setShowShortcuts(true)}
+            >
+              Shortcuts
+            </button>
+          </>
         ) : (
           <>
             <span className={css.toolbarInfo}>
@@ -742,6 +779,13 @@ export function AnnotationEditor({
                 : "Click a shape to select · drag empty space to draw a box · scroll to zoom"}
             </span>
             <div className={css.toolbarSpacer} />
+            <button
+              type="button"
+              className={css.toolbarBtn}
+              onClick={() => setShowShortcuts(true)}
+            >
+              Shortcuts
+            </button>
             <button
               type="button"
               className={css.toolbarBtn}
@@ -1097,6 +1141,94 @@ export function AnnotationEditor({
           </Stage>
         )}
       </div>
+
+      {showShortcuts && (
+        <div className={css.overlay} onClick={() => setShowShortcuts(false)}>
+          <div className={css.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={css.modalTitle}>Keyboard & Mouse Shortcuts</h2>
+
+            <div className={css.section}>
+              <h3 className={css.sectionTitle}>Navigation</h3>
+              <div className={css.row}>
+                <span>Pan</span>
+                <span className={css.key}>Shift + Drag</span>
+              </div>
+              <div className={css.row}>
+                <span>Zoom</span>
+                <span className={css.key}>Scroll</span>
+              </div>
+              <div className={css.row}>
+                <span>Reset view</span>
+                <span className={css.key}>Reset View button</span>
+              </div>
+            </div>
+
+            <div className={css.section}>
+              <h3 className={css.sectionTitle}>Edit Mode</h3>
+              <div className={css.row}>
+                <span>Enter edit mode</span>
+                <span className={css.key}>Double-click empty area</span>
+              </div>
+              <div className={css.row}>
+                <span>Cancel / deselect / exit</span>
+                <span className={css.key}>Esc</span>
+              </div>
+              <div className={css.row}>
+                <span>Save changes</span>
+                <span className={css.key}>Save button</span>
+              </div>
+            </div>
+
+            <div className={css.section}>
+              <h3 className={css.sectionTitle}>Annotations</h3>
+              <div className={css.row}>
+                <span>Select annotation</span>
+                <span className={css.key}>Click</span>
+              </div>
+              <div className={css.row}>
+                <span>Deselect</span>
+                <span className={css.key}>Click empty area</span>
+              </div>
+              <div className={css.row}>
+                <span>Create box</span>
+                <span className={css.key}>Drag empty area</span>
+              </div>
+              <div className={css.row}>
+                <span>Move annotation</span>
+                <span className={css.key}>Drag body</span>
+              </div>
+              <div className={css.row}>
+                <span>Reshape (vertex)</span>
+                <span className={css.key}>Drag vertex handle</span>
+              </div>
+              <div className={css.row}>
+                <span>Move edge</span>
+                <span className={css.key}>Drag edge</span>
+              </div>
+              <div className={css.row}>
+                <span>Delete selected</span>
+                <span className={css.key}>✕ button</span>
+              </div>
+              <div className={css.row}>
+                <span>Quick delete</span>
+                <span className={css.key}>Ctrl / ⌘ + Click</span>
+              </div>
+              <div className={css.row}>
+                <span>Zoom to annotation</span>
+                <span className={css.key}>Shift + Double-click</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={css.closeBtn}
+              onClick={() => setShowShortcuts(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

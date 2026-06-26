@@ -81,6 +81,7 @@ export function CuratePageScreen() {
   const [saving, setSaving] = useState(false)
 
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null)
+  const [annotationDirty, setAnnotationDirty] = useState(false)
 
   const { data: serverData, isLoading, isError } = useQuery({
     queryKey: queryKeys.curate.pageLines(pageId ?? ''),
@@ -235,8 +236,9 @@ export function CuratePageScreen() {
   }, [page, pageId, localLines, actualLines, listPageNum])
 
   const handleSave = useCallback(() => {
+    if (annotationDirty) return
     doSave({ approved, rotation: currentRotation })
-  }, [doSave, approved, currentRotation])
+  }, [doSave, approved, currentRotation, annotationDirty])
 
   const handleSaveAnnotations = useCallback((saved: Annotation[]) => {
     const nextLines: typeof actualLines = []
@@ -338,9 +340,10 @@ export function CuratePageScreen() {
   }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage])
 
   const approveSaveNext = useCallback(async () => {
+    if (annotationDirty) return
     await doSave({ approved: true, rotation: currentRotation })
     goNext()
-  }, [doSave, currentRotation, goNext])
+  }, [doSave, currentRotation, goNext, annotationDirty])
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
 
@@ -365,7 +368,7 @@ export function CuratePageScreen() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [rotateLeft, rotateRight, rotate180, handleSave, navigate, goPrev, goNext, approveSaveNext])
+  }, [rotateLeft, rotateRight, rotate180, handleSave, navigate, goPrev, goNext, approveSaveNext, annotationDirty])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -376,7 +379,8 @@ export function CuratePageScreen() {
   const hasChanges =
     currentRotation !== (page?.image_rotation ?? 0) ||
     approved !== (page?.approved ?? false) ||
-    localLines !== null
+    localLines !== null ||
+    annotationDirty
 
   return (
     <div className={css.page}>
@@ -440,14 +444,26 @@ export function CuratePageScreen() {
               type="button"
               className={`${css.actionBtn} ${css.saveBtn}`}
               onClick={handleSave}
-              disabled={!hasChanges || saving}
+              disabled={!hasChanges || saving || annotationDirty}
             >
               {saving ? 'Saving…' : 'Save'} <span className={css.keyHint}>S</span>
             </button>
           </div>
 
+          {annotationDirty && (
+            <div className={css.annotationDirtyWarning}>
+              Annotation editor has unsaved changes — save or cancel them before saving the page.
+            </div>
+          )}
+
           <div className={css.actionsSection}>
-            <button type="button" className={css.actionBtn} onClick={approveSaveNext} title="Approve, Save & Next  [Shift+Enter]">
+            <button
+              type="button"
+              className={css.actionBtn}
+              onClick={approveSaveNext}
+              disabled={annotationDirty}
+              title="Approve, Save & Next  [Shift+Enter]"
+            >
               Approve, Save & Next <span className={css.keyHint}>⇧⏎</span>
             </button>
           </div>
@@ -525,6 +541,7 @@ export function CuratePageScreen() {
             onAnnotationHover={handleAnnotationHover}
             onAnnotationClick={handleAnnotationClick}
             onSaveAnnotations={handleSaveAnnotations}
+            onDirtyChanged={setAnnotationDirty}
           />
         )}
       </div>
