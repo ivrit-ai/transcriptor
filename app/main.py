@@ -1,10 +1,8 @@
-import logging
-import traceback
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
@@ -20,28 +18,7 @@ from app.api.routes import (
 from app.config import settings
 from app.storage import LOCAL_IMAGES_SERVE_ROOT_PATH
 
-log = logging.getLogger(__name__)
-
-_recent_errors: list[dict] = []  # temporary debug store, max 20 entries
-
-
 app = FastAPI(title="Transcriptor")
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    tb = traceback.format_exc()
-    log.error("Unhandled exception on %s %s\n%s", request.method, request.url.path, tb)
-    entry = {
-        "path": str(request.url.path),
-        "user_sub": request.headers.get("x-xhost-user-sub", ""),
-        "user_email": request.headers.get("x-xhost-user-email", ""),
-        "traceback": tb,
-    }
-    _recent_errors.append(entry)
-    if len(_recent_errors) > 20:
-        _recent_errors.pop(0)
-    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 if settings.dev_mode:
     app.add_middleware(
