@@ -217,7 +217,7 @@ def main() -> None:
     run(push, cwd=REPO_ROOT)
 
     print(f"==> Triggering a deploy...")
-    app_id = os.environ.get("XHOST_API_BASE")
+    app_id = os.environ.get("XHOST_APP_ID")
     channel_id = os.environ.get("XHOST_API_CHANNEL")
     xhost_api_base = os.environ.get("XHOST_API_BASE", "api.xhostd.com")
     if token and app_id and channel_id:

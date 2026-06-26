@@ -1,14 +1,48 @@
 import { useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
-import { TopNav, Icon } from '../components/shared'
+import { TopNav, Icon, ManuscriptPreview } from '../components/shared'
 import { api } from '../api'
-import type { ProfileDTO } from '../api'
+import type { ProfileDTO, DocumentDTO } from '../api'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
-const FALLBACK: ProfileDTO = { name: 'מתנדב', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0 }
+const FALLBACK: ProfileDTO = {
+  name: 'מתנדב', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0,
+  documents: 0, joined_at: new Date().toISOString(), daily: [],
+}
+
+// Hebrew relative tenure since joining, e.g. "הצטרפת לפני 3 חודשים".
+function tenureLabel(joinedAt: string): string {
+  const joined = new Date(joinedAt)
+  if (Number.isNaN(joined.getTime())) return ''
+  const days = Math.max(0, Math.floor((Date.now() - joined.getTime()) / 86_400_000))
+  if (days <= 0) return 'הצטרפת היום'
+  if (days === 1) return 'הצטרפת אתמול'
+  if (days < 7) return `הצטרפת לפני ${days} ימים`
+  if (days < 30) {
+    const weeks = Math.floor(days / 7)
+    return weeks === 1 ? 'הצטרפת לפני שבוע' : `הצטרפת לפני ${weeks} שבועות`
+  }
+  if (days < 365) {
+    const months = Math.floor(days / 30)
+    return months === 1 ? 'הצטרפת לפני חודש' : `הצטרפת לפני ${months} חודשים`
+  }
+  const years = Math.floor(days / 365)
+  return years === 1 ? 'הצטרפת לפני שנה' : `הצטרפת לפני ${years} שנים`
+}
+
+const HEATMAP_COLORS = ['var(--tl-muted-fill)', 'oklch(0.86 0.06 60)', 'oklch(0.74 0.1 55)', 'oklch(0.62 0.12 50)']
+
+// Map a daily count to one of 4 colour buckets: 0 / 1-3 / 4-9 / 10+.
+function bucketFor(count: number): number {
+  if (count <= 0) return 0
+  if (count <= 3) return 1
+  if (count <= 9) return 2
+  return 3
+}
 
 function GoalRing({ value, goal, size = 150 }: { value: number; goal: number; size?: number }) {
   const pct = Math.min(1, value / goal)
@@ -74,7 +108,7 @@ function StatCard({ value, label, accent, sub }: { value: string | number; label
   return (
     <div style={{
       background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
-      borderRadius: 14, padding: '16px 18px', flex: 1,
+      borderRadius: 14, padding: '16px 18px', flex: 1, minWidth: 130,
     }}>
       <div style={{
         fontFamily: 'var(--font-serif)', fontSize: 30, fontWeight: 700,
@@ -87,15 +121,45 @@ function StatCard({ value, label, accent, sub }: { value: string | number; label
   )
 }
 
-function ContribGrid({ weeks = 7, cell = 16, gap = 5 }: { weeks?: number; cell?: number; gap?: number }) {
-  const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
-  const colors = ['var(--tl-muted-fill)', 'oklch(0.86 0.06 60)', 'oklch(0.74 0.1 55)', 'oklch(0.62 0.12 50)']
-  const levels: number[] = []
-  let s = 7
-  for (let i = 0; i < weeks * 7; i++) {
-    s = (s * 9301 + 49297) % 233280
-    levels.push(i > weeks * 7 - 3 ? 3 : Math.floor((s / 233280) * 4))
+function ContribGrid({
+  daily, weeks = 7, cell = 16, gap = 5,
+}: { daily: { date: string; count: number }[]; weeks?: number; cell?: number; gap?: number }) {
+  const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'] // Sun..Sat
+
+  // Build a lookup of count by YYYY-MM-DD.
+  const counts = new Map(daily.map((d) => [d.date, d.count]))
+
+  // The grid ends on the current week (rightmost column), with today in its
+  // weekday row. We walk back week-by-week so the last column is "this week".
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayDow = today.getDay() // 0 = Sunday … 6 = Saturday
+
+  // grid[week][dow] -> count (week 0 is the oldest visible week, on the left)
+  const grid: (number | null)[][] = Array.from({ length: weeks }, () =>
+    Array.from({ length: 7 }, () => null as number | null),
+  )
+
+  const iso = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   }
+
+  for (let w = 0; w < weeks; w++) {
+    for (let dow = 0; dow < 7; dow++) {
+      // Days back from today: within the current (rightmost) week, days after
+      // `todayDow` belong to the future and are left empty.
+      const weeksBack = weeks - 1 - w
+      const back = weeksBack * 7 + (todayDow - dow)
+      if (back < 0) continue // future day in the current week
+      const d = new Date(today)
+      d.setDate(today.getDate() - back)
+      grid[w][dow] = counts.get(iso(d)) ?? 0
+    }
+  }
+
   return (
     <div style={{ display: 'flex', gap: 8 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap, paddingTop: 0 }}>
@@ -107,17 +171,143 @@ function ContribGrid({ weeks = 7, cell = 16, gap = 5 }: { weeks?: number; cell?:
         ))}
       </div>
       <div style={{ display: 'flex', gap, direction: 'ltr' }}>
-        {Array.from({ length: weeks }).map((_, w) => (
+        {grid.map((week, w) => (
           <div key={w} style={{ display: 'flex', flexDirection: 'column', gap }}>
-            {Array.from({ length: 7 }).map((__, d) => (
+            {week.map((count, d) => (
               <div key={d} style={{
                 width: cell, height: cell, borderRadius: 4,
-                background: colors[levels[w * 7 + d]],
+                background: count === null ? 'transparent' : HEATMAP_COLORS[bucketFor(count)],
               }} />
             ))}
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: number; onOpen: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      title="המשך לעבוד על העמוד הזה"
+      className="pg-folio"
+      style={{ width: thumbWidth, flexShrink: 0, cursor: 'pointer', borderRadius: 10 }}
+    >
+      <div style={{ position: 'relative', paddingTop: 8 }}>
+        <ManuscriptPreview
+          width={thumbWidth}
+          tilt={false}
+          imageUrl={doc.image_url}
+          pageWidthPx={doc.width_px}
+          pageHeightPx={doc.height_px}
+          rotation={doc.image_rotation}
+          customBbox={doc.spotlight_bbox ?? undefined}
+        />
+        {doc.approved && (
+          <span
+            title="עמוד מאושר"
+            style={{
+              position: 'absolute', top: 0, insetInlineStart: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'oklch(0.58 0.1 150)',
+              boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
+            }}
+          >
+            <Icon name="check" size={13} color="#fff" />
+          </span>
+        )}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+        color: 'var(--tl-ink)', marginTop: 10,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{doc.document_name}</div>
+      <div style={{
+        fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)', marginTop: 2,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {doc.page_label && doc.page_label !== doc.document_name && (
+          <>עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.page_label}</span> · </>
+        )}
+        <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.lines_done}</span> שורות
+      </div>
+    </div>
+  )
+}
+
+function DocumentGallery({ isMobile }: { isMobile: boolean }) {
+  const navigate = useNavigate()
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.profile.documents,
+    queryFn: () => api.getMyDocuments(),
+    staleTime: 30_000,
+  })
+
+  const docs = data ?? []
+  const thumbWidth = isMobile ? 150 : 168
+
+  const header = (
+    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
+      כתבי היד שתעתקת
+    </div>
+  )
+
+  let body: ReactNode
+  if (isLoading) {
+    body = (
+      <div style={{ display: 'flex', gap: 18, direction: 'rtl' }} aria-busy="true" aria-label="טוען…">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} style={{ width: thumbWidth, flexShrink: 0 }}>
+            <div style={{
+              width: thumbWidth, height: thumbWidth * 0.62, borderRadius: 8,
+              background: 'var(--tl-muted-fill)',
+            }} />
+            <div style={{ width: '70%', height: 12, borderRadius: 4, background: 'var(--tl-muted-fill)', marginTop: 12 }} />
+            <div style={{ width: '40%', height: 10, borderRadius: 4, background: 'var(--tl-muted-fill)', marginTop: 8 }} />
+          </div>
+        ))}
+      </div>
+    )
+  } else if (docs.length === 0) {
+    body = (
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', padding: '8px 0 4px' }}>
+        עדיין לא תיעדת עמודים — התחילו לתעתק וכתבי היד שלכם יופיעו כאן.
+      </div>
+    )
+  } else {
+    body = (
+      <div style={{
+        display: 'flex',
+        gap: 18,
+        direction: 'rtl',
+        ...(isMobile
+          ? { overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' as const }
+          : { flexWrap: 'wrap' as const, justifyContent: 'center' as const }),
+      }}>
+        {docs.map((doc) => (
+          <DocFolio
+            key={doc.page_id}
+            doc={doc}
+            thumbWidth={thumbWidth}
+            onOpen={() => navigate(`/work/${doc.page_id}`)}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
+      borderRadius: 16, padding: isMobile ? '18px' : '22px 24px',
+    }}>
+      {header}
+      {body}
     </div>
   )
 }
@@ -152,16 +342,22 @@ export function ProgressScreen() {
         <p style={{ fontFamily: 'var(--font-ui)', fontSize: isMobile ? 14 : 15, color: 'var(--tl-muted)', margin: '4px 0 0' }}>
           {ME.today >= ME.goal ? 'השלמת את היעד היומי — כל הכבוד' : `עוד ${ME.goal - ME.today} שורות להשלמת היעד היומי`}
         </p>
+        {tenureLabel(ME.joined_at) && (
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: isMobile ? 12 : 13, color: 'var(--tl-muted)', opacity: 0.85, margin: '2px 0 0' }}>
+            {tenureLabel(ME.joined_at)}
+          </p>
+        )}
       </div>
-      <StreakBadge days={ME.streak} big={!isMobile} />
+      {ME.streak > 0 && <StreakBadge days={ME.streak} big={!isMobile} />}
     </div>
   )
 
   const statsRow = (
-    <div style={{ display: 'flex', gap: 12 }}>
+    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
       <StatCard value={fmt(ME.week)} label="השבוע" />
       <StatCard value={fmt(ME.total)} label="סה״כ שורות" accent="var(--tl-accent-text)" />
       <StatCard value={fmt(ME.pages)} label="עמודים" />
+      <StatCard value={fmt(ME.documents)} label="כתבי יד" />
     </div>
   )
 
@@ -173,9 +369,11 @@ export function ProgressScreen() {
       <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
         הפעילות שלך
       </div>
-      <ContribGrid weeks={isMobile ? 6 : 7} cell={isMobile ? 14 : 16} />
+      <div style={{ display: 'flex', justifyContent: isMobile ? 'flex-start' : 'center' }}>
+        <ContribGrid daily={ME.daily} weeks={isMobile ? 6 : 7} cell={isMobile ? 14 : 16} />
+      </div>
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6,
+        display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-end' : 'center', gap: 6,
         marginTop: 12, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
       }}>
         <span>שורות: פחות</span>
@@ -226,8 +424,9 @@ export function ProgressScreen() {
             <GoalRing value={ME.today} goal={ME.goal} size={150} />
           </div>
           {statsRow}
-          {resumeCard}
           {activityCard}
+          <DocumentGallery isMobile={isMobile} />
+          {resumeCard}
         </div>
       </div>
     )
@@ -246,14 +445,13 @@ export function ProgressScreen() {
           }}>
             <GoalRing value={ME.today} goal={ME.goal} size={156} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'center' }}>
             {statsRow}
-            {resumeCard}
+            {activityCard}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
-          {activityCard}
-        </div>
+        <DocumentGallery isMobile={isMobile} />
+        {resumeCard}
       </div>
     </div>
   )

@@ -512,3 +512,9 @@ def admin_import_start(
     except import_runner.ImportConfigError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return state.to_public_dict()
+
+
+@router.get("/errors")
+def recent_errors(_: Annotated[User, Depends(require_admin)]) -> list:
+    from app.main import _recent_errors
+    return list(reversed(_recent_errors))

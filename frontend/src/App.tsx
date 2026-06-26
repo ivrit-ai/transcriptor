@@ -10,6 +10,7 @@ import { GuidelinesScreen } from './screens/GuidelinesScreen'
 import { WorkScreen } from './screens/WorkScreen'
 import { AllCaughtUpScreen } from './screens/AllCaughtUpScreen'
 import { ProgressScreen } from './screens/ProgressScreen'
+import { LeaderboardScreen } from './screens/LeaderboardScreen'
 import { AdminScreen } from './screens/AdminScreen'
 import { CurateScreen } from './screens/CurateScreen'
 import { CuratePageScreen } from './screens/CuratePageScreen'
@@ -29,8 +30,10 @@ export default function App() {
 
             {/* Protected */}
             <Route path="/work" element={<AuthGuard><WorkScreen /></AuthGuard>} />
+            <Route path="/work/:pageId" element={<AuthGuard><WorkScreen /></AuthGuard>} />
             <Route path="/done" element={<AuthGuard><AllCaughtUpScreen /></AuthGuard>} />
             <Route path="/me" element={<AuthGuard><ProgressScreen /></AuthGuard>} />
+            <Route path="/leaderboard" element={<AuthGuard><LeaderboardScreen /></AuthGuard>} />
             <Route path="/admin" element={<AdminGuard><AdminScreen /></AdminGuard>} />
             <Route path="/curate" element={<CuratorGuard><CurateScreen /></CuratorGuard>} />
             <Route path="/curate/:pageId" element={<CuratorGuard><CuratePageScreen /></CuratorGuard>} />
