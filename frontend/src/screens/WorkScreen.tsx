@@ -15,13 +15,28 @@ function ImmTicks({ lines, cursor, onJump }: {
   cursor: number
   onJump: (i: number) => void
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const activeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (scrollRef.current && activeRef.current) {
+      const container = scrollRef.current
+      const el = activeRef.current
+      const cw = container.clientWidth
+      const ew = el.offsetWidth
+      const l = el.offsetLeft
+      if (l < container.scrollLeft || l + ew > container.scrollLeft + cw) {
+        container.scrollTo({ left: l - (cw - ew) / 2, behavior: 'smooth' })
+      }
+    }
+  }, [cursor])
   return (
-    <div style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto', maxWidth: '50%', flexShrink: 1 }}>
+    <div ref={scrollRef} style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto',  width: '100%', flexShrink: 1 }}>
       {lines.map((l, i) => {
         const done = l.status === 'done_by_you' || l.status === 'flagged'
         return (
           <button
             key={l.id}
+            ref={i === cursor ? activeRef : undefined}
             onClick={() => onJump(i)}
             title={`שורה ${i + 1}`}
             style={{ border: 'none', background: 'transparent', padding: '20px 8px', cursor: 'pointer', lineHeight: 0, minWidth: 24, flexShrink: 0 }}
@@ -31,7 +46,7 @@ function ImmTicks({ lines, cursor, onJump }: {
               width: i === cursor ? 16 : 7, height: 4, borderRadius: 2,
               background: i === cursor
                 ? 'var(--tl-spotlight)'
-                : done ? 'oklch(0.7 0.06 150)' : 'rgba(60,45,25,0.25)',
+                : done ? 'oklch(0.7 0.06 150)' : 'rgba(216, 148, 60, 0.73)',
               transition: 'width .25s, background .25s',
             }} />
           </button>
@@ -412,30 +427,21 @@ export function WorkScreen() {
               right: 0,
               height: headerH,
               display: "flex",
+              gap: 5,
               alignItems: "center",
               justifyContent: "space-between",
               padding: `0 ${sideM}px`,
               fontFamily: "var(--font-ui)",
               pointerEvents: "none",
             }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                color: "var(--tl-muted)",
-                pointerEvents: "auto",
-              }}
-            >
-              עמוד{" "}
-              <span style={{ direction: "ltr", display: "inline-block" }}>
-                {page?.page_label ?? page?.page_id ?? ""}
-              </span>
-            </span>
-            <div style={{ pointerEvents: "auto" }}>
+          > 
+            <div style={{ pointerEvents: "auto", minWidth: 0 }}>
               <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
             </div>
-            <span
+
+            <div
               style={{
+                flexShrink: 0,
                 fontSize: 13,
                 fontWeight: 600,
                 color: "oklch(0.5 0.08 150)",
@@ -447,7 +453,7 @@ export function WorkScreen() {
                 {new Intl.NumberFormat("en-US").format(L.daily)}
               </span>{" "}
               היום
-            </span>
+            </div>            
           </div>
         </>
       )}
