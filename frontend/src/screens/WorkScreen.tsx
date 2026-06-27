@@ -6,6 +6,7 @@ import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
 import { AnnotationViewer } from '../components/AnnotationViewer'
+import css from './WorkScreen.module.css'
 
 // ── Tick bar ─────────────────────────────────────────────────────────────────
 function ImmTicks({ lines, cursor, onJump }: {
@@ -427,7 +428,6 @@ export function WorkScreen() {
         boxShadow: '0 8px 30px rgba(40,30,20,0.14)',
       }
     : {
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
         padding: window.innerWidth < 768 ? '12px 14px 14px' : '15px 26px 18px',
         background: 'color-mix(in srgb, var(--tl-surface) 86%, transparent)',
         backdropFilter: 'blur(14px) saturate(1.1)',
@@ -440,7 +440,7 @@ export function WorkScreen() {
   const console_ = (
     <div ref={cardRef} dir="rtl" style={consoleCardStyle}>
       {/* Current line image crop — AnnotationViewer zoomed to the line, capped at 40vh */}
-      {L.current && (
+      {L.current && wide && (
         <div
           style={{
             width: '100%',
@@ -482,21 +482,13 @@ export function WorkScreen() {
       <textarea
         id="transcription-input"
         ref={taRef}
-        className="tl-textarea"
+        className={`tl-textarea ${css.consoleInputArea}`}
         dir="rtl"
         lang="he"
         value={L.input}
-        placeholder="הקלד את הטקסט של השורה המודגשת…"
+        placeholder="הקלד את הטקסט מהשורה המודגשת…"
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
-        rows={3}
-        style={{
-          fieldSizing: 'content',
-          resize: 'none',
-          fontSize: '2.5em',
-          width: '100%',
-          background: 'var(--tl-surface)',
-        }}
       />
 
       {/* Nav arrows + flags — two groups separated by a divider */}
@@ -640,34 +632,37 @@ export function WorkScreen() {
 
   // ── Wide: side-by-side columns; narrow: stacked ───────────────────────────
   const innerContent = wide ? (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+    <div
+      style={{ flex: 1, display: "flex", flexDirection: "row", minHeight: 0 }}
+    >
       {/* Image column — 60% */}
-      <div style={{ flex: '0 0 60%', maxWidth: 1000, position: 'relative' }}>
-        {L.loading
-          ? <Skeleton />
-          : stage
-        }
+      <div style={{ flex: "0 0 60%", maxWidth: 1000, position: "relative" }}>
+        {L.loading ? <Skeleton /> : stage}
       </div>
       {/* Console column */}
-      <div style={{
-        flex: 1,
-        display: 'flex', alignItems: 'center',
-        padding: '24px 32px',
-        background: 'var(--tl-page)',
-        borderLeft: '0.5px solid var(--tl-border)',
-      }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          padding: "24px 32px",
+          background: "var(--tl-page)",
+          borderLeft: "0.5px solid var(--tl-border)",
+        }}
+      >
         {!L.loading && console_}
       </div>
     </div>
   ) : (
-    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-      {L.loading
-        ? <Skeleton />
-        : stage
-      }
-      {!L.loading && console_}
+    <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          {L.loading ? <Skeleton /> : stage}
+        </div>
+        {!L.loading && console_}
+      </div>
     </div>
-  )
+  );
 
   return (
     <div dir="rtl" lang="he" style={{

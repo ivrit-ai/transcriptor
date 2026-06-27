@@ -111,8 +111,18 @@ export function AnnotationViewer({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Shift+drag to pan
+  // ── Pan / pinch ─────────────────────────────────────────────────────
   const panningRef = useRef<{ lastX: number; lastY: number } | null>(null);
+  const pinchRef = useRef<{
+    initialDistance: number;
+    initialZoom: number;
+    initialPan: { x: number; y: number };
+  } | null>(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const draggedRef = useRef(false);
   const [shiftHeld, setShiftHeld] = useState(false);
 
   // ── Track container size ────────────────────────────────────────────────
@@ -161,6 +171,10 @@ export function AnnotationViewer({
   const handleClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>, index: number) => {
       e.cancelBubble = true;
+      if (draggedRef.current) {
+        draggedRef.current = false;
+        return;
+      }
       onAnnotationClick?.(index);
     },
     [onAnnotationClick],
@@ -213,33 +227,117 @@ export function AnnotationViewer({
   // ── Shift+drag pan ─────────────────────────────────────────────────────
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      draggedRef.current = false;
       const nativeEvt = e.evt as MouseEvent | TouchEvent;
-      const isShift = "shiftKey" in nativeEvt ? nativeEvt.shiftKey : false;
-      if (!isShift) return;
       const stage = stageRef.current;
       if (!stage) return;
       const pos = stage.getPointerPosition();
       if (!pos) return;
+
+      if ("touches" in nativeEvt) {
+        if (nativeEvt.touches.length === 1) {
+          panningRef.current = { lastX: pos.x, lastY: pos.y };
+          pinchRef.current = null;
+        } else if (nativeEvt.touches.length === 2) {
+          pinchRef.current = {
+            initialDistance: Math.hypot(
+              nativeEvt.touches[1].clientX - nativeEvt.touches[0].clientX,
+              nativeEvt.touches[1].clientY - nativeEvt.touches[0].clientY,
+            ),
+            initialZoom: zoomRef.current,
+            initialPan: { x: panRef.current.x, y: panRef.current.y },
+          };
+          panningRef.current = null;
+        }
+        return;
+      }
+
+      if (!("shiftKey" in nativeEvt) || !nativeEvt.shiftKey) return;
       panningRef.current = { lastX: pos.x, lastY: pos.y };
     },
     [],
   );
 
-  const handleStageMouseMove = useCallback(() => {
-    if (!panningRef.current) return;
-    const stage = stageRef.current;
-    if (!stage) return;
-    const pos = stage.getPointerPosition();
-    if (!pos) return;
-    const dx = pos.x - panningRef.current.lastX;
-    const dy = pos.y - panningRef.current.lastY;
-    panningRef.current = { lastX: pos.x, lastY: pos.y };
-    setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-  }, []);
+  const handleStageMouseMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pos = stage.getPointerPosition();
+      if (!pos) return;
 
-  const handleStageMouseUp = useCallback(() => {
-    panningRef.current = null;
-  }, []);
+      // ── Pinch zoom (2 touches) ──────────────────────────────────────────
+      if (pinchRef.current) {
+        draggedRef.current = true;
+        if (disableZoom) return;
+        const nativeEvt = e.evt;
+        if (!("touches" in nativeEvt) || nativeEvt.touches.length < 2) return;
+        const t1 = nativeEvt.touches[0];
+        const t2 = nativeEvt.touches[1];
+        const dist = Math.hypot(
+          t2.clientX - t1.clientX,
+          t2.clientY - t1.clientY,
+        );
+        const rect = stage.container().getBoundingClientRect();
+        const cx = (t1.clientX + t2.clientX) / 2 - rect.left;
+        const cy = (t1.clientY + t2.clientY) / 2 - rect.top;
+
+        const { initialDistance, initialZoom, initialPan } = pinchRef.current;
+        const factor = dist / initialDistance;
+        let newZoom = initialZoom * factor;
+        newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
+        const oldScale = baseScale * initialZoom;
+        const newScale = baseScale * newZoom;
+
+        const initWorldX =
+          rootSize.w / 2 - (dispW * oldScale) / 2 + initialPan.x;
+        const initWorldY =
+          rootSize.h / 2 - (dispH * oldScale) / 2 + initialPan.y;
+
+        const pointTo = {
+          x: (cx - initWorldX) / oldScale,
+          y: (cy - initWorldY) / oldScale,
+        };
+
+        const newWorldX = cx - pointTo.x * newScale;
+        const newWorldY = cy - pointTo.y * newScale;
+
+        setZoom(newZoom);
+        setPan({
+          x: newWorldX - rootSize.w / 2 + (dispW * newScale) / 2,
+          y: newWorldY - rootSize.h / 2 + (dispH * newScale) / 2,
+        });
+        return;
+      }
+
+      // ── Pan (single touch or shift+drag) ────────────────────────────────
+      if (!panningRef.current) return;
+      draggedRef.current = true;
+      const dx = pos.x - panningRef.current.lastX;
+      const dy = pos.y - panningRef.current.lastY;
+      panningRef.current = { lastX: pos.x, lastY: pos.y };
+      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    },
+    [baseScale, disableZoom, rootSize, dispW, dispH],
+  );
+
+  const handleStageMouseUp = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      pinchRef.current = null;
+      const nativeEvt = e.evt as MouseEvent | TouchEvent;
+      if ("touches" in nativeEvt && nativeEvt.touches.length === 1) {
+        const stage = stageRef.current;
+        if (stage) {
+          const pos = stage.getPointerPosition();
+          if (pos) {
+            panningRef.current = { lastX: pos.x, lastY: pos.y };
+            return;
+          }
+        }
+      }
+      panningRef.current = null;
+    },
+    [],
+  );
 
   // ── Shift key tracking ─────────────────────────────────────────────────
   useEffect(() => {
