@@ -10,6 +10,8 @@ import {
   ListTodo,
   ListChecks,
   Menu,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const icons = {
@@ -24,6 +26,8 @@ const icons = {
   "list-todo": ListTodo,
   "list-checks": ListChecks,
   menu: Menu,
+  sun: Sun,
+  moon: Moon,
 } as const;
 
 interface IconProps {

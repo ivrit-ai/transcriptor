@@ -67,7 +67,7 @@ export function AuthScreen() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      navigate('/work', { replace: true })
+      // navigate('/work', { replace: true })
     }
   }, [isLoading, isAuthenticated, navigate])
 

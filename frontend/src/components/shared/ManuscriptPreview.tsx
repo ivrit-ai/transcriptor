@@ -2,13 +2,13 @@ import type { BBox } from '../../types'
 
 // Sample page dimensions (matches the zip's OIP sample image)
 export const SAMPLE_PAGE = {
-  width_px: 474,
-  height_px: 218,
+  width_px: 800,
+  height_px: 245,
   image_url: '/sample-page.jpg',
 }
 
 // A representative line on the sample page to spotlight
-const SPOTLIGHT_BBOX: BBox = { x: 6, y: 72, w: 462, h: 40 }
+const SPOTLIGHT_BBOX: BBox = { x: 27, y: 120, w: 742, h: 40 }
 
 interface ManuscriptPreviewProps {
   width?: number
