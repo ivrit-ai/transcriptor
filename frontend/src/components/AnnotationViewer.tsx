@@ -4,7 +4,8 @@ import useImage from "use-image";
 import type Konva from "konva";
 import type { Annotation } from "./AnnotationEditor";
 import type { BBox } from "../types";
-import { SquareSquare, Expand } from "lucide-react";
+import { SquareSquare, Expand, Brush } from "lucide-react";
+import { readCanvas, writeCanvas } from "image-js";
 import css from "./AnnotationViewer.module.css";
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -407,6 +408,60 @@ export function AnnotationViewer({
     setPan({ x: 0, y: 0 });
   }, []);
 
+  // ── Reveal (image processing) ──────────────────────────────────────────
+  const [revealing, setRevealing] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const revealCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const handleReveal = useCallback(async () => {
+    if (revealed) {
+      setRevealed(false);
+      return;
+    }
+
+    if (highlightedIndex == null || !image) return;
+    const a = annotations[highlightedIndex];
+    if (!a) return;
+    const { x, y, w, h } = a.bbox;
+    if (w === 0 || h === 0) return;
+    setRevealing(true);
+    try {
+      // render the full image (with rotation) to an offscreen canvas
+      const rotatedW = rotated ? imageHeight : imageWidth;
+      const rotatedH = rotated ? imageWidth : imageHeight;
+      const renderCanvas = document.createElement("canvas");
+      renderCanvas.width = rotatedW;
+      renderCanvas.height = rotatedH;
+      const ctx = renderCanvas.getContext("2d")!;
+      ctx.translate(imagePos.x, imagePos.y);
+      ctx.rotate((norm * Math.PI) / 180);
+      ctx.drawImage(image, 0, 0, imageWidth, imageHeight);
+      // extract the bbox region
+      const regionCanvas = document.createElement("canvas");
+      regionCanvas.width = w;
+      regionCanvas.height = h;
+      const rctx = regionCanvas.getContext("2d")!;
+      rctx.drawImage(renderCanvas, x, y, w, h, 0, 0, w, h);
+      // process with image-js
+      const imgJS = readCanvas(regionCanvas);
+      // const processed = imgJS.grey().threshold().invert().convertColor("GREY");
+      const processed = imgJS.level().invert()
+      const out = document.createElement("canvas");
+      writeCanvas(processed, out);
+      revealCanvasRef.current = out;
+      setRevealed(true);
+    } catch (err) {
+      console.error("Reveal failed", err);
+    } finally {
+      setRevealing(false);
+    }
+  }, [revealed, highlightedIndex, annotations, image, rotated, imageWidth, imageHeight, imagePos, norm]);
+
+  // reset reveal when highlighted annotation changes
+  useEffect(() => {
+    setRevealed(false);
+    revealCanvasRef.current = null;
+  }, [annotations]);
+
   // ── Detect if highlighted line is out of view ─────────────────────────
   const showReturnPill = useMemo(() => {
     if (highlightedIndex == null || !annotations[highlightedIndex])
@@ -478,23 +533,34 @@ export function AnnotationViewer({
                         rotation={norm}
                         fill="rgba(0,0,0,0.5)"
                       />
-                      <Group
-                        listening={false}
-                        clipFunc={(ctx) => {
-                          ctx.beginPath();
-                          ctx.rect(bbox.x, bbox.y, bbox.w, bbox.h);
-                          ctx.closePath();
-                        }}
-                      >
+                      {revealed && revealCanvasRef.current ? (
                         <KonvaImage
-                          image={image}
-                          width={imageWidth}
-                          height={imageHeight}
-                          rotation={norm}
-                          x={imagePos.x}
-                          y={imagePos.y}
+                          image={revealCanvasRef.current}
+                          x={bbox.x}
+                          y={bbox.y}
+                          width={bbox.w}
+                          height={bbox.h}
+                          listening={false}
                         />
-                      </Group>
+                      ) : (
+                        <Group
+                          listening={false}
+                          clipFunc={(ctx) => {
+                            ctx.beginPath();
+                            ctx.rect(bbox.x, bbox.y, bbox.w, bbox.h);
+                            ctx.closePath();
+                          }}
+                        >
+                          <KonvaImage
+                            image={image}
+                            width={imageWidth}
+                            height={imageHeight}
+                            rotation={norm}
+                            x={imagePos.x}
+                            y={imagePos.y}
+                          />
+                        </Group>
+                      )}
                     </Group>
                   );
                 })()}
@@ -582,26 +648,51 @@ export function AnnotationViewer({
         }}
       >
         {highlightedIndex != null && (
-          <button
-            onClick={() => zoomToHighlighted(true)}
-            aria-label="התמקד בשורה"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: "none",
-              background: "rgba(0,0,0,0.35)",
-              backdropFilter: "blur(6px)",
-              color: "rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              transition: "background 0.15s",
-            }}
-          >
-            <SquareSquare size={16} />
-          </button>
+          <>
+            <button
+              onClick={handleReveal}
+              disabled={revealing}
+              aria-label="חשוף טקסט"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                border: "none",
+                background: revealing
+                  ? "rgba(100,180,255,0.5)"
+                  : "rgba(0,0,0,0.35)",
+                backdropFilter: "blur(6px)",
+                color: "rgba(255,255,255,0.85)",
+                cursor: "pointer",
+                transition: "background 0.15s",
+              }}
+            >
+              <Brush size={16} />
+            </button>
+            <button
+              onClick={() => zoomToHighlighted(true)}
+              aria-label="התמקד בשורה"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                border: "none",
+                background: "rgba(0,0,0,0.35)",
+                backdropFilter: "blur(6px)",
+                color: "rgba(255,255,255,0.85)",
+                cursor: "pointer",
+                transition: "background 0.15s",
+              }}
+            >
+              <SquareSquare size={16} />
+            </button>
+          </>
         )}
         <button
           onClick={fitToViewport}

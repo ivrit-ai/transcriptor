@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",
+    "image-js": "^1.6.1",
     "konva": "^10.3.0",
     "lucide-react": "^1.21.0",
     "react": "^18.3.1",
