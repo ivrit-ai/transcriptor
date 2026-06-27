@@ -5,6 +5,7 @@ import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
+import { FlagSelector } from '../components/FlagSelector'
 import { AnnotationViewer } from '../components/AnnotationViewer'
 import css from './WorkScreen.module.css'
 
@@ -572,80 +573,18 @@ export function WorkScreen() {
           background: 'var(--tl-border)', flexShrink: 0,
         }} />
 
-        {/* Flags */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
-          {L.FLAG_REASONS.map((r, i) =>
-            r.kind === 'other' ? (
-              <button
-                key={r.kind}
-                className="tl-reason-inline"
-                onClick={() => setOtherOpen(o => !o)}
-                title="אחר — פתח תיבת הסבר (Ctrl+4)"
-                style={activeFlagKind === 'other' || otherOpen ? {
-                  background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
-                  color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
-                  borderColor: activeFlagKind === 'other' ? 'oklch(0.72 0.1 15)' : undefined,
-                } : undefined}
-              >
-                {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
-              </button>
-            ) : (
-              <button
-                key={r.kind}
-                className="tl-reason-inline"
-                onClick={() => L.flag(r.kind)}
-                title={`${r.label} (Ctrl+${i + 1})`}
-                style={activeFlagKind === r.kind ? {
-                  background: 'oklch(0.96 0.03 15)',
-                  color: 'oklch(0.42 0.14 15)',
-                  borderColor: 'oklch(0.72 0.1 15)',
-                } : undefined}
-              >
-                {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
-              </button>
-            )
-          )}
-        </div>
+        <FlagSelector
+          FLAG_REASONS={L.FLAG_REASONS}
+          activeFlagKind={activeFlagKind}
+          wide={wide}
+          onFlag={L.flag}
+          otherOpen={otherOpen}
+          otherText={otherText}
+          setOtherOpen={setOtherOpen}
+          setOtherText={setOtherText}
+          otherInputRef={otherInputRef}
+        />
       </div>
-
-      {/* "אחר" freeform reason input */}
-      {otherOpen && (
-        <div style={{ display: 'flex', gap: 7, marginTop: 8, alignItems: 'center' }}>
-          <input
-            ref={otherInputRef}
-            value={otherText}
-            onChange={(e) => setOtherText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }
-              if (e.key === 'Escape') { setOtherOpen(false); setOtherText('') }
-            }}
-            placeholder="פרט את הסיבה…"
-            dir="rtl"
-            style={{
-              flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13,
-              border: '0.5px solid var(--tl-border)', borderRadius: 999,
-              padding: '6px 13px', background: 'var(--tl-surface)',
-              color: 'var(--tl-ink)', outline: 'none',
-            }}
-          />
-          <button
-            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }}
-            disabled={!otherText.trim()}
-            style={{
-              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
-              padding: '6px 14px', borderRadius: 999, border: 'none',
-              cursor: otherText.trim() ? 'pointer' : 'default',
-              background: otherText.trim() ? 'var(--tl-accent)' : 'var(--tl-muted-fill)',
-              color: otherText.trim() ? '#fff' : 'var(--tl-muted)',
-              transition: 'background 0.12s, color 0.12s',
-              flexShrink: 0,
-            }}
-          >שלח</button>
-        </div>
-      )}
 
       {/* Submit + skip-page row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 16 }}>
