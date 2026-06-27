@@ -501,9 +501,10 @@ export function WorkScreen() {
     if (changed && inputRef.current.trim()) {
       setSkipPagePending(true)
     } else {
+      L.skipPage()
       goNextPage()
     }
-  }, [goNextPage])
+  }, [L.skipPage, goNextPage])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Shift+Enter
@@ -990,8 +991,8 @@ export function WorkScreen() {
       {skipPagePending && (
         <NavConfirmDialog
           message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
-          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); goNextPage() }}
-          onMoveOnly={() => { setSkipPagePending(false); goNextPage() }}
+          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.skipPage(); goNextPage() }}
+          onMoveOnly={() => { setSkipPagePending(false); L.skipPage(); goNextPage() }}
           onCancel={() => setSkipPagePending(false)}
         />
       )}

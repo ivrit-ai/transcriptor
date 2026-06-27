@@ -49,6 +49,8 @@ export interface ProfileDTO {
   daily: { date: string; count: number }[]
 }
 
+export type DocStatus = 'active' | 'done' | 'skipped'
+
 export interface DocumentDTO {
   page_id: string
   document_name: string
@@ -58,10 +60,12 @@ export interface DocumentDTO {
   height_px: number
   image_rotation: number
   lines_done: number
-  total_lines: number
   last_at: string
   approved: boolean
   spotlight_bbox: { x: number; y: number; w: number; h: number } | null
+  status: DocStatus
+  done: boolean
+  skipped: boolean
 }
 
 export interface CommunityDTO {
@@ -170,4 +174,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+
+  skipPage: (pageId: string): Promise<null> =>
+    import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
+      ? Promise.resolve(null)
+      : request<null>(`/api/pages/${pageId}/skip`, { method: 'POST' }),
 }

@@ -1,5 +1,6 @@
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription
 from app.models.user import User
+from app.models.user_progress import UserProgress
 from app.services.rules import SessionLine, order_session_lines
 from app.storage import resolve_image_url
 
@@ -39,43 +41,165 @@ def get_next_session(
     user: User,
     target: int = 3,
 ) -> SessionDTO | None:
+    has_progress = session.execute(
+        select(UserProgress)
+        .where(UserProgress.user_id == user.id)
+        .limit(1)
+        .exists()
+        .select()
+    ).scalar_one()
+
+    if not has_progress:
+        return _case_a_random(session, user, target)
+
+    return _case_b_with_progress(session, user, target)
+
+
+def _page_has_eligible_line(
+    session: Session,
+    page_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user_transcribed_subq,
+    target: int = 3,
+) -> bool:
+    return session.execute(
+        select(Line)
+        .where(
+            Line.page_id == page_id,
+            Line.transcription_count < target,
+            Line.id.not_in(user_transcribed_subq),
+        )
+        .exists()
+        .select()
+    ).scalar_one()
+
+
+def _case_a_random(
+    session: Session,
+    user: User,
+    target: int = 3,
+) -> SessionDTO | None:
+    line = session.execute(
+        select(Line)
+        .join(Page, Line.page_id == Page.id)
+        .where(
+            Page.approved.is_(True),
+            Line.transcription_count < target,
+        )
+        .order_by(func.random())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if line is None:
+        return None
+
+    return _build_session_dto(session, user, line.page, target)
+
+
+def _case_b_with_progress(
+    session: Session,
+    user: User,
+    target: int = 3,
+) -> SessionDTO | None:
     user_transcribed_subq = (
         select(Transcription.line_id)
         .where(Transcription.user_id == user.id)
         .scalar_subquery()
     )
 
-    eligible_count_subq = (
-        select(func.count(Line.id))
+    last_progress = session.execute(
+        select(UserProgress)
         .where(
-            Line.page_id == Page.id,
-            Line.transcription_count < target,
-            Line.id.not_in(user_transcribed_subq),
+            UserProgress.user_id == user.id,
+            UserProgress.skipped.is_(False),
         )
-        .scalar_subquery()
-    )
-
-    has_eligible = (
-        select(Line)
-        .where(
-            Line.page_id == Page.id,
-            Line.transcription_count < target,
-            Line.id.not_in(user_transcribed_subq),
-        )
-        .exists()
-    )
-
-    page = session.execute(
-        select(Page)
-        .where(Page.approved.is_(True), has_eligible)
-        .order_by(eligible_count_subq.desc())
+        .order_by(UserProgress.updated_at.desc())
         .limit(1)
     ).scalar_one_or_none()
 
-    if page is None:
+    if last_progress is not None:
+        page = session.get(Page, last_progress.page_id)
+        if page is not None and page.approved and _page_has_eligible_line(
+            session, page.id, user.id, user_transcribed_subq, target
+        ):
+            return _build_session_dto(session, user, page, target)
+
+    unfinished = session.execute(
+        select(UserProgress)
+        .where(
+            UserProgress.user_id == user.id,
+            UserProgress.done.is_(False),
+            UserProgress.skipped.is_(False),
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if unfinished is not None:
+        page = session.get(Page, unfinished.page_id)
+        if page is not None and page.approved and _page_has_eligible_line(
+            session, page.id, user.id, user_transcribed_subq, target
+        ):
+            return _build_session_dto(session, user, page, target)
+
+    return _case_a_random_with_exclusions(session, user, target)
+
+
+def _case_a_random_with_exclusions(
+    session: Session,
+    user: User,
+    target: int = 3,
+) -> SessionDTO | None:
+    excluded_page_ids_subq = (
+        select(UserProgress.page_id)
+        .where(UserProgress.user_id == user.id)
+        .scalar_subquery()
+    )
+
+    line = session.execute(
+        select(Line)
+        .join(Page, Line.page_id == Page.id)
+        .where(
+            Page.approved.is_(True),
+            Line.transcription_count < target,
+            Page.id.not_in(excluded_page_ids_subq),
+        )
+        .order_by(func.random())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if line is None:
         return None
 
-    return _build_session_dto(session, user, page, target)
+    return _build_session_dto(session, user, line.page, target)
+
+
+def mark_page_skipped(
+    db: Session,
+    user: User,
+    page_id: uuid.UUID,
+) -> None:
+    now = datetime.now(timezone.utc)
+    prog = db.execute(
+        select(UserProgress).where(
+            UserProgress.user_id == user.id,
+            UserProgress.page_id == page_id,
+        )
+    ).scalar_one_or_none()
+
+    if prog is None:
+        prog = UserProgress(
+            user_id=user.id,
+            page_id=page_id,
+            skipped=True,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(prog)
+    else:
+        prog.skipped = True
+        prog.updated_at = now
+
+    db.flush()
 
 
 def get_session_for_page(
@@ -84,12 +208,6 @@ def get_session_for_page(
     page_id: uuid.UUID,
     target: int = 3,
 ) -> SessionDTO | None:
-    """Build a session for a specific page, regardless of how much work is left.
-
-    Used to re-open a page the user has already contributed to (e.g. from their
-    profile gallery). Lines they've completed come back as ``done_by_you`` so the
-    work view opens in review/edit mode when nothing eligible remains.
-    """
     page = session.get(Page, page_id)
     if page is None:
         return None

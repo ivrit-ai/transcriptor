@@ -187,13 +187,17 @@ function ContribGrid({
 }
 
 function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: number; onOpen: () => void }) {
+  const title = doc.skipped ? 'עמוד שדילגת עליו — לחץ לפתיחה מחדש'
+    : doc.done ? 'עמוד שהושלם — לחץ לצפייה'
+    : 'המשך לעבוד על העמוד הזה'
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      title="המשך לעבוד על העמוד הזה"
+      title={title}
       className="pg-folio"
       style={{ width: thumbWidth, flexShrink: 0, cursor: 'pointer', borderRadius: 10 }}
     >
@@ -207,18 +211,32 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
           rotation={doc.image_rotation}
           customBbox={doc.spotlight_bbox ?? undefined}
         />
-        {doc.approved && (
+        {doc.skipped && (
           <span
-            title="עמוד מאושר"
+            title="דילגת על עמוד זה"
+            style={{
+              position: 'absolute', top: 0, insetInlineEnd: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'oklch(0.6 0.08 60)',
+              boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
+            }}
+          >
+            <Icon name="back" size={13} color="#fff" />
+          </span>
+        )}
+        {doc.status === 'active' && (
+          <span
+            title="עמוד בפעולה"
             style={{
               position: 'absolute', top: 0, insetInlineStart: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 24, height: 24, borderRadius: '50%',
-              background: 'oklch(0.58 0.1 150)',
+              background: 'oklch(0.6 0.08 250)',
               boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
             }}
           >
-            <Icon name="check" size={13} color="#fff" />
+            <Icon name="forward" size={13} color="#fff" />
           </span>
         )}
       </div>
@@ -233,6 +251,12 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
       }}>
         {doc.page_label && doc.page_label !== doc.document_name && (
           <>עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.page_label}</span> · </>
+        )}
+        {doc.status === 'skipped' && (
+          <>דילגת · </>
+        )}
+        {doc.status === 'done' && (
+          <>הושלם · </>
         )}
         <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.lines_done}</span> שורות
       </div>

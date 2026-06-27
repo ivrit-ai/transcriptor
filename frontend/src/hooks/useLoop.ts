@@ -69,6 +69,7 @@ export interface LoopState {
   flag: (kind: FlagKind, text?: string) => void
   goTo: (i: number) => void
   reset: () => void
+  skipPage: () => void
   daily: number
   done: number
   eligibleTotal: number
@@ -223,6 +224,12 @@ export function useLoop(pageId?: string): LoopState {
     refetch()
   }, [refetch])
 
+  const skipPage = useCallback(async () => {
+    if (!page?.page_id) return
+    await api.skipPage(page.page_id)
+    refetch()
+  }, [page?.page_id, refetch])
+
   useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -248,6 +255,7 @@ export function useLoop(pageId?: string): LoopState {
     flag,
     goTo,
     reset,
+    skipPage,
     daily,
     done,
     eligibleTotal,

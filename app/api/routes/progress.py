@@ -10,6 +10,7 @@ from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
+from app.models.user_progress import UserProgress
 from app.storage import resolve_image_url
 
 router = APIRouter()
@@ -140,12 +141,13 @@ def my_documents(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict]:
-    # Per-page aggregates for pages this user has transcribed text on.
-    lines_done_col = func.count(func.distinct(Transcription.line_id)).label("lines_done")
-    last_at_col = func.max(Transcription.created_at).label("last_at")
-
-    page_rows = db.execute(
-        select(Page, lines_done_col, last_at_col)
+    # Collect page IDs from both UserProgress (done/skipped) and Transcriptions
+    # (actively worked-on). This ensures skipped pages are not missed.
+    from_progress = select(UserProgress.page_id).where(
+        UserProgress.user_id == user.id,
+    )
+    from_transcriptions = (
+        select(Page.id)
         .select_from(Transcription)
         .join(Line, Transcription.line_id == Line.id)
         .join(Page, Line.page_id == Page.id)
@@ -153,51 +155,95 @@ def my_documents(
             Transcription.user_id == user.id,
             Transcription.kind == TranscriptionKind.text,
         )
+    )
+    all_page_ids = list(
+        db.execute(from_progress.union(from_transcriptions)).scalars().all()
+    )
+    if not all_page_ids:
+        return []
+
+    # UserProgress lookup per page.
+    progress_rows = (
+        db.execute(
+            select(UserProgress).where(
+                UserProgress.user_id == user.id,
+                UserProgress.page_id.in_(all_page_ids),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    progress_by_page = {p.page_id: p for p in progress_rows}
+
+    # Per-page aggregates (Page + transcription stats).  LEFT JOIN so that
+    # pages with zero transcriptions (e.g. skipped) still appear.
+    page_rows = db.execute(
+        select(
+            Page,
+            func.count(func.distinct(Transcription.line_id)).label("lines_done"),
+            func.max(Transcription.created_at).label("last_at"),
+        )
+        .select_from(Page)
+        .outerjoin(Line, Line.page_id == Page.id)
+        .outerjoin(
+            Transcription,
+            (Transcription.line_id == Line.id)
+            & (Transcription.user_id == user.id)
+            & (Transcription.kind == TranscriptionKind.text),
+        )
+        .where(Page.id.in_(all_page_ids))
         .group_by(Page.id)
-        .order_by(last_at_col.desc())
+        .order_by(func.max(Transcription.created_at).desc().nulls_last())
         .limit(_DOCUMENTS_LIMIT)
     ).all()
-
-    if not page_rows:
-        return []
 
     pages = [row[0] for row in page_rows]
     page_ids = [p.id for p in pages]
 
-    # Total line count per page.
-    total_lines_by_page: dict = {
-        pid: int(cnt)
-        for pid, cnt in db.execute(
-            select(Line.page_id, func.count(Line.id))
-            .where(Line.page_id.in_(page_ids))
-            .group_by(Line.page_id)
-        ).all()
-    }
-
-    # Spotlight: bbox of the user's most-recently transcribed line on each page.
+    # Spotlight: most-recently transcribed bbox per page (Postgres DISTINCT ON
+    # via row_number window).
     spotlight_by_page: dict = {}
-    spotlight_rows = db.execute(
-        select(Line.page_id, Line.bbox, Transcription.created_at)
-        .join(Transcription, Transcription.line_id == Line.id)
-        .where(
-            Transcription.user_id == user.id,
-            Transcription.kind == TranscriptionKind.text,
-            Line.page_id.in_(page_ids),
+    if page_ids:
+        ranked = (
+            select(
+                Line.page_id,
+                Line.bbox,
+                func.row_number()
+                .over(
+                    partition_by=Line.page_id,
+                    order_by=Transcription.created_at.desc(),
+                )
+                .label("rn"),
+            )
+            .join(Transcription, Transcription.line_id == Line.id)
+            .where(
+                Transcription.user_id == user.id,
+                Transcription.kind == TranscriptionKind.text,
+                Line.page_id.in_(page_ids),
+            )
+            .subquery()
         )
-        .order_by(Transcription.created_at.desc())
-    ).all()
-    for pid, bbox, _created in spotlight_rows:
-        # First row per page wins (rows are newest-first).
-        if pid not in spotlight_by_page and bbox is not None:
-            spotlight_by_page[pid] = {
-                "x": bbox.get("x"),
-                "y": bbox.get("y"),
-                "w": bbox.get("w"),
-                "h": bbox.get("h"),
-            }
+        spotlight_rows = db.execute(
+            select(ranked.c.page_id, ranked.c.bbox).where(ranked.c.rn == 1)
+        ).all()
+        for pid, bbox in spotlight_rows:
+            if bbox is not None:
+                spotlight_by_page[pid] = {
+                    "x": bbox.get("x"),
+                    "y": bbox.get("y"),
+                    "w": bbox.get("w"),
+                    "h": bbox.get("h"),
+                }
 
     result = []
     for page, lines_done, last_at in page_rows:
+        prog = progress_by_page.get(page.id)
+        if prog is not None:
+            status = "done" if prog.done else ("skipped" if prog.skipped else "active")
+        else:
+            # Pages touched before user_progress existed are shown as active.
+            status = "active"
+
         result.append(
             {
                 "page_id": str(page.id),
@@ -207,11 +253,13 @@ def my_documents(
                 "width_px": page.width_px,
                 "height_px": page.height_px,
                 "image_rotation": page.image_rotation,
-                "lines_done": int(lines_done),
-                "total_lines": total_lines_by_page.get(page.id, 0),
+                "lines_done": int(lines_done) if lines_done else 0,
                 "last_at": last_at.isoformat() if last_at is not None else None,
                 "approved": page.approved,
                 "spotlight_bbox": spotlight_by_page.get(page.id),
+                "status": status,
+                "done": prog.done if prog is not None else False,
+                "skipped": prog.skipped if prog is not None else False,
             }
         )
     return result
