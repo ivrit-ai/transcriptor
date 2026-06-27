@@ -29,6 +29,8 @@ export interface AnnotationViewerProps {
   autoFitHighlighted?: boolean;
   /** Disable wheel zoom (pan only) */
   disableZoom?: boolean;
+  /** Increment to force recalculation (e.g. after container resize) */
+  recalcKey?: number;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -99,6 +101,7 @@ export function AnnotationViewer({
   onAnnotationHover,
   autoFitHighlighted = false,
   disableZoom = false,
+  recalcKey,
 }: AnnotationViewerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -396,7 +399,7 @@ export function AnnotationViewer({
     if (!autoFitHighlighted || !ready || highlightedIndex == null) return;
     const a = annotations[highlightedIndex];
     if (!a) return;
-    const key = `${highlightedIndex}-${a.bbox.x},${a.bbox.y},${a.bbox.w},${a.bbox.h}`;
+    const key = `${highlightedIndex}-${a.bbox.x},${a.bbox.y},${a.bbox.w},${a.bbox.h}-r${recalcKey ?? 0}`;
     if (prevFitKey.current === key) return;
     prevFitKey.current = key;
     zoomToHighlighted(true);

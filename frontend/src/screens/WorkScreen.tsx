@@ -247,6 +247,13 @@ export function WorkScreen() {
   const [otherOpen, setOtherOpen] = useState(false)
   const [otherText, setOtherText] = useState('')
   const otherInputRef = useRef<HTMLInputElement>(null)
+  const [topHeight, setTopHeight] = useState(() => Math.round(window.innerHeight * 0.4))
+  const [rightWidth, setRightWidth] = useState(() => Math.min(Math.round(window.innerWidth * 0.35), 700))
+  const topHeightRef = useRef(topHeight)
+  const rightWidthRef = useRef(rightWidth)
+  const topResizeDrag = useRef<{ startY: number; startHeight: number } | null>(null)
+  const rightResizeDrag = useRef<{ startX: number; startWidth: number } | null>(null)
+  const [focusedRecalcKey, setFocusedRecalcKey] = useState(0)
 
   const wide = viewportW >= 960
 
@@ -308,6 +315,8 @@ export function WorkScreen() {
   const currentRef = useRef(L.current)
   inputRef.current = L.input
   currentRef.current = L.current
+  topHeightRef.current = topHeight
+  rightWidthRef.current = rightWidth
 
   const navigateTo = useCallback((i: number) => {
     if (i === L.cursor) return
@@ -342,6 +351,43 @@ export function WorkScreen() {
       goNextPage()
     }
   }, [L.skipPage, goNextPage])
+
+  // ── Resize handlers ──────────────────────────────────────────────────────
+  const onTopResizeStart = useCallback((e: React.PointerEvent) => {
+    const el = e.currentTarget as HTMLElement
+    el.setPointerCapture(e.pointerId)
+    topResizeDrag.current = { startY: e.clientY, startHeight: topHeightRef.current }
+  }, [])
+
+  const onTopResizeMove = useCallback((e: React.PointerEvent) => {
+    if (!topResizeDrag.current) return
+    const delta = e.clientY - topResizeDrag.current.startY
+    const newH = Math.max(150, Math.min(window.innerHeight - 250, topResizeDrag.current.startHeight + delta))
+    setTopHeight(newH)
+  }, [])
+
+  const onTopResizeEnd = useCallback(() => {
+    topResizeDrag.current = null
+    setFocusedRecalcKey(k => k + 1)
+  }, [])
+
+  const onRightResizeStart = useCallback((e: React.PointerEvent) => {
+    const el = e.currentTarget as HTMLElement
+    el.setPointerCapture(e.pointerId)
+    rightResizeDrag.current = { startX: e.clientX, startWidth: rightWidthRef.current }
+  }, [])
+
+  const onRightResizeMove = useCallback((e: React.PointerEvent) => {
+    if (!rightResizeDrag.current) return
+    // -1 since this is an RTL display
+    const delta = -1 * (e.clientX - rightResizeDrag.current.startX)
+    const newW = Math.max(280, Math.min(1000, rightResizeDrag.current.startWidth + delta))
+    setRightWidth(newW)
+  }, [])
+
+  const onRightResizeEnd = useCallback(() => {
+    rightResizeDrag.current = null
+  }, [])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit: Ctrl/Cmd+Enter
@@ -484,8 +530,8 @@ export function WorkScreen() {
 
   const console_ = (
     <div ref={cardRef} dir="rtl" style={consoleCardStyle}>
-      {/* Current line image crop — AnnotationViewer zoomed to the line, capped at 40vh */}
-      {L.current && wide && (
+      {/* Current line image crop — shown in narrow mode only (wide uses top focusedStage) */}
+      {L.current && !wide && (
         <div
           style={{
             width: '100%',
@@ -613,33 +659,128 @@ export function WorkScreen() {
     </div>
   )
 
-  // ── Wide: side-by-side columns; narrow: stacked ───────────────────────────
+  // ── Focused annotation viewer (top panel, wide mode) ────────────────────
+  const focusedStage = (
+    <div style={{ position: 'absolute', inset: 0, background: 'var(--tl-page)' }}>
+      {L.current && (
+        <AnnotationViewer
+          imageUrl={page?.image_url ?? ''}
+          imageWidth={pagePxW}
+          imageHeight={pagePxH}
+          imageRotation={rotation}
+          annotations={[{
+            bbox: L.current.bbox,
+            lineStatus: 'processed' as const,
+          }]}
+          highlightedIndex={0}
+          autoFitHighlighted
+          recalcKey={focusedRecalcKey}
+        />
+      )}
+    </div>
+  )
+
+  // ── Document map (bottom-right panel, wide mode) ────────────────────────
+  const documentMapStage = (
+    <div style={{ position: 'absolute', inset: 10, background: 'var(--tl-page)', overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}>
+      <AnnotationViewer
+        imageUrl={page?.image_url ?? ''}
+        imageWidth={pagePxW}
+        imageHeight={pagePxH}
+        imageRotation={rotation}
+        annotations={annotations}
+        highlightedIndex={L.cursor}
+        onAnnotationClick={(i) => navigateTo(i)}
+      />
+    </div>
+  )
+
+  // ── Wide: top-focused + bottom-console+map; narrow: stacked ─────────────
   const innerContent = wide ? (
-    <div
-      style={{ flex: 1, display: "flex", flexDirection: "row", minHeight: 0 }}
-    >
-      {/* Image column — 60% */}
-      <div style={{ flex: "0 0 60%", maxWidth: 1000, position: "relative" }}>
-        {L.loading ? <Skeleton /> : stage}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Tick bar + daily count */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: headerH, padding: `0 ${sideM}px`, flexShrink: 0,
+        fontFamily: 'var(--font-ui)',
+        background: 'var(--tl-page)',
+        borderBottom: '0.5px solid var(--tl-border)',
+      }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
+        </div>
+        <div style={{
+          flexShrink: 0, fontSize: 13, fontWeight: 600,
+          color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+        }}>
+          <span style={{ direction: 'ltr', display: 'inline-block' }}>
+            {new Intl.NumberFormat('en-US').format(L.daily)}
+          </span> היום
+        </div>
       </div>
-      {/* Console column */}
+
+      {/* Top: focused annotation viewer — adjustable height */}
+      <div style={{ height: topHeight, flexShrink: 0, position: 'relative' }}>
+        {L.loading ? <Skeleton /> : focusedStage}
+      </div>
+
+      {/* Vertical resize handle (between top & bottom) */}
       <div
+        onPointerDown={onTopResizeStart}
+        onPointerMove={onTopResizeMove}
+        onPointerUp={onTopResizeEnd}
+        onPointerCancel={onTopResizeEnd}
         style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          padding: "24px 32px",
-          background: "var(--tl-page)",
-          borderLeft: "0.5px solid var(--tl-border)",
+          height: 8, cursor: 'row-resize', flexShrink: 0,
+          position: 'relative', zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        {!L.loading && console_}
+        <div style={{
+          width: 40, height: 3, borderRadius: 2,
+          background: 'var(--tl-border)', flexShrink: 0,
+        }} />
+      </div>
+
+      {/* Bottom: console (left visual) + document map (right visual) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+        {/* Right (visual): document map */}
+        <div style={{ width: rightWidth, flexShrink: 0, position: 'relative' }}>
+          {L.loading ? null : documentMapStage}
+        </div>
+
+        {/* Horizontal resize handle */}
+        <div
+          onPointerDown={onRightResizeStart}
+          onPointerMove={onRightResizeMove}
+          onPointerUp={onRightResizeEnd}
+          onPointerCancel={onRightResizeEnd}
+          style={{
+            width: 8, cursor: 'col-resize', flexShrink: 0,
+            position: 'relative', zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            width: 3, height: 40, borderRadius: 2,
+            background: 'var(--tl-border)', flexShrink: 0,
+          }} />
+        </div>
+
+        {/* Left (visual): console */}
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'flex-start',
+          padding: '24px 32px', overflow: 'auto',
+          background: 'var(--tl-page)',
+        }}>
+          {!L.loading && console_}
+        </div>
       </div>
     </div>
   ) : (
-    <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <div style={{ flex: 1, position: "relative" }}>
+    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
           {L.loading ? <Skeleton /> : stage}
         </div>
         {!L.loading && console_}
