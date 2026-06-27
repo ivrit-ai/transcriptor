@@ -2,13 +2,14 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.event import Event
 from app.models.line import Line
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
+from app.models.user_progress import UserProgress
 from app.services.rules import should_increment_count
 
 
@@ -28,6 +29,60 @@ def _validate_kind_text(kind: TranscriptionKind, text: str | None) -> None:
     else:
         if text:
             raise ValueError(f"kind={kind.value} must have no text")
+
+
+def _upsert_user_progress(
+    session: Session,
+    user_id: uuid.UUID,
+    page_id: uuid.UUID,
+    line_id: uuid.UUID,
+    target: int = 3,
+) -> None:
+    now = datetime.now(timezone.utc)
+    prog = session.execute(
+        select(UserProgress).where(
+            UserProgress.user_id == user_id,
+            UserProgress.page_id == page_id,
+        )
+    ).scalar_one_or_none()
+
+    user_transcribed_on_page_subq = (
+        select(Transcription.line_id)
+        .where(
+            Transcription.user_id == user_id,
+            Transcription.line_id.in_(
+                select(Line.id).where(Line.page_id == page_id)
+            ),
+        )
+        .scalar_subquery()
+    )
+
+    remaining = session.execute(
+        select(func.count(Line.id))
+        .where(
+            Line.page_id == page_id,
+            Line.transcription_count < target,
+            Line.id.not_in(user_transcribed_on_page_subq),
+        )
+    ).scalar_one()
+
+    if prog is None:
+        prog = UserProgress(
+            user_id=user_id,
+            page_id=page_id,
+            last_submitted_line_id=line_id,
+            done=(remaining == 0),
+            skipped=False,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(prog)
+    else:
+        prog.last_submitted_line_id = line_id
+        prog.done = (remaining == 0)
+        prog.updated_at = now
+
+    session.flush()
 
 
 def submit_response(
@@ -69,6 +124,8 @@ def submit_response(
         line_id=line_id,
         event_type="edited" if is_edit else "submitted",
     ))
+
+    _upsert_user_progress(session, user.id, line.page_id, line_id, target=3)
     session.flush()
 
     return SubmitResult(

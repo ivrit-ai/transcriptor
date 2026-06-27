@@ -1,14 +1,13 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
-
-const EASE = 'cubic-bezier(.3,.8,.3,1)'
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 4
+import { FlagSelector } from '../components/FlagSelector'
+import { AnnotationViewer } from '../components/AnnotationViewer'
+import css from './WorkScreen.module.css'
 
 // ── Tick bar ─────────────────────────────────────────────────────────────────
 function ImmTicks({ lines, cursor, onJump }: {
@@ -16,13 +15,28 @@ function ImmTicks({ lines, cursor, onJump }: {
   cursor: number
   onJump: (i: number) => void
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const activeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (scrollRef.current && activeRef.current) {
+      const container = scrollRef.current
+      const el = activeRef.current
+      const cw = container.clientWidth
+      const ew = el.offsetWidth
+      const l = el.offsetLeft
+      if (l < container.scrollLeft || l + ew > container.scrollLeft + cw) {
+        container.scrollTo({ left: l - (cw - ew) / 2, behavior: 'smooth' })
+      }
+    }
+  }, [cursor])
   return (
-    <div style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto', maxWidth: '50%', flexShrink: 1 }}>
+    <div ref={scrollRef} style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto',  width: '100%', flexShrink: 1 }}>
       {lines.map((l, i) => {
         const done = l.status === 'done_by_you' || l.status === 'flagged'
         return (
           <button
             key={l.id}
+            ref={i === cursor ? activeRef : undefined}
             onClick={() => onJump(i)}
             title={`שורה ${i + 1}`}
             style={{ border: 'none', background: 'transparent', padding: '20px 8px', cursor: 'pointer', lineHeight: 0, minWidth: 24, flexShrink: 0 }}
@@ -32,38 +46,12 @@ function ImmTicks({ lines, cursor, onJump }: {
               width: i === cursor ? 16 : 7, height: 4, borderRadius: 2,
               background: i === cursor
                 ? 'var(--tl-spotlight)'
-                : done ? 'oklch(0.7 0.06 150)' : 'rgba(60,45,25,0.25)',
+                : done ? 'oklch(0.7 0.06 150)' : 'rgba(216, 148, 60, 0.73)',
               transition: 'width .25s, background .25s',
             }} />
           </button>
         )
       })}
-    </div>
-  )
-}
-
-// ── Zoom controls ─────────────────────────────────────────────────────────────
-function ZoomControls({ zoom, onChange }: { zoom: number; onChange: (z: number) => void }) {
-  const pct = Math.round(zoom * 100)
-  return (
-    <div
-      style={{ display: 'flex', alignItems: 'center', gap: 1 }}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <button
-        className="tl-zoom-btn"
-        onClick={() => onChange(Math.max(MIN_ZOOM, zoom - 0.25))}
-        title="הקטן תצוגה  •  Ctrl + גלגל למטה"
-      >−</button>
-      <span style={{
-        fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--tl-muted)',
-        minWidth: 34, textAlign: 'center', userSelect: 'none',
-      }}>{pct}%</span>
-      <button
-        className="tl-zoom-btn"
-        onClick={() => onChange(Math.min(MAX_ZOOM, zoom + 0.25))}
-        title="הגדל תצוגה  •  Ctrl + גלגל למעלה"
-      >+</button>
     </div>
   )
 }
@@ -143,16 +131,11 @@ function SaveToastBadge({ toast }: { toast: SaveToast | null }) {
 }
 
 // ── Shimmer skeleton ──────────────────────────────────────────────────────────
-function Skeleton({ top, sideM, pageH }: { top: number; sideM: number; pageH: number }) {
+function Skeleton() {
   return (
-    <div style={{
-      position: 'absolute', inset: 0,
-      padding: `${top}px ${sideM}px`,
-    }}>
+    <div style={{ position: 'absolute', inset: 0, padding: '44px 26px' }}>
       <div style={{
-        width: '100%',
-        height: Math.max(60, pageH),
-        borderRadius: 6,
+        width: '100%', height: '100%', borderRadius: 6,
         background: 'linear-gradient(90deg, var(--tl-muted-fill) 25%, color-mix(in srgb, var(--tl-muted-fill) 55%, #fff) 50%, var(--tl-muted-fill) 75%)',
         backgroundSize: '200% 100%',
         animation: 'tlshimmer 1.4s ease-in-out infinite',
@@ -257,18 +240,7 @@ export function WorkScreen() {
     }
   }, [pageId, navigate, L.reset, queryClient])
   const taRef = useRef<HTMLTextAreaElement>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ x: number; y: number } | null>(null)
-
-  // Initialize from window so there's no layout flash on first render
-  const [box, setBox] = useState({ w: window.innerWidth, h: window.innerHeight })
-  const [cardH, setCardH] = useState(150)
-  const [peek, setPeek] = useState(0)
-  const [offsetX, setOffsetX] = useState(0)
-  const [zoom, setZoom] = useState(1)
-  // Track full viewport width separately — box.w measures the image column in wide mode,
-  // so using it for the wide breakpoint would oscillate (60% of 1280 < 960).
   const [viewportW, setViewportW] = useState(window.innerWidth)
   const [pendingNavIdx, setPendingNavIdx] = useState<number | null>(null)
   const [skipPagePending, setSkipPagePending] = useState(false)
@@ -290,23 +262,6 @@ export function WorkScreen() {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  // Measure image column (wrapRef) for spotlight math
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[0].contentRect
-      setBox({ w: r.width, h: r.height })
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  // Measure console card height every render
-  useEffect(() => {
-    if (cardRef.current) setCardH(cardRef.current.offsetHeight)
-  })
-
   // Auto-focus textarea on desktop after each advance
   useEffect(() => {
     if (!L.loading && !L.finished && window.innerWidth >= 768) {
@@ -316,142 +271,25 @@ export function WorkScreen() {
   // Auto-focus the "אחר" input when it opens
   useEffect(() => { if (otherOpen) otherInputRef.current?.focus() }, [otherOpen])
 
-  // Snap back to line (reset pan) when cursor advances
-  useEffect(() => { setPeek(0); setOffsetX(0) }, [L.cursor])
   // Close "אחר" input when moving to a new line
   useEffect(() => { setOtherOpen(false); setOtherText('') }, [L.cursor])
 
-  // ── Go-back: find the last annotated line before cursor (for Alt+↑ shortcut) ─
-  let prevDoneIdx = -1
-  for (let i = L.cursor - 1; i >= 0; i--) {
-    const s = L.lines[i]?.status
-    if (s === 'done_by_you' || s === 'flagged') { prevDoneIdx = i; break }
-  }
-
-  // ── Layout math ──────────────────────────────────────────────────────────────
+  // ── Layout ────────────────────────────────────────────────────────────────────
   const sideM = window.innerWidth < 768 ? 14 : 26
   const headerH = window.innerWidth < 768 ? 36 : 44
-  // In wide mode, column is 60% of viewport; use viewportW directly for reliability
-  const columnW = wide ? viewportW * 0.6 : box.w
-  const pageDispW = Math.max(40, columnW - sideM * 2)
   const page = L.page
 
   const pagePxW = page?.width_px ?? 474
   const pagePxH = page?.height_px ?? 218
   const rotation = ((page?.image_rotation ?? 0) % 360 + 360) % 360
 
-  // Display dimensions: swap W/H when rotated 90 or 270 degrees
-  const displayPageW = rotation % 180 === 0 ? pagePxW : pagePxH
-  const displayPageH = rotation % 180 === 0 ? pagePxH : pagePxW
-
-  // Scale is based on the displayed (possibly swapped) width
-  const baseScale = pageDispW / displayPageW
-  const displayScale = baseScale * zoom
-
-  // The visual frame of the page (after rotation)
-  const zoomedW = displayPageW * displayScale   // frame width
-  const zoomedH = displayPageH * displayScale   // frame height
-
-  // The raw image layer dimensions (unrotated, then CSS-rotated)
-  const rawImageW = pagePxW * displayScale
-  const rawImageH = pagePxH * displayScale
-  // Offsets to center the raw image layer inside the rotated frame
-  const imageLayerLeft = (zoomedW - rawImageW) / 2
-  const imageLayerTop  = (zoomedH - rawImageH) / 2
-
-  // Line bboxes are already in the displayed (rotated) coordinate system — use as-is
-  const b = L.current?.bbox ?? { x: 0, y: 0, w: displayPageW, h: 30 }
-  const lx = b.x * displayScale
-  const ly = b.y * displayScale
-  const lw = b.w * displayScale
-  const lh = b.h * displayScale
-
-  const baseTop = headerH + (window.innerWidth < 768 ? 6 : 12)
-  // In wide mode the console is a sidebar, so the full column height is available
-  const effectiveCardH = wide ? 0 : cardH
-  const cardTopY = box.h - effectiveCardH
-  const zonePad = window.innerWidth < 768 ? 12 : 26
-  const availH = cardTopY - zonePad - baseTop
-  const fits = zoomedH <= availH
-  const centerTop = (box.h - zoomedH) / 2
-  const pageTop0 = fits
-    ? Math.max(baseTop, Math.min(centerTop, cardTopY - zonePad - zoomedH))
-    : baseTop
-  const lineBottom0 = pageTop0 + ly + lh
-  const autoTy = fits ? 0 : Math.min(0, cardTopY - zonePad - lineBottom0)
-  const minTy = fits ? 0 : Math.min(0, cardTopY - zonePad - (pageTop0 + zoomedH))
-  const peekLo = minTy - autoTy
-  const peekHi = -autoTy
-  const clamp = useCallback((p: number) => Math.max(peekLo, Math.min(peekHi, p)), [peekLo, peekHi])
-  const ty = autoTy + clamp(peek)
-  const canRoam = minTy < -1
-  const peeking = canRoam && Math.abs(clamp(peek)) > 4
-
-  // ── Horizontal pan when zoomed ────────────────────────────────────────────
-  const canRoamX = zoomedW > pageDispW
-  const txMin = canRoamX ? pageDispW - zoomedW : 0   // right edge flush with column
-  const txMax = 0                                      // left edge flush with column
-  // Auto-center the spotlight horizontally
-  const rawAutoTx = canRoamX ? pageDispW / 2 - (lx + lw / 2) : 0
-  const autoTx = Math.max(txMin, Math.min(txMax, rawAutoTx))
-  const clampX = useCallback(
-    (x: number) => Math.max(txMin - autoTx, Math.min(txMax - autoTx, x)),
-    [txMin, txMax, autoTx],
+  const annotations = useMemo(
+    () => L.lines.map(l => ({
+      bbox: l.bbox,
+      lineStatus: (l.status === 'done_by_you' || l.status === 'flagged') ? 'processed' as const : 'initial' as const,
+    })),
+    [L.lines],
   )
-  const finalTx = autoTx + clampX(offsetX)
-
-  // ── Wheel: Ctrl = zoom, plain = pan ──────────────────────────────────────
-  const changeZoom = useCallback((newZoom: number) => {
-    setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)))
-    setOffsetX(0)
-  }, [])
-
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const handler = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault()
-        e.stopPropagation()
-        const delta = e.deltaY > 0 ? -0.12 : 0.12
-        setZoom(z => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z + delta)))
-        setOffsetX(0)
-        return
-      }
-      if (!canRoam && !canRoamX) return
-      e.preventDefault()
-      e.stopPropagation()
-      // Prefer axis with larger delta; horizontal scroll (trackpad) pans X
-      if (canRoamX && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        setOffsetX(x => clampX(x - e.deltaX))
-      } else if (canRoam) {
-        setPeek(p => clamp(p - e.deltaY))
-      } else if (canRoamX) {
-        setOffsetX(x => clampX(x - e.deltaY))
-      }
-    }
-    el.addEventListener('wheel', handler, { capture: true, passive: false })
-    return () => el.removeEventListener('wheel', handler, true)
-  }, [canRoam, canRoamX, clamp, clampX])
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (!canRoam && !canRoamX) return
-    drag.current = { x: e.clientX, y: e.clientY }
-    try { wrapRef.current?.setPointerCapture(e.pointerId) } catch { /* ignore */ }
-  }
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!drag.current) return
-    const dx = e.clientX - drag.current.x
-    const dy = e.clientY - drag.current.y
-    drag.current.x = e.clientX
-    drag.current.y = e.clientY
-    if (canRoam) setPeek(p => clamp(p + dy))
-    if (canRoamX) setOffsetX(x => clampX(x + dx))
-  }
-  const onPointerUp = (e: React.PointerEvent) => {
-    drag.current = null
-    try { wrapRef.current?.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
-  }
 
   // Which flag (if any) was previously applied to the current line
   const activeFlagKind = (L.current?.status === 'flagged' || L.current?.status === 'done_by_you')
@@ -459,7 +297,6 @@ export function WorkScreen() {
     ? L.current.prior_kind
     : null
 
-  const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   // Buttons navigate to any adjacent line; keyboard shortcuts skip to eligible/annotated
   const prevIdx = L.cursor - 1
   const nextIdx = L.cursor + 1
@@ -501,27 +338,28 @@ export function WorkScreen() {
     if (changed && inputRef.current.trim()) {
       setSkipPagePending(true)
     } else {
+      L.skipPage()
       goNextPage()
     }
-  }, [goNextPage])
+  }, [L.skipPage, goNextPage])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit: Shift+Enter
-    if (e.key === 'Enter' && e.shiftKey) {
+    // Submit: Ctrl/Cmd+Enter
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       L.submit()
       return
     }
-    // Skip to next eligible line: Alt+ArrowDown
-    if (e.key === 'ArrowDown' && e.altKey) {
+    // Adjacent line: Shift+ArrowDown
+    if (e.key === 'ArrowDown' && e.shiftKey) {
       e.preventDefault()
-      if (nextEligibleIdx !== -1) navigateTo(nextEligibleIdx)
+      if (canGoNext) navigateTo(nextIdx)
       return
     }
-    // Go back to previous annotated line: Alt+ArrowUp
-    if (e.key === 'ArrowUp' && e.altKey) {
+    // Adjacent line: Shift+ArrowUp
+    if (e.key === 'ArrowUp' && e.shiftKey) {
       e.preventDefault()
-      if (prevDoneIdx !== -1) navigateTo(prevDoneIdx)
+      if (canGoBack) navigateTo(prevIdx)
       return
     }
     // Flag shortcuts: Ctrl+1 … Ctrl+4 (main keyboard and numpad)
@@ -541,196 +379,86 @@ export function WorkScreen() {
     }
   }
 
-  const isDragging = !!drag.current
-  const transition = isDragging ? 'none' : `transform .45s ${EASE}`
-  const spotTransition = isDragging ? 'none' : `left .45s ${EASE}, top .45s ${EASE}, width .35s, height .35s`
-
-  // ── Stage (full-bleed folio) ──────────────────────────────────────────────
+  // ── Stage (Konva via AnnotationEditor) ─────────────────────────────────────
   const stage = (
     <div
-      ref={wrapRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
       style={{
-        position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden',
-        cursor: (!canRoam && !canRoamX) ? 'default' : isDragging ? 'grabbing' : 'grab',
-        touchAction: 'none', userSelect: 'none',
+        position: "absolute",
+        inset: 0,
+        background: "var(--tl-page)",
+        overflow: "hidden",
+        touchAction: "none",
+        userSelect: "none",
       }}
     >
-      {/* page matte */}
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--tl-page)' }} />
-
-      {/* page + spotlight */}
-      <div style={{
-        position: 'absolute', left: sideM, top: pageTop0, width: zoomedW, height: zoomedH,
-        transform: `translate(${finalTx}px, ${ty}px)`,
-        transition,
-        willChange: 'transform',
-      }}>
-        {/* Raw image layer — sized to original px dimensions, CSS-rotated about its center */}
-        <div style={{
-          position: 'absolute',
-          left: imageLayerLeft, top: imageLayerTop,
-          width: rawImageW, height: rawImageH,
-          transform: `rotate(${rotation}deg)`,
-          transformOrigin: 'center center',
-          borderRadius: 6,
-          boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
-          overflow: 'hidden',
-          pointerEvents: 'none',
-        }}>
-          {/* dimmed sheet */}
-          <img
-            src={page?.image_url}
-            alt=""
-            draggable={false}
-            style={{
-              width: rawImageW, height: rawImageH, display: 'block',
-              filter: 'brightness(0.64) saturate(0.82) contrast(0.98)',
-              pointerEvents: 'none',
-            }}
-          />
-        </div>
-
-        {/* Lines layer — non-rotated, sized to the display frame; bboxes are in display coords */}
-        <div style={{ position: 'absolute', left: 0, top: 0, width: zoomedW, height: zoomedH, pointerEvents: 'none' }}>
-          {/* Faint outlines for all line boxes — subtle spatial context */}
-          {L.lines.map((line, i) => {
-            if (i === L.cursor) return null
-            const ox = line.bbox.x * displayScale
-            const oy = line.bbox.y * displayScale
-            const ow = line.bbox.w * displayScale
-            const oh = line.bbox.h * displayScale
-            const done = line.status === 'done_by_you' || line.status === 'flagged'
-            return (
-              <div
-                key={line.id}
-                onClick={(e) => { e.stopPropagation(); navigateTo(i) }}
-                onPointerDown={(e) => { if (e.pointerType !== 'touch') e.stopPropagation() }}
-                title={`שורה ${i + 1}`}
-                style={{
-                  position: 'absolute', left: ox, top: oy, width: ow, height: oh,
-                  border: done
-                    ? '1.5px solid rgba(80,210,130,0.7)'
-                    : '1.5px solid rgba(255,210,120,0.6)',
-                  borderRadius: 2,
-                  pointerEvents: 'auto',
-                  cursor: 'pointer',
-                  transition: spotTransition,
-                }}
-              />
-            )
-          })}
-
-          {/* spotlight cut-out — clipping box in display coords, rotated image inside */}
-          {L.current && (
-            <div style={{
-              position: 'absolute', left: lx, top: ly, width: lw, height: lh,
-              overflow: 'hidden', borderRadius: 4,
-              boxShadow: `0 0 0 2.5px var(--tl-spotlight), 0 0 24px 3px var(--tl-spotlight-glow), 0 6px 18px rgba(40,30,20,0.28)`,
-              transition: spotTransition,
-            }}>
-              <div style={{
-                position: 'absolute',
-                left: -lx,
-                top: -ly,
-                width: zoomedW,
-                height: zoomedH,
-                pointerEvents: 'none',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  left: imageLayerLeft,
-                  top: imageLayerTop,
-                  width: rawImageW,
-                  height: rawImageH,
-                  transform: `rotate(${rotation}deg)`,
-                  transformOrigin: 'center center',
-                  pointerEvents: 'none',
-                }}>
-                  <img
-                    src={page?.image_url}
-                    alt=""
-                    draggable={false}
-                    style={{
-                      width: rawImageW, height: rawImageH,
-                      maxWidth: 'none', display: 'block',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* RTL leading-edge caret */}
-          {L.current && (
-            <div style={{
-              position: 'absolute',
-              left: lx + lw, top: ly + lh / 2,
-              transform: 'translate(2px,-50%)',
-              width: 0, height: 0,
-              borderTop: '6px solid transparent',
-              borderBottom: '6px solid transparent',
-              borderRight: '7px solid var(--tl-spotlight)',
-              transition: spotTransition,
-              pointerEvents: 'none',
-            }} />
-          )}
-        </div>{/* end lines layer */}
-      </div>{/* end page + spotlight */}
-
-      {/* top scrim */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: headerH + 22,
-        background: `linear-gradient(var(--tl-page), color-mix(in srgb, var(--tl-page) 12%, transparent))`,
-        pointerEvents: 'none',
-      }} />
-
-      {/* header bar */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: headerH,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: `0 ${sideM}px`, fontFamily: 'var(--font-ui)',
-      }}>
-        <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>
-          עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
-        </span>
-        <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <ZoomControls zoom={zoom} onChange={changeZoom} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap' }}>
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>
-              {new Intl.NumberFormat('en-US').format(L.daily)}
-            </span>{' '}היום
-          </span>
-        </div>
+      <div style={{ position: "absolute", inset: wide ? headerH : 0 }}>
+        <AnnotationViewer
+          imageUrl={page?.image_url ?? ""}
+          imageWidth={pagePxW}
+          imageHeight={pagePxH}
+          imageRotation={rotation}
+          annotations={annotations}
+          highlightedIndex={L.cursor}
+          onAnnotationClick={(i) => navigateTo(i)}
+        />
       </div>
 
-      {/* return-to-line pill */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setPeek(0); setOffsetX(0) }}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', top: headerH + 4, left: '50%', transform: 'translateX(-50%)',
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
-          color: 'oklch(0.5 0.08 250)', background: 'var(--tl-surface)',
-          border: '0.5px solid oklch(0.6 0.08 250 / 0.45)',
-          borderRadius: 999, padding: '5px 11px', cursor: 'pointer',
-          boxShadow: '0 2px 10px rgba(40,30,20,0.14)',
-          opacity: peeking ? 1 : 0, pointerEvents: peeking ? 'auto' : 'none',
-          transition: 'opacity 0.2s', zIndex: 4,
-        }}
-      >
-        חזרה לשורה <Icon name="forward" size={13} color="oklch(0.5 0.08 250)" />
-      </button>
+      {wide && (
+        <>
+          {/* top scrim */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: headerH + 22,
+              background: `linear-gradient(var(--tl-page), color-mix(in srgb, var(--tl-page) 12%, transparent))`,
+              pointerEvents: "none",
+            }}
+          />
+
+          {/* header bar */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: headerH,
+              display: "flex",
+              gap: 5,
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: `0 ${sideM}px`,
+              fontFamily: "var(--font-ui)",
+              pointerEvents: "none",
+            }}
+          > 
+            <div style={{ pointerEvents: "auto", minWidth: 0 }}>
+              <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
+            </div>
+
+            <div
+              style={{
+                flexShrink: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "oklch(0.5 0.08 150)",
+                whiteSpace: "nowrap",
+                pointerEvents: "auto",
+              }}
+            >
+              <span style={{ direction: "ltr", display: "inline-block" }}>
+                {new Intl.NumberFormat("en-US").format(L.daily)}
+              </span>{" "}
+              היום
+            </div>            
+          </div>
+        </>
+      )}
     </div>
-  )
+  );
 
   // ── Input console ─────────────────────────────────────────────────────────
   const consoleCardStyle: React.CSSProperties = wide
@@ -745,7 +473,6 @@ export function WorkScreen() {
         boxShadow: '0 8px 30px rgba(40,30,20,0.14)',
       }
     : {
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
         padding: window.innerWidth < 768 ? '12px 14px 14px' : '15px 26px 18px',
         background: 'color-mix(in srgb, var(--tl-surface) 86%, transparent)',
         backdropFilter: 'blur(14px) saturate(1.1)',
@@ -757,6 +484,32 @@ export function WorkScreen() {
 
   const console_ = (
     <div ref={cardRef} dir="rtl" style={consoleCardStyle}>
+      {/* Current line image crop — AnnotationViewer zoomed to the line, capped at 40vh */}
+      {L.current && wide && (
+        <div
+          style={{
+            width: '100%',
+            height: '30vh',
+            maxHeight: '30vh',
+            borderRadius: 6,
+            overflow: 'hidden',
+            marginBottom: 12,
+          }}
+        >
+          <AnnotationViewer
+            imageUrl={page?.image_url ?? ''}
+            imageWidth={pagePxW}
+            imageHeight={pagePxH}
+            imageRotation={rotation}
+            annotations={[{
+              bbox: L.current.bbox,
+              lineStatus: 'processed' as const,
+            }]}
+            highlightedIndex={0}
+            autoFitHighlighted
+          />
+        </div>
+      )}
       <label htmlFor="transcription-input" style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
         fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
@@ -774,19 +527,13 @@ export function WorkScreen() {
       <textarea
         id="transcription-input"
         ref={taRef}
-        className="tl-textarea"
+        className={`tl-textarea ${css.consoleInputArea}`}
         dir="rtl"
         lang="he"
         value={L.input}
-        placeholder="הקלד את הטקסט של השורה המודגשת…"
+        placeholder="הקלד את הטקסט מהשורה המודגשת…"
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
-        rows={1}
-        style={{
-          width: '100%',
-          height: window.innerWidth < 768 ? 50 : 58,
-          background: 'var(--tl-surface)',
-        }}
       />
 
       {/* Nav arrows + flags — two groups separated by a divider */}
@@ -800,7 +547,7 @@ export function WorkScreen() {
             className="tl-reason-inline"
             onClick={() => navigateTo(prevIdx)}
             disabled={!canGoBack}
-            title="שורה קודמת (Alt+↑)"
+            title="שורה קודמת (Shift+↑)"
             style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
             <Icon name="back" size={13} color="var(--tl-muted)" />
@@ -810,7 +557,7 @@ export function WorkScreen() {
             className="tl-reason-inline"
             onClick={() => navigateTo(nextIdx)}
             disabled={!canGoNext}
-            title="שורה הבאה (Alt+↓)"
+            title="שורה הבאה (Shift+↓)"
             style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
           >
             הבא
@@ -824,83 +571,21 @@ export function WorkScreen() {
           background: 'var(--tl-border)', flexShrink: 0,
         }} />
 
-        {/* Flags */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
-          {L.FLAG_REASONS.map((r, i) =>
-            r.kind === 'other' ? (
-              <button
-                key={r.kind}
-                className="tl-reason-inline"
-                onClick={() => setOtherOpen(o => !o)}
-                title="אחר — פתח תיבת הסבר (Ctrl+4)"
-                style={activeFlagKind === 'other' || otherOpen ? {
-                  background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
-                  color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
-                  borderColor: activeFlagKind === 'other' ? 'oklch(0.72 0.1 15)' : undefined,
-                } : undefined}
-              >
-                {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
-              </button>
-            ) : (
-              <button
-                key={r.kind}
-                className="tl-reason-inline"
-                onClick={() => L.flag(r.kind)}
-                title={`${r.label} (Ctrl+${i + 1})`}
-                style={activeFlagKind === r.kind ? {
-                  background: 'oklch(0.96 0.03 15)',
-                  color: 'oklch(0.42 0.14 15)',
-                  borderColor: 'oklch(0.72 0.1 15)',
-                } : undefined}
-              >
-                {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
-              </button>
-            )
-          )}
-        </div>
+        <FlagSelector
+          FLAG_REASONS={L.FLAG_REASONS}
+          activeFlagKind={activeFlagKind}
+          wide={wide}
+          onFlag={L.flag}
+          otherOpen={otherOpen}
+          otherText={otherText}
+          setOtherOpen={setOtherOpen}
+          setOtherText={setOtherText}
+          otherInputRef={otherInputRef}
+        />
       </div>
 
-      {/* "אחר" freeform reason input */}
-      {otherOpen && (
-        <div style={{ display: 'flex', gap: 7, marginTop: 8, alignItems: 'center' }}>
-          <input
-            ref={otherInputRef}
-            value={otherText}
-            onChange={(e) => setOtherText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }
-              if (e.key === 'Escape') { setOtherOpen(false); setOtherText('') }
-            }}
-            placeholder="פרט את הסיבה…"
-            dir="rtl"
-            style={{
-              flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13,
-              border: '0.5px solid var(--tl-border)', borderRadius: 999,
-              padding: '6px 13px', background: 'var(--tl-surface)',
-              color: 'var(--tl-ink)', outline: 'none',
-            }}
-          />
-          <button
-            onClick={() => { if (otherText.trim()) { L.flag('other', otherText.trim()); setOtherOpen(false) } }}
-            disabled={!otherText.trim()}
-            style={{
-              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
-              padding: '6px 14px', borderRadius: 999, border: 'none',
-              cursor: otherText.trim() ? 'pointer' : 'default',
-              background: otherText.trim() ? 'var(--tl-accent)' : 'var(--tl-muted-fill)',
-              color: otherText.trim() ? '#fff' : 'var(--tl-muted)',
-              transition: 'background 0.12s, color 0.12s',
-              flexShrink: 0,
-            }}
-          >שלח</button>
-        </div>
-      )}
-
       {/* Submit + skip-page row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 16 }}>
         <button
           onClick={handleSkipPage}
           style={{
@@ -922,7 +607,7 @@ export function WorkScreen() {
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
-          <span className="tl-kbd">⇧ Enter</span>
+          <span className="tl-kbd">Ctrl/Cmd + Enter</span>
         </button>
       </div>
     </div>
@@ -930,34 +615,37 @@ export function WorkScreen() {
 
   // ── Wide: side-by-side columns; narrow: stacked ───────────────────────────
   const innerContent = wide ? (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+    <div
+      style={{ flex: 1, display: "flex", flexDirection: "row", minHeight: 0 }}
+    >
       {/* Image column — 60% */}
-      <div style={{ flex: '0 0 60%', position: 'relative' }}>
-        {L.loading
-          ? <Skeleton top={baseTop} sideM={sideM} pageH={zoomedH} />
-          : stage
-        }
+      <div style={{ flex: "0 0 60%", maxWidth: 1000, position: "relative" }}>
+        {L.loading ? <Skeleton /> : stage}
       </div>
       {/* Console column */}
-      <div style={{
-        flex: 1,
-        display: 'flex', alignItems: 'center',
-        padding: '24px 32px',
-        background: 'var(--tl-page)',
-        borderLeft: '0.5px solid var(--tl-border)',
-      }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          padding: "24px 32px",
+          background: "var(--tl-page)",
+          borderLeft: "0.5px solid var(--tl-border)",
+        }}
+      >
         {!L.loading && console_}
       </div>
     </div>
   ) : (
-    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-      {L.loading
-        ? <Skeleton top={baseTop} sideM={sideM} pageH={zoomedH} />
-        : stage
-      }
-      {!L.loading && console_}
+    <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          {L.loading ? <Skeleton /> : stage}
+        </div>
+        {!L.loading && console_}
+      </div>
     </div>
-  )
+  );
 
   return (
     <div dir="rtl" lang="he" style={{
@@ -990,8 +678,8 @@ export function WorkScreen() {
       {skipPagePending && (
         <NavConfirmDialog
           message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
-          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); goNextPage() }}
-          onMoveOnly={() => { setSkipPagePending(false); goNextPage() }}
+          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.skipPage(); goNextPage() }}
+          onMoveOnly={() => { setSkipPagePending(false); L.skipPage(); goNextPage() }}
           onCancel={() => setSkipPagePending(false)}
         />
       )}

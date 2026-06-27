@@ -18,6 +18,9 @@ import css from "./AnnotationEditor.module.css";
 /** Per-annotation mutation status (client-side only, never persisted) */
 export type AnnotationStatus = "clean" | "dirty" | "new" | "deleted";
 
+/** Line transcription progress for viewer styling */
+export type AnnotationLineStatus = "initial" | "processed";
+
 export interface Annotation {
   bbox: BBox;
   polygon?: unknown;
@@ -25,6 +28,8 @@ export interface Annotation {
   _status?: AnnotationStatus;
   /** Saved status before soft-delete so undelete restores correctly. */
   _prevStatus?: AnnotationStatus;
+  /** Transcription progress for viewer styling (e.g. 'initial' = open, 'processed' = done/flagged) */
+  lineStatus?: AnnotationLineStatus;
 }
 
 export interface AnnotationEditorProps {
@@ -47,6 +52,8 @@ export interface AnnotationEditorProps {
   onSaveAnnotations?: (annotations: Annotation[]) => void;
   /** Called when dirty state transitions (true = pending changes in edit mode, false = all clean or edit mode exited) */
   onDirtyChanged?: (dirty: boolean) => void;
+  /** When true, hides the toolbar and prevents entering edit mode (view-only). */
+  readOnly?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -153,6 +160,7 @@ export function AnnotationEditor({
   onAnnotationClick,
   onSaveAnnotations,
   onDirtyChanged,
+  readOnly = false,
 }: AnnotationEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -590,11 +598,11 @@ export function AnnotationEditor({
 
   const handleStageDblClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (editing) return;
+      if (editing || readOnly) return;
       e.cancelBubble = true;
       enterEdit();
     },
-    [editing, enterEdit],
+    [editing, readOnly, enterEdit],
   );
 
   // ── Zoom to fit a specific annotation ────────────────────────────────
@@ -752,76 +760,78 @@ export function AnnotationEditor({
 
   return (
     <div ref={rootRef} className={css.root}>
-      <div className={css.toolbar}>
-        {!editing ? (
-          <>
-            <button type="button" className={css.toolbarBtn} onClick={enterEdit}>
-              Edit Annotations
-            </button>
-            <button
-              type="button"
-              className={css.toolbarBtn}
-              onClick={() => setShowShortcuts(true)}
-            >
-              Shortcuts
-            </button>
-          </>
-        ) : (
-          <>
-            <span className={css.toolbarInfo}>
-              {counts.active} annotation{counts.active !== 1 ? "s" : ""}
-            </span>
-            {counts.deleted > 0 && (
-              <span className={css.toolbarDeletedCount}>
-                {counts.deleted} deleted
+      {!readOnly && (
+        <div className={css.toolbar}>
+          {!editing ? (
+            <>
+              <button type="button" className={css.toolbarBtn} onClick={enterEdit}>
+                Edit Annotations
+              </button>
+              <button
+                type="button"
+                className={css.toolbarBtn}
+                onClick={() => setShowShortcuts(true)}
+              >
+                Shortcuts
+              </button>
+            </>
+          ) : (
+            <>
+              <span className={css.toolbarInfo}>
+                {counts.active} annotation{counts.active !== 1 ? "s" : ""}
               </span>
-            )}
-            {counts.created > 0 && (
-              <span className={css.toolbarNewCount}>{counts.created} new</span>
-            )}
-            {counts.modified > 0 && (
-              <span className={css.toolbarDirtyCount}>
-                {counts.modified} modified
+              {counts.deleted > 0 && (
+                <span className={css.toolbarDeletedCount}>
+                  {counts.deleted} deleted
+                </span>
+              )}
+              {counts.created > 0 && (
+                <span className={css.toolbarNewCount}>{counts.created} new</span>
+              )}
+              {counts.modified > 0 && (
+                <span className={css.toolbarDirtyCount}>
+                  {counts.modified} modified
+                </span>
+              )}
+              <span className={css.toolbarHint}>
+                {isCreating
+                  ? "Drag to size the box — release to create"
+                  : "Click a shape to select · drag empty space to draw a box · scroll to zoom"}
               </span>
-            )}
-            <span className={css.toolbarHint}>
-              {isCreating
-                ? "Drag to size the box — release to create"
-                : "Click a shape to select · drag empty space to draw a box · scroll to zoom"}
-            </span>
-            <div className={css.toolbarSpacer} />
-            <button
-              type="button"
-              className={css.toolbarBtn}
-              onClick={() => setShowShortcuts(true)}
-            >
-              Shortcuts
-            </button>
-            <button
-              type="button"
-              className={css.toolbarBtn}
-              onClick={resetView}
-            >
-              Reset View
-            </button>
-            <button
-              type="button"
-              className={css.toolbarBtn}
-              onClick={cancelEdit}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={`${css.toolbarBtn} ${css.toolbarBtnPrimary}`}
-              onClick={saveEdit}
-              disabled={!dirty}
-            >
-              Save
-            </button>
-          </>
-        )}
-      </div>
+              <div className={css.toolbarSpacer} />
+              <button
+                type="button"
+                className={css.toolbarBtn}
+                onClick={() => setShowShortcuts(true)}
+              >
+                Shortcuts
+              </button>
+              <button
+                type="button"
+                className={css.toolbarBtn}
+                onClick={resetView}
+              >
+                Reset View
+              </button>
+              <button
+                type="button"
+                className={css.toolbarBtn}
+                onClick={cancelEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${css.toolbarBtn} ${css.toolbarBtnPrimary}`}
+                onClick={saveEdit}
+                disabled={!dirty}
+              >
+                Save
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div ref={canvasRef} className={css.canvas}>
         {rootSize.w > 0 && rootSize.h > 0 && (

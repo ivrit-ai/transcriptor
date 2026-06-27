@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_contribution_consent
 from app.models.user import User
-from app.services.dispatch import SessionDTO, get_next_session, get_session_for_page
+from app.services.dispatch import SessionDTO, get_next_session, get_session_for_page, mark_page_skipped
 
 router = APIRouter()
 
@@ -32,3 +32,13 @@ def session_for_page(
     if result is None:
         return Response(status_code=404)
     return result
+
+
+@router.post("/pages/{page_id}/skip", status_code=204)
+def skip_page(
+    page_id: uuid.UUID,
+    user: Annotated[User, Depends(require_contribution_consent)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    mark_page_skipped(db, user, page_id)
+    return Response(status_code=204)
