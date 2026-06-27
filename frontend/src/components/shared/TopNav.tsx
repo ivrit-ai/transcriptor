@@ -24,6 +24,19 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem('tl-theme')
+    if (stored === 'light' || stored === 'dark') return stored
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('tl-theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme(p => p === 'dark' ? 'light' : 'dark')
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1023px)')
     setIsMobile(mq.matches)
@@ -132,6 +145,23 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                 </nav>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={toggleTheme}
+                  aria-label={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    color: 'var(--tl-muted)',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+                </button>
                 {!compact && (
                   <button
                     onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
@@ -201,6 +231,33 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
             >
               {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
             </Link>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 16px',
+              borderTop: '0.5px solid var(--tl-border)',
+            }}>
+              <button
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  color: 'var(--tl-muted)',
+                }}
+              >
+                <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
+              </button>
+              <span style={{ fontSize: 15, color: 'var(--tl-muted)' }}>
+                {theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+              </span>
+            </div>
           </div>
         )}
 
