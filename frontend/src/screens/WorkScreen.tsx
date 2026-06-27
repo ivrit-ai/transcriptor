@@ -439,6 +439,32 @@ export function WorkScreen() {
 
   const console_ = (
     <div ref={cardRef} dir="rtl" style={consoleCardStyle}>
+      {/* Current line image crop — AnnotationViewer zoomed to the line, capped at 40vh */}
+      {L.current && (
+        <div
+          style={{
+            width: '100%',
+            height: '30vh',
+            maxHeight: '30vh',
+            borderRadius: 6,
+            overflow: 'hidden',
+            marginBottom: 12,
+          }}
+        >
+          <AnnotationViewer
+            imageUrl={page?.image_url ?? ''}
+            imageWidth={pagePxW}
+            imageHeight={pagePxH}
+            imageRotation={rotation}
+            annotations={[{
+              bbox: L.current.bbox,
+              lineStatus: 'processed' as const,
+            }]}
+            highlightedIndex={0}
+            autoFitHighlighted
+          />
+        </div>
+      )}
       <label htmlFor="transcription-input" style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9,
         fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--tl-muted)',
@@ -463,10 +489,12 @@ export function WorkScreen() {
         placeholder="הקלד את הטקסט של השורה המודגשת…"
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
-        rows={1}
+        rows={3}
         style={{
+          fieldSizing: 'content',
+          resize: 'none',
+          fontSize: '2.5em',
           width: '100%',
-          height: window.innerWidth < 768 ? 50 : 58,
           background: 'var(--tl-surface)',
         }}
       />
@@ -614,7 +642,7 @@ export function WorkScreen() {
   const innerContent = wide ? (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
       {/* Image column — 60% */}
-      <div style={{ flex: '0 0 60%', position: 'relative' }}>
+      <div style={{ flex: '0 0 60%', maxWidth: 1000, position: 'relative' }}>
         {L.loading
           ? <Skeleton />
           : stage

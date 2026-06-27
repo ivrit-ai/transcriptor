@@ -4,6 +4,7 @@ import useImage from "use-image";
 import type Konva from "konva";
 import type { Annotation } from "./AnnotationEditor";
 import type { BBox } from "../types";
+import { SquareSquare, Expand } from "lucide-react";
 import css from "./AnnotationViewer.module.css";
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -23,6 +24,10 @@ export interface AnnotationViewerProps {
   highlightedIndex: number | null;
   onAnnotationClick?: (index: number) => void;
   onAnnotationHover?: (index: number | null) => void;
+  /** Auto-zoom to the highlighted annotation on mount and on change */
+  autoFitHighlighted?: boolean;
+  /** Disable wheel zoom (pan only) */
+  disableZoom?: boolean;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,6 +96,8 @@ export function AnnotationViewer({
   highlightedIndex,
   onAnnotationClick,
   onAnnotationHover,
+  autoFitHighlighted = false,
+  disableZoom = false,
 }: AnnotationViewerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -175,6 +182,7 @@ export function AnnotationViewer({
   // ── Wheel zoom ─────────────────────────────────────────────────────────
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
+      if (disableZoom) return;
       e.evt.preventDefault();
       const stage = stageRef.current;
       if (!stage || baseScale <= 0) return;
@@ -253,7 +261,7 @@ export function AnnotationViewer({
   }, []);
 
   // ── Zoom to fit highlighted (return-to-line) ───────────────────────────
-  const zoomToHighlighted = useCallback((tight?: boolean) => {
+  const zoomToHighlighted = useCallback((tight: boolean = false) => {
     if (highlightedIndex == null) return;
     const a = annotations[highlightedIndex];
     if (!a) return;
@@ -282,6 +290,24 @@ export function AnnotationViewer({
       y: newWorldY - rootSize.h / 2 + (dispH * actualNewScale) / 2,
     });
   }, [highlightedIndex, annotations, rootSize, baseScale, dispW, dispH]);
+
+  // ── Auto-fit to highlighted annotation ────────────────────────────────
+  const prevFitKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoFitHighlighted || !ready || highlightedIndex == null) return;
+    const a = annotations[highlightedIndex];
+    if (!a) return;
+    const key = `${highlightedIndex}-${a.bbox.x},${a.bbox.y},${a.bbox.w},${a.bbox.h}`;
+    if (prevFitKey.current === key) return;
+    prevFitKey.current = key;
+    zoomToHighlighted(true);
+  }, [autoFitHighlighted, ready, highlightedIndex, annotations, zoomToHighlighted]);
+
+  // ── Fit full image to viewport ──────────────────────────────────────────
+  const fitToViewport = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
   // ── Detect if highlighted line is out of view ─────────────────────────
   const showReturnPill = useMemo(() => {
@@ -410,6 +436,61 @@ export function AnnotationViewer({
           התמקד בשורה
         </button>
       )}
+
+      {/* Bottom-right floating buttons */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 8,
+          right: 8,
+          zIndex: 10,
+          display: "flex",
+          gap: 6,
+        }}
+      >
+        {highlightedIndex != null && (
+          <button
+            onClick={() => zoomToHighlighted(true)}
+            aria-label="התמקד בשורה"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: "none",
+              background: "rgba(0,0,0,0.35)",
+              backdropFilter: "blur(6px)",
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              transition: "background 0.15s",
+            }}
+          >
+            <SquareSquare size={16} />
+          </button>
+        )}
+        <button
+          onClick={fitToViewport}
+          aria-label="הצג את כל התמונה"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "none",
+            background: "rgba(0,0,0,0.35)",
+            backdropFilter: "blur(6px)",
+            color: "rgba(255,255,255,0.85)",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+        >
+          <Expand size={16} />
+        </button>
+      </div>
     </div>
   );
 }
