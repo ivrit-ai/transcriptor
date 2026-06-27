@@ -211,18 +211,18 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
           rotation={doc.image_rotation}
           customBbox={doc.spotlight_bbox ?? undefined}
         />
-        {doc.skipped && (
+        {doc.status == 'skipped' && (
           <span
             title="דילגת על עמוד זה"
             style={{
-              position: 'absolute', top: 0, insetInlineEnd: 0,
+              position: 'absolute', top: 0, insetInlineStart: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 24, height: 24, borderRadius: '50%',
               background: 'oklch(0.6 0.08 60)',
               boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
             }}
           >
-            <Icon name="back" size={13} color="#fff" />
+            <Icon name="pencil-off" size={13} color="#fff" />
           </span>
         )}
         {doc.status === 'active' && (
@@ -236,7 +236,21 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
               boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
             }}
           >
-            <Icon name="forward" size={13} color="#fff" />
+            <Icon name="list-todo" size={13} color="#fff" />
+          </span>
+        )}
+        {doc.status === 'done' && (
+          <span
+            title="סיימת עמוד זה"
+            style={{
+              position: 'absolute', top: 0, insetInlineStart: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'oklch(0.6634 0.1875 138.71)',
+              boxShadow: '0 2px 6px rgba(172, 226, 25, 0.28)',
+            }}
+          >
+            <Icon name="check-line" size={13} color="#fff" />
           </span>
         )}
       </div>
@@ -251,6 +265,9 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
       }}>
         {doc.page_label && doc.page_label !== doc.document_name && (
           <>עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{doc.page_label}</span> · </>
+        )}
+        {doc.status === 'active' && (
+          <>בעבודה · </>
         )}
         {doc.status === 'skipped' && (
           <>דילגת · </>
