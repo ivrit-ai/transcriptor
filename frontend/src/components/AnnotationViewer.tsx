@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { Stage, Layer, Group, Line, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Group, Line, Rect, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import type Konva from "konva";
 import type { Annotation } from "./AnnotationEditor";
@@ -465,6 +465,40 @@ export function AnnotationViewer({
                   />
                 )}
 
+                {ready && highlightedIndex != null && annotations[highlightedIndex] != null && (() => {
+                  const a = annotations[highlightedIndex];
+                  const bbox = computeBbox(annotationPoints(a));
+                  return (
+                    <Group key="dim-overlay">
+                      <Rect
+                        x={imagePos.x}
+                        y={imagePos.y}
+                        width={imageWidth}
+                        height={imageHeight}
+                        rotation={norm}
+                        fill="rgba(0,0,0,0.5)"
+                      />
+                      <Group
+                        listening={false}
+                        clipFunc={(ctx) => {
+                          ctx.beginPath();
+                          ctx.rect(bbox.x, bbox.y, bbox.w, bbox.h);
+                          ctx.closePath();
+                        }}
+                      >
+                        <KonvaImage
+                          image={image}
+                          width={imageWidth}
+                          height={imageHeight}
+                          rotation={norm}
+                          x={imagePos.x}
+                          y={imagePos.y}
+                        />
+                      </Group>
+                    </Group>
+                  );
+                })()}
+
                 {ready &&
                   annotations.map((a, i) => {
                     const highlighted =
@@ -481,6 +515,7 @@ export function AnnotationViewer({
                           fill={shapeFill(a, highlighted)}
                           lineCap="round"
                           lineJoin="round"
+                          opacity={highlightedIndex != null ? 0.5 : 1}
                           onClick={(e: Konva.KonvaEventObject<MouseEvent>) =>
                             handleClick(e, i)
                           }
