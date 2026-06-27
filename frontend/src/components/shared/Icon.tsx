@@ -9,6 +9,7 @@ import {
   CheckLine,
   ListTodo,
   ListChecks,
+  Menu,
 } from "lucide-react";
 
 const icons = {
@@ -22,6 +23,7 @@ const icons = {
   "check-line": CheckLine,
   "list-todo": ListTodo,
   "list-checks": ListChecks,
+  menu: Menu,
 } as const;
 
 interface IconProps {

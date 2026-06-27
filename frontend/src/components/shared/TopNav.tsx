@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { PrimaryBtn } from './PrimaryBtn'
+import { Icon } from './Icon'
 import { useSession } from '../../contexts/SessionContext'
 import { useIsCurator, useIsAdmin } from '../../guards/useGuardChecks'
 
@@ -18,6 +20,31 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const { isAuthenticated } = useSession()
   const isCurator = useIsCurator()
   const isAdmin = useIsAdmin()
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches)
+      if (!e.matches) setMobileMenuOpen(false)
+    }
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mobileMenuOpen])
 
   const navLinks: { id: NavId; label: string; path: string }[] = [
     { id: 'work',        label: 'תעתוק',          path: '/work'         },
@@ -31,7 +58,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const currentId = active ?? (navLinks.find((l) => l.path === location.pathname)?.id)
 
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       direction: 'rtl',
       position: 'sticky',
       top: 0,
@@ -50,66 +77,134 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: compact ? '0 20px' : '0 40px',
-          height: compact ? 56 : 72,
+          padding: isMobile ? '0 10px' : (compact ? '0 20px' : '0 40px'),
+          height: isMobile ? 36 : (compact ? 56 : 72),
         }}>
-          <BrandMark size={compact ? 25 : 30} withName={!compact} />
+          <BrandMark size={isMobile ? 12 : (compact ? 25 : 30)} withName={!isMobile && !compact} />
 
-          {!compact && (
-            <nav style={{ display: 'flex', gap: 4, fontFamily: 'var(--font-ui)' }}>
-              {navLinks.map((l) => {
-                const isActive = currentId === l.id
-                return (
-                  <Link
-                    key={l.id}
-                    to={l.path}
+          {isMobile ? (
+            <button
+              onClick={() => setMobileMenuOpen(p => !p)}
+              aria-label={mobileMenuOpen ? 'סגור תפריט' : 'פתח תפריט'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                color: 'var(--tl-ink)',
+                lineHeight: 0,
+              }}
+            >
+              <Icon name={mobileMenuOpen ? 'close' : 'menu'} size={14} />
+            </button>
+          ) : (
+            <>
+              {!compact && (
+                <nav style={{ display: 'flex', gap: 4, fontFamily: 'var(--font-ui)' }}>
+                  {navLinks.map((l) => {
+                    const isActive = currentId === l.id
+                    return (
+                      <Link
+                        key={l.id}
+                        to={l.path}
+                        style={{
+                          fontSize: 15,
+                          fontWeight: isActive ? 600 : 500,
+                          color: isActive ? 'var(--tl-ink)' : 'var(--tl-muted)',
+                          padding: '8px 14px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          background: isActive ? 'var(--tl-muted-fill)' : 'transparent',
+                          border: 'none',
+                          fontFamily: 'var(--font-ui)',
+                          transition: 'background 0.15s, color 0.15s',
+                          textDecoration: 'none',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {l.label}
+                      </Link>
+                    )
+                  })}
+                </nav>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {!compact && (
+                  <button
+                    onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
                     style={{
-                      fontSize: 15,
-                      fontWeight: isActive ? 600 : 500,
-                      color: isActive ? 'var(--tl-ink)' : 'var(--tl-muted)',
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      background: isActive ? 'var(--tl-muted-fill)' : 'transparent',
-                      border: 'none',
                       fontFamily: 'var(--font-ui)',
-                      transition: 'background 0.15s, color 0.15s',
-                      textDecoration: 'none',
-                      display: 'inline-block',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: 'var(--tl-muted)',
+                      cursor: 'pointer',
+                      background: 'none',
+                      border: 'none',
+                      transition: 'color 0.15s',
                     }}
                   >
-                    {l.label}
-                  </Link>
-                )
-              })}
-            </nav>
+                    {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
+                  </button>
+                )}
+                <PrimaryBtn size="sm" onClick={() => navigate(isAuthenticated ? '/work' : '/auth')}>
+                  {isAuthenticated ? 'המשך' : 'התחל'}
+                </PrimaryBtn>
+              </div>
+            </>
           )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {!compact && (
-              <button
-                onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: 'var(--tl-muted)',
-                  cursor: 'pointer',
-                  background: 'none',
-                  border: 'none',
-                  transition: 'color 0.15s',
-                }}
-              >
-                {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
-              </button>
-            )}
-            <PrimaryBtn size="sm" onClick={() => navigate(isAuthenticated ? '/work' : '/auth')}>
-              {isAuthenticated ? 'המשך' : 'התחל'}
-            </PrimaryBtn>
-          </div>
         </div>
 
-        {compact && (
+        {isMobile && mobileMenuOpen && (
+          <div style={{
+            borderTop: '0.5px solid var(--tl-border)',
+            padding: '4px 0',
+          }}>
+            {navLinks.map((l) => {
+              const isActive = currentId === l.id
+              return (
+                <Link
+                  key={l.id}
+                  to={l.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: 'block',
+                    padding: '10px 16px',
+                    fontSize: 15,
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? 'var(--tl-ink)' : 'var(--tl-muted)',
+                    background: isActive ? 'var(--tl-muted-fill)' : 'transparent',
+                    textDecoration: 'none',
+                    fontFamily: 'var(--font-ui)',
+                  }}
+                >
+                  {l.label}
+                </Link>
+              )
+            })}
+            <Link
+              to={isAuthenticated ? '/me' : '/auth'}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                display: 'block',
+                padding: '10px 16px',
+                fontSize: 15,
+                fontWeight: 500,
+                color: 'var(--tl-muted)',
+                textDecoration: 'none',
+                fontFamily: 'var(--font-ui)',
+                borderTop: '0.5px solid var(--tl-border)',
+                marginTop: 4,
+              }}
+            >
+              {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
+            </Link>
+          </div>
+        )}
+
+        {!isMobile && compact && (
           <div style={{
             display: 'flex', justifyContent: 'center', gap: 4,
             borderTop: '0.5px solid var(--tl-border)',

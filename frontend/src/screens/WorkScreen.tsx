@@ -373,10 +373,19 @@ export function WorkScreen() {
 
   // ── Stage (Konva via AnnotationEditor) ─────────────────────────────────────
   const stage = (
-    <div style={{ position: 'absolute', inset: 0, background: 'var(--tl-page)', overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}>
-      <div style={{ position: 'absolute', inset: headerH }}>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "var(--tl-page)",
+        overflow: "hidden",
+        touchAction: "none",
+        userSelect: "none",
+      }}
+    >
+      <div style={{ position: "absolute", inset: wide ? headerH : 0 }}>
         <AnnotationViewer
-          imageUrl={page?.image_url ?? ''}
+          imageUrl={page?.image_url ?? ""}
           imageWidth={pagePxW}
           imageHeight={pagePxH}
           imageRotation={rotation}
@@ -386,34 +395,71 @@ export function WorkScreen() {
         />
       </div>
 
-      {/* top scrim */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: headerH + 22,
-        background: `linear-gradient(var(--tl-page), color-mix(in srgb, var(--tl-page) 12%, transparent))`,
-        pointerEvents: 'none',
-      }} />
+      {wide && (
+        <>
+          {/* top scrim */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: headerH + 22,
+              background: `linear-gradient(var(--tl-page), color-mix(in srgb, var(--tl-page) 12%, transparent))`,
+              pointerEvents: "none",
+            }}
+          />
 
-      {/* header bar */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: headerH,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: `0 ${sideM}px`, fontFamily: 'var(--font-ui)',
-        pointerEvents: 'none',
-      }}>
-        <span style={{ fontSize: 13, color: 'var(--tl-muted)', pointerEvents: 'auto' }}>
-          עמוד <span style={{ direction: 'ltr', display: 'inline-block' }}>{page?.page_label ?? page?.page_id ?? ''}</span>
-        </span>
-        <div style={{ pointerEvents: 'auto' }}>
-          <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap', pointerEvents: 'auto' }}>
-          <span style={{ direction: 'ltr', display: 'inline-block' }}>
-            {new Intl.NumberFormat('en-US').format(L.daily)}
-          </span>{' '}היום
-        </span>
-      </div>
+          {/* header bar */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: headerH,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: `0 ${sideM}px`,
+              fontFamily: "var(--font-ui)",
+              pointerEvents: "none",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--tl-muted)",
+                pointerEvents: "auto",
+              }}
+            >
+              עמוד{" "}
+              <span style={{ direction: "ltr", display: "inline-block" }}>
+                {page?.page_label ?? page?.page_id ?? ""}
+              </span>
+            </span>
+            <div style={{ pointerEvents: "auto" }}>
+              <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
+            </div>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "oklch(0.5 0.08 150)",
+                whiteSpace: "nowrap",
+                pointerEvents: "auto",
+              }}
+            >
+              <span style={{ direction: "ltr", display: "inline-block" }}>
+                {new Intl.NumberFormat("en-US").format(L.daily)}
+              </span>{" "}
+              היום
+            </span>
+          </div>
+        </>
+      )}
     </div>
-  )
+  );
 
   // ── Input console ─────────────────────────────────────────────────────────
   const consoleCardStyle: React.CSSProperties = wide
