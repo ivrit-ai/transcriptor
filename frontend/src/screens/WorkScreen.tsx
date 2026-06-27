@@ -259,13 +259,6 @@ export function WorkScreen() {
   // Close "אחר" input when moving to a new line
   useEffect(() => { setOtherOpen(false); setOtherText('') }, [L.cursor])
 
-  // ── Go-back: find the last annotated line before cursor (for Alt+↑ shortcut) ─
-  let prevDoneIdx = -1
-  for (let i = L.cursor - 1; i >= 0; i--) {
-    const s = L.lines[i]?.status
-    if (s === 'done_by_you' || s === 'flagged') { prevDoneIdx = i; break }
-  }
-
   // ── Layout ────────────────────────────────────────────────────────────────────
   const sideM = window.innerWidth < 768 ? 14 : 26
   const headerH = window.innerWidth < 768 ? 36 : 44
@@ -289,7 +282,6 @@ export function WorkScreen() {
     ? L.current.prior_kind
     : null
 
-  const nextEligibleIdx = L.lines.findIndex((l, i) => i > L.cursor && l.status === 'eligible')
   // Buttons navigate to any adjacent line; keyboard shortcuts skip to eligible/annotated
   const prevIdx = L.cursor - 1
   const nextIdx = L.cursor + 1
@@ -343,16 +335,16 @@ export function WorkScreen() {
       L.submit()
       return
     }
-    // Skip to next eligible line: Shift+ArrowDown
+    // Adjacent line: Shift+ArrowDown
     if (e.key === 'ArrowDown' && e.shiftKey) {
       e.preventDefault()
-      if (nextEligibleIdx !== -1) navigateTo(nextEligibleIdx)
+      if (canGoNext) navigateTo(nextIdx)
       return
     }
-    // Go back to previous annotated line: Shift+ArrowUp
+    // Adjacent line: Shift+ArrowUp
     if (e.key === 'ArrowUp' && e.shiftKey) {
       e.preventDefault()
-      if (prevDoneIdx !== -1) navigateTo(prevDoneIdx)
+      if (canGoBack) navigateTo(prevIdx)
       return
     }
     // Flag shortcuts: Ctrl+1 … Ctrl+4 (main keyboard and numpad)
