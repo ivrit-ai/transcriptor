@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryKeys } from "../queries";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import type { FlagKind, SubmitKind, SessionDTO } from "../types";
 import type { BBox } from "../types";
 
@@ -107,6 +107,8 @@ export function useLoop(pageId?: string): LoopState {
     data: session,
     isLoading,
     isFetching,
+    isError,
+    error,
     refetch,
   } = useQuery({
     queryKey: pageId
@@ -114,11 +116,28 @@ export function useLoop(pageId?: string): LoopState {
       : queryKeys.session.next,
     queryFn: () => (pageId ? api.getSession(pageId) : api.nextSession()),
     staleTime: Infinity,
-    retry: 2,
+    retry: (failureCount, err) =>
+      err instanceof ApiError && (err.status === 401 || err.status === 403)
+        ? false
+        : failureCount < 2,
   });
+
+  // An auth failure on /api means the gateway cookie is stale/invalid even
+  // though whoami still considered us logged in. Bounce to a top-level login
+  // to mint a fresh cookie rather than mistaking it for "no work left".
+  useEffect(() => {
+    if (
+      isError &&
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      window.location.href = "/xhost-auth/login?return_to=/work";
+    }
+  }, [isError, error]);
 
   useEffect(() => {
     if (isLoading) return;
+    if (isError) return;
     if (!session || session.lines.length === 0) {
       setPage(null);
       setLines([]);
@@ -148,7 +167,7 @@ export function useLoop(pageId?: string): LoopState {
       setInput("");
     }
     setFinished(false);
-  }, [session, isLoading]);
+  }, [session, isLoading, isError]);
 
   const loading = isLoading || (!session && isFetching);
 
