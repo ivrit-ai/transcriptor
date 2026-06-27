@@ -21,6 +21,13 @@ const DEV_SESSION: SessionDTO = {
 
 export const CONSENT_VERSION = '1.0'
 
+export class ApiError extends Error {
+  constructor(public status: number) {
+    super(String(status))
+    this.name = 'ApiError'
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T | null> {
   const res = await fetch(BASE + path, {
     ...options,
@@ -30,7 +37,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T | null
     },
   })
   if (res.status === 204) return null
-  if (!res.ok) throw new Error(`${res.status}`)
+  if (!res.ok) throw new ApiError(res.status)
   return res.json() as Promise<T>
 }
 
