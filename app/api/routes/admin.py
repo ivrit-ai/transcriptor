@@ -26,9 +26,13 @@ def curator_list(
     _: Annotated[User, Depends(require_curator)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict]:
-    rows = db.execute(
-        select(User.id, User.email).where(User.role.in_(["curator", "admin"]))
-    ).mappings().all()
+    rows = (
+        db.execute(
+            select(User.id, User.email).where(User.role.in_(["curator", "admin"]))
+        )
+        .mappings()
+        .all()
+    )
     return [{"user_id": str(r["id"]), "email": r["email"]} for r in rows]
 
 
@@ -75,10 +79,14 @@ def admin_stats(
 
     total_lines: int = db.execute(select(func.count(Line.id))).scalar_one()
     complete_lines: int = db.execute(
-        select(func.count(Line.id)).where(Line.transcription_count >= _COMPLETION_TARGET)
+        select(func.count(Line.id)).where(
+            Line.transcription_count >= _COMPLETION_TARGET
+        )
     ).scalar_one()
 
-    completion_pct = round(100.0 * complete_lines / total_lines, 1) if total_lines else 0.0
+    completion_pct = (
+        round(100.0 * complete_lines / total_lines, 1) if total_lines else 0.0
+    )
 
     return {
         "total_users": total_users,
@@ -95,38 +103,59 @@ def admin_users(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict]:
-    rows = db.execute(
-        select(
-            User.id,
-            User.display_name,
-            User.email,
-            User.role,
-            User.created_at,
-            func.max(Transcription.updated_at).label("last_active"),
-            func.count(Transcription.id).label("total_submissions"),
-            func.count(
-                case((Transcription.kind == TranscriptionKind.text, Transcription.id))
-            ).label("text_count"),
-            func.count(
-                case((Transcription.kind == TranscriptionKind.cant_read, Transcription.id))
-            ).label("cant_read_count"),
-            func.count(
-                case((
-                    Transcription.kind.in_([
-                        TranscriptionKind.bad_crop,
-                        TranscriptionKind.not_hebrew,
-                        TranscriptionKind.not_text,
-                    ]),
-                    Transcription.id,
-                ))
-            ).label("flag_count"),
+    rows = (
+        db.execute(
+            select(
+                User.id,
+                User.display_name,
+                User.email,
+                User.role,
+                User.created_at,
+                func.max(Transcription.updated_at).label("last_active"),
+                func.count(Transcription.id).label("total_submissions"),
+                func.count(
+                    case(
+                        (Transcription.kind == TranscriptionKind.text, Transcription.id)
+                    )
+                ).label("text_count"),
+                func.count(
+                    case(
+                        (
+                            Transcription.kind == TranscriptionKind.cant_read,
+                            Transcription.id,
+                        )
+                    )
+                ).label("cant_read_count"),
+                func.count(
+                    case(
+                        (
+                            Transcription.kind.in_(
+                                [
+                                    TranscriptionKind.bad_crop,
+                                    TranscriptionKind.not_hebrew,
+                                    TranscriptionKind.not_text,
+                                ]
+                            ),
+                            Transcription.id,
+                        )
+                    )
+                ).label("flag_count"),
+            )
+            .outerjoin(Transcription, Transcription.user_id == User.id)
+            .group_by(
+                User.id, User.display_name, User.email, User.role, User.created_at
+            )
+            .order_by(
+                func.count(
+                    case(
+                        (Transcription.kind == TranscriptionKind.text, Transcription.id)
+                    )
+                ).desc()
+            )
         )
-        .outerjoin(Transcription, Transcription.user_id == User.id)
-        .group_by(User.id, User.display_name, User.email, User.role, User.created_at)
-        .order_by(func.count(
-            case((Transcription.kind == TranscriptionKind.text, Transcription.id))
-        ).desc())
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return [
         {
@@ -183,25 +212,29 @@ def admin_coverage(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict]:
-    rows = db.execute(
-        select(
-            Batch.id,
-            Batch.external_id,
-            Batch.source,
-            func.count(func.distinct(Page.id)).label("total_pages"),
-            func.count(Line.id).label("total_lines"),
-            func.count(
-                case((Line.transcription_count > 0, Line.id))
-            ).label("lines_with_any"),
-            func.count(
-                case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
-            ).label("lines_complete"),
+    rows = (
+        db.execute(
+            select(
+                Batch.id,
+                Batch.external_id,
+                Batch.source,
+                func.count(func.distinct(Page.id)).label("total_pages"),
+                func.count(Line.id).label("total_lines"),
+                func.count(case((Line.transcription_count > 0, Line.id))).label(
+                    "lines_with_any"
+                ),
+                func.count(
+                    case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
+                ).label("lines_complete"),
+            )
+            .join(Page, Page.batch_id == Batch.id)
+            .join(Line, Line.page_id == Page.id)
+            .group_by(Batch.id, Batch.external_id, Batch.source)
+            .order_by(Batch.external_id)
         )
-        .join(Page, Page.batch_id == Batch.id)
-        .join(Line, Line.page_id == Page.id)
-        .group_by(Batch.id, Batch.external_id, Batch.source)
-        .order_by(Batch.external_id)
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return [
         {
@@ -212,9 +245,9 @@ def admin_coverage(
             "total_lines": r["total_lines"],
             "lines_with_any": r["lines_with_any"],
             "lines_complete": r["lines_complete"],
-            "completion_pct": round(
-                100.0 * r["lines_complete"] / r["total_lines"], 1
-            ) if r["total_lines"] else 0.0,
+            "completion_pct": round(100.0 * r["lines_complete"] / r["total_lines"], 1)
+            if r["total_lines"]
+            else 0.0,
         }
         for r in rows
     ]
@@ -240,23 +273,29 @@ def admin_pages(
         select(func.count(Page.id)).where(Page.approved.is_(True))
     ).scalar_one()
 
-    rows = db.execute(
-        select(
-            Page.id,
-            Page.external_id,
-            Page.image_path,
-            Page.approved,
-            Page.approved_by,
-            Page.updated_at,
-            Batch.id.label("batch_id"),
-            Batch.external_id.label("batch_external_id"),
-            Batch.source,
+    rows = (
+        db.execute(
+            select(
+                Page.id,
+                Page.external_id,
+                Page.image_path,
+                Page.approved,
+                Page.approved_by,
+                Page.rejected,
+                Page.rejected_by,
+                Page.updated_at,
+                Batch.id.label("batch_id"),
+                Batch.external_id.label("batch_external_id"),
+                Batch.source,
+            )
+            .join(Batch, Batch.id == Page.batch_id)
+            .order_by(Batch.external_id, Page.external_id)
+            .offset(offset)
+            .limit(page_size)
         )
-        .join(Batch, Batch.id == Page.batch_id)
-        .order_by(Batch.external_id, Page.external_id)
-        .offset(offset)
-        .limit(page_size)
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     items = [
         {
@@ -265,6 +304,8 @@ def admin_pages(
             "image_path": r["image_path"],
             "approved": r["approved"],
             "approved_by": str(r["approved_by"]) if r["approved_by"] else None,
+            "rejected": r["rejected"],
+            "rejected_by": str(r["rejected_by"]) if r["rejected_by"] else None,
             "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
             "batch_id": str(r["batch_id"]),
             "batch_external_id": r["batch_external_id"],
@@ -298,11 +339,13 @@ def admin_page_lines(
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
 
-    lines = db.execute(
-        select(Line)
-        .where(Line.page_id == page.id)
-        .order_by(Line.line_index)
-    ).scalars().all()
+    lines = (
+        db.execute(
+            select(Line).where(Line.page_id == page.id).order_by(Line.line_index)
+        )
+        .scalars()
+        .all()
+    )
 
     return {
         "page_id": str(page.id),
@@ -314,6 +357,7 @@ def admin_page_lines(
         "height_px": page.height_px,
         "image_rotation": page.image_rotation,
         "approved": page.approved,
+        "rejected": page.rejected,
         "lines": [
             {
                 "id": str(line.id),
@@ -336,6 +380,7 @@ class UpdatePageLinesRequest(BaseModel):
     rotation: int | None = None
     lines: list[dict] | None = None
     approved: bool | None = None
+    rejected: bool | None = None
 
 
 @router.put("/page_lines")
@@ -362,6 +407,15 @@ def update_page_lines(
 
     if body.rotation is not None:
         page.image_rotation = body.rotation
+
+    if body.rejected is not None:
+        if body.rejected and body.approved:
+            raise HTTPException(
+                status_code=422,
+                detail="cannot specify both approved and rejected",
+            )
+        page.rejected = body.rejected
+        page.rejected_by = _.id if body.rejected else None
 
     if body.approved is not None:
         page.approved = body.approved
@@ -399,6 +453,7 @@ def update_page_lines(
         "page_id": str(page.id),
         "image_rotation": page.image_rotation,
         "approved": page.approved,
+        "rejected": page.rejected,
         "line_ids": update_line_ids,
     }
 
@@ -408,19 +463,30 @@ def admin_queue(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict:
-    line_stats = db.execute(
-        select(
-            func.count(Line.id).label("total"),
-            func.count(case((Line.transcription_count == 0, Line.id))).label("untouched"),
-            func.count(case((
-                (Line.transcription_count > 0) & (Line.transcription_count < _COMPLETION_TARGET),
-                Line.id,
-            ))).label("in_progress"),
-            func.count(
-                case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
-            ).label("complete"),
+    line_stats = (
+        db.execute(
+            select(
+                func.count(Line.id).label("total"),
+                func.count(case((Line.transcription_count == 0, Line.id))).label(
+                    "untouched"
+                ),
+                func.count(
+                    case(
+                        (
+                            (Line.transcription_count > 0)
+                            & (Line.transcription_count < _COMPLETION_TARGET),
+                            Line.id,
+                        )
+                    )
+                ).label("in_progress"),
+                func.count(
+                    case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
+                ).label("complete"),
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
 
     pages_complete: int = db.execute(
         select(func.count(Page.id)).where(

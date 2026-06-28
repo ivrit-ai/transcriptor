@@ -26,7 +26,7 @@ class Transcription(Base):
     __table_args__ = (UniqueConstraint("line_id", "user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    line_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lines.id"), nullable=False)
+    line_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lines.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     kind: Mapped[TranscriptionKind] = mapped_column(
         SAEnum(TranscriptionKind, name="transcriptionkind"), nullable=False

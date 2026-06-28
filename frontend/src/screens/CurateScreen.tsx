@@ -91,6 +91,8 @@ export function CurateScreen() {
             <span className={css.colExternalId}>External ID</span>
             <span className={css.colApproved}>Approved?</span>
             <span className={css.colApprovedBy}>Approved By</span>
+            <span className={css.colRejected}>Rejected?</span>
+            <span className={css.colRejectedBy}>Rejected By</span>
             <span className={css.colUpdatedAt}>Updated</span>
           </div>
           {rows.map((row, i) => (
@@ -105,6 +107,8 @@ export function CurateScreen() {
               <span className={css.colExternalId}>{row.page_external_id}</span>
               <span className={css.colApproved}>{row.approved ? '✓' : '—'}</span>
               <span className={css.colApprovedBy}>{curatorMap.get(row.approved_by ?? '') ?? row.approved_by ?? '—'}</span>
+              <span className={css.colRejected}>{row.rejected ? '✗' : '—'}</span>
+              <span className={css.colRejectedBy}>{curatorMap.get(row.rejected_by ?? '') ?? row.rejected_by ?? '—'}</span>
               <span className={css.colUpdatedAt}>{row.updated_at ?? '—'}</span>
             </button>
           ))}
