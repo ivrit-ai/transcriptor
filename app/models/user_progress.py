@@ -26,7 +26,7 @@ class UserProgress(Base):
     done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     skipped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_submitted_line_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("lines.id"), nullable=True, default=None
+        ForeignKey("lines.id", ondelete="CASCADE"), nullable=True, default=None
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

@@ -10,6 +10,7 @@ from app.db import Base
 if TYPE_CHECKING:
     from app.models.page import Page
     from app.models.transcription import Transcription
+    from app.models.event import Event
 
 
 class Line(Base):
@@ -30,4 +31,5 @@ class Line(Base):
     external_id: Mapped[str] = mapped_column(String, nullable=False)
 
     page: Mapped["Page"] = relationship("Page", back_populates="lines")
-    transcriptions: Mapped[list["Transcription"]] = relationship("Transcription", back_populates="line")
+    transcriptions: Mapped[list["Transcription"]] = relationship("Transcription", back_populates="line", passive_deletes=True)
+    events: Mapped[list["Event"]] = relationship("Event", back_populates="line", passive_deletes=True)

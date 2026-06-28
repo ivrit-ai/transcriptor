@@ -111,6 +111,8 @@
 .colExternalId,
 .colApproved,
 .colApprovedBy,
+.colRejected,
+.colRejectedBy,
 .colUpdatedAt {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,6 +144,18 @@
 }
 
 .colApprovedBy {
+  flex: 0 0 100px;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.colRejected {
+  flex: 0 0 56px;
+  text-align: center;
+}
+
+.colRejectedBy {
   flex: 0 0 100px;
   min-width: 0;
   font-family: var(--font-mono, monospace);

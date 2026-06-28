@@ -137,6 +137,8 @@
   color: var(--tl-ink);
   cursor: pointer;
   font-family: var(--font-ui);
+  &.positive { color: var(--tl-success-text); }
+  &.negative { color: var(--tl-failure-text); }
 }
 
 .checkLabel input[type="checkbox"] {

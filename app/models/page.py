@@ -27,6 +27,8 @@ class Page(Base):
     height_px: Mapped[int] = mapped_column(Integer, nullable=False)
     approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, default=None)
+    rejected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    rejected_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, default=None)
     image_rotation: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
@@ -37,3 +39,4 @@ class Page(Base):
     batch: Mapped["Batch"] = relationship("Batch", back_populates="pages")
     lines: Mapped[list["Line"]] = relationship("Line", back_populates="page")
     approver: Mapped["User | None"] = relationship("User", foreign_keys=[approved_by])
+    rejecter: Mapped["User | None"] = relationship("User", foreign_keys=[rejected_by])

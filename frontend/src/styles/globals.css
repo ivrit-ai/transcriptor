@@ -32,6 +32,7 @@
   /* Accessibility tokens */
   --tl-label-warm: oklch(0.55 0.1 60);
   --tl-success-text: oklch(0.5 0.1 150);
+  --tl-failure-text: oklch(0.64 0.2 35);
   --tl-streak-text: oklch(0.45 0.1 50);
 
   /* Legacy aliases kept for existing components */

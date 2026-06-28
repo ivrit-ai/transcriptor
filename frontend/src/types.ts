@@ -97,6 +97,8 @@ export interface AdminDatasetRowDTO {
   image_path: string
   approved: boolean
   approved_by: string | null
+  rejected: boolean
+  rejected_by: string | null
   updated_at: string | null
   batch_id: string
   batch_external_id: string
@@ -132,6 +134,7 @@ export interface AdminPageLinesDTO {
   height_px: number
   image_rotation: number
   approved: boolean
+  rejected: boolean
   lines: AdminPageLineDTO[]
 }
 
@@ -146,12 +149,14 @@ export interface UpdatePageLinesBody {
     transcription_count?: number
   }>
   approved?: boolean
+  rejected?: boolean
 }
 
 export interface UpdatePageLinesResponse {
   page_id: string
   image_rotation: number
   approved: boolean
+  rejected: boolean
   line_ids: string[] | null
 }
 
