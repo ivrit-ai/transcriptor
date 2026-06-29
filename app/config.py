@@ -7,15 +7,11 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/transcriptor"
     test_database_url: str = "postgresql://postgres:postgres@localhost:5432/transcriptor_test"
-    secret_key: str = "dev-secret-key"
     consent_version: str = "1.0"
     dev_mode: bool = False
     local_data_dir: str = "data_sample"
     images_serve_origin: str = ""
     admin_emails: list[str] = []
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_redirect_uri: str = "https://transcriptor-yanirmr.xhostd.com/api/auth/callback"
 
     @field_validator("admin_emails", mode="before")
     @classmethod
