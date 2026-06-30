@@ -17,7 +17,7 @@ interface TopNavProps {
 export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated } = useSession()
+  const { isAuthenticated, logout } = useSession()
   const isCurator = useIsCurator()
   const isAdmin = useIsAdmin()
   const [isMobile, setIsMobile] = useState(false)
@@ -148,6 +148,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                 <button
                   onClick={toggleTheme}
                   aria-label={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+                  title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -163,21 +164,43 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                   <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
                 </button>
                 {!compact && (
-                  <button
-                    onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: 'var(--tl-muted)',
-                      cursor: 'pointer',
-                      background: 'none',
-                      border: 'none',
-                      transition: 'color 0.15s',
-                    }}
-                  >
-                    {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => navigate(isAuthenticated ? '/me' : '/auth')}
+                      style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: 'var(--tl-muted)',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: 'none',
+                        transition: 'color 0.15s',
+                      }}
+                    >
+                      {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
+                    </button>
+                    {isAuthenticated && (
+                      <button
+                        onClick={logout}
+                        aria-label="יציאה"
+                        title="יציאה"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          color: 'var(--tl-muted)',
+                          transition: 'color 0.15s',
+                        }}
+                      >
+                        <Icon name="logout" size={16} />
+                      </button>
+                    )}
+                  </>
                 )}
                 <PrimaryBtn size="sm" onClick={() => navigate(isAuthenticated ? '/work' : '/auth')}>
                   {isAuthenticated ? 'המשך' : 'התחל'}
@@ -231,6 +254,27 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
             >
               {isAuthenticated ? 'הפרופיל שלי' : 'כניסה'}
             </Link>
+            {isAuthenticated && (
+              <button
+                onClick={() => { setMobileMenuOpen(false); logout() }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'right',
+                  padding: '10px 16px',
+                  fontSize: 15,
+                  fontWeight: 500,
+                  color: 'var(--tl-muted)',
+                  background: 'none',
+                  border: 'none',
+                  borderTop: '0.5px solid var(--tl-border)',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                יציאה
+              </button>
+            )}
             <div style={{
               display: 'flex',
               alignItems: 'center',
