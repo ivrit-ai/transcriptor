@@ -305,12 +305,12 @@ body {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--tl-muted);
   background: transparent;
   border: 0.5px solid var(--tl-border);
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
