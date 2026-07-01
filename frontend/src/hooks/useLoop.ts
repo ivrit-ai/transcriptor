@@ -43,10 +43,10 @@ function linesFromDTO(dto: SessionDTO): LoopLine[] {
 }
 
 function firstEligibleIdx(lines: LoopLine[]): number {
-  const i = lines.findIndex(
-    (l) => l.status === "eligible" || l.status === "done_by_you",
-  );
-  return i === -1 ? 0 : i;
+  const eligible = lines.findIndex((l) => l.status === "eligible");
+  if (eligible !== -1) return eligible;
+  const doneByYou = lines.findIndex((l) => l.status === "done_by_you");
+  return doneByYou !== -1 ? doneByYou : 0;
 }
 
 function nextEligibleIdx(lines: LoopLine[], from: number): number {
