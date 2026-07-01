@@ -192,12 +192,16 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: 4,
                           padding: 0,
                           color: 'var(--tl-muted)',
                           transition: 'color 0.15s',
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '0.875rem',
                         }}
                       >
                         <Icon name="logout" size={16} />
+                        יציאה
                       </button>
                     )}
                   </>
