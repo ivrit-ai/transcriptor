@@ -34,6 +34,7 @@ export interface SaveToast {
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
   { kind: "cant_read", label: "טקסט לא ברור" },
   { kind: "not_text", label: "לא טקסט" },
+  { kind: "not_hebrew", label: "לא עברית" },
   { kind: "bad_crop", label: "התמונה חתוכה" },
   { kind: "other", label: "אחר" },
 ];
