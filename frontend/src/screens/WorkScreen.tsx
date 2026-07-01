@@ -574,7 +574,7 @@ export function WorkScreen() {
         id="transcription-input"
         ref={taRef}
         className={`tl-textarea ${css.consoleInputArea}`}
-        dir="rtl"
+        dir="ltr"
         lang="he"
         value={L.input}
         placeholder="הקלד את הטקסט מהשורה המודגשת…"
