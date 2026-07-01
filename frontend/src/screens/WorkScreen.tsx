@@ -219,6 +219,99 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
   )
 }
 
+// ── Special characters panel ──────────────────────────────────────────────────
+const SPECIAL_CHARS = [
+  { char: '√', label: 'שורש ריבועי' },
+  { char: '✓', label: 'וי (סימן אישור)' },
+  { char: '☐', label: 'תיבת סימון ריקה' },
+  { char: '←', label: 'חץ שמאל' },
+  { char: '→', label: 'חץ ימין' },
+  { char: '≠', label: 'לא שווה' },
+  { char: '≥', label: 'גדול או שווה' },
+  { char: '≤', label: 'קטן או שווה' },
+  { char: '∞', label: 'אינסוף' },
+]
+
+function SpecialCharsPanel({ taRef, input, setInput }: {
+  taRef: React.RefObject<HTMLTextAreaElement>
+  input: string
+  setInput: (v: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  const insertChar = (char: string) => {
+    const ta = taRef.current
+    const start = ta ? (ta.selectionStart ?? input.length) : input.length
+    const end = ta ? (ta.selectionEnd ?? input.length) : input.length
+    const newVal = input.slice(0, start) + char + input.slice(end)
+    setInput(newVal)
+    requestAnimationFrame(() => {
+      if (ta) {
+        ta.selectionStart = ta.selectionEnd = start + char.length
+        ta.focus()
+      }
+    })
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontFamily: 'var(--font-ui)', fontSize: 12,
+          color: 'var(--tl-muted)',
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '2px 0',
+          transition: 'color 0.12s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--tl-ink)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--tl-muted)')}
+      >
+        <span style={{
+          display: 'inline-block', fontSize: 9,
+          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s',
+        }}>▶</span>
+        תווים מיוחדים
+      </button>
+      {open && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+          {SPECIAL_CHARS.map(({ char, label }) => (
+            <button
+              key={char}
+              onClick={() => insertChar(char)}
+              title={label}
+              style={{
+                width: 34, height: 34,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '0.5px solid var(--tl-border)',
+                borderRadius: 7,
+                background: 'var(--tl-surface)',
+                cursor: 'pointer',
+                color: 'var(--tl-ink)',
+                fontSize: 17,
+                fontFamily: 'monospace',
+                transition: 'background 0.1s, border-color 0.1s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--tl-muted-fill)'
+                e.currentTarget.style.borderColor = 'var(--tl-accent)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'var(--tl-surface)'
+                e.currentTarget.style.borderColor = 'var(--tl-border)'
+              }}
+            >
+              {char}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export function WorkScreen() {
   const navigate = useNavigate()
@@ -583,6 +676,8 @@ export function WorkScreen() {
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
       />
+
+      <SpecialCharsPanel taRef={taRef} input={L.input} setInput={L.setInput} />
 
       {/* Nav arrows + flags — two groups separated by a divider */}
       <div style={{
