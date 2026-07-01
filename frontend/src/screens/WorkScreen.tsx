@@ -32,7 +32,11 @@ function ImmTicks({ lines, cursor, onJump }: {
   return (
     <div ref={scrollRef} style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto',  width: '100%', flexShrink: 1 }}>
       {lines.map((l, i) => {
-        const done = l.status === 'done_by_you' || l.status === 'flagged'
+        const dotColor = i === cursor
+          ? 'var(--tl-spotlight)'
+          : l.status === 'flagged' ? 'oklch(0.6 0.18 25)'
+          : l.status === 'done_by_you' ? 'oklch(0.7 0.06 150)'
+          : 'rgba(216, 148, 60, 0.73)'
         return (
           <button
             key={l.id}
@@ -44,9 +48,7 @@ function ImmTicks({ lines, cursor, onJump }: {
             <span style={{
               display: 'block',
               width: i === cursor ? 16 : 7, height: 4, borderRadius: 2,
-              background: i === cursor
-                ? 'var(--tl-spotlight)'
-                : done ? 'oklch(0.7 0.06 150)' : 'rgba(216, 148, 60, 0.73)',
+              background: dotColor,
               transition: 'width .25s, background .25s',
             }} />
           </button>
@@ -293,7 +295,7 @@ export function WorkScreen() {
   const annotations = useMemo(
     () => L.lines.map(l => ({
       bbox: l.bbox,
-      lineStatus: (l.status === 'done_by_you' || l.status === 'flagged') ? 'processed' as const : 'initial' as const,
+      lineStatus: l.status === 'flagged' ? 'flagged' as const : l.status === 'done_by_you' ? 'processed' as const : 'initial' as const,
     })),
     [L.lines],
   )
