@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
@@ -238,19 +238,43 @@ function SpecialCharsPanel({ taRef, input, setInput }: {
   setInput: (v: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  // Saved cursor position — captured on textarea blur so that when mousedown
+  // on a char button blurs it (resetting selectionStart to 0 in most browsers)
+  // we still have the original position.
+  const savedCursor = useRef<{ start: number; end: number } | null>(null)
+
+  useEffect(() => {
+    const ta = taRef.current
+    if (!ta) return
+    const save = () => {
+      savedCursor.current = { start: ta.selectionStart ?? 0, end: ta.selectionEnd ?? 0 }
+    }
+    ta.addEventListener('blur', save)
+    return () => ta.removeEventListener('blur', save)
+  }, [taRef])
+  // Pending cursor position to restore after React commits the new value.
+  const pendingCursor = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const pos = pendingCursor.current
+    if (pos === null) return
+    pendingCursor.current = null
+    const ta = taRef.current
+    if (ta) {
+      ta.selectionStart = ta.selectionEnd = pos
+      ta.focus()
+    }
+  })
 
   const insertChar = (char: string) => {
     const ta = taRef.current
-    const start = ta ? (ta.selectionStart ?? input.length) : input.length
-    const end = ta ? (ta.selectionEnd ?? input.length) : input.length
+    const saved = savedCursor.current
+    const start = saved ? saved.start : (ta ? (ta.selectionStart ?? input.length) : input.length)
+    const end = saved ? saved.end : (ta ? (ta.selectionEnd ?? input.length) : input.length)
+    savedCursor.current = null
     const newVal = input.slice(0, start) + char + input.slice(end)
+    pendingCursor.current = start + char.length
     setInput(newVal)
-    requestAnimationFrame(() => {
-      if (ta) {
-        ta.selectionStart = ta.selectionEnd = start + char.length
-        ta.focus()
-      }
-    })
   }
 
   return (
@@ -280,6 +304,7 @@ function SpecialCharsPanel({ taRef, input, setInput }: {
           {SPECIAL_CHARS.map(({ char, label }) => (
             <button
               key={char}
+              onMouseDown={e => e.preventDefault()}
               onClick={() => insertChar(char)}
               title={label}
               style={{

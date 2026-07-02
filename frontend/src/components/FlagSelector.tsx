@@ -72,7 +72,7 @@ export function FlagSelector({
                 key={r.kind}
                 className="tl-reason-inline"
                 onClick={() => setOtherOpen(!otherOpen)}
-                title="אחר — פתח תיבת הסבר (Ctrl+4)"
+                title={`אחר — פתח תיבת הסבר (Ctrl+${i + 1})`}
                 style={activeFlagKind === 'other' || otherOpen ? {
                   background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
                   color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
