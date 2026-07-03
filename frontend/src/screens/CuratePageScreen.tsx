@@ -506,7 +506,7 @@ export function CuratePageScreen() {
           break;
         case "Escape":
           e.preventDefault();
-          navigate("/curate");
+          navigate("/curate", { state: { listPage: listPageNum } });
           break;
         case "ArrowLeft":
           e.preventDefault();
@@ -717,7 +717,7 @@ export function CuratePageScreen() {
               <button
                 type="button"
                 className={css.backBtn}
-                onClick={() => navigate("/curate")}
+                onClick={() => navigate("/curate", { state: { listPage: listPageNum } })}
               >
                 ← Back To List <span className={css.keyHint}>Esc</span>
               </button>
