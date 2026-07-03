@@ -28,6 +28,167 @@ const FLAG_CARDS = [
   { label: "לא מצליח לקרוא", d: "דהוי, מטושטש או בכתב יד שאי אפשר לפענח." },
 ];
 
+const FAQ_ITEMS: { q: string; a: string; caption?: string }[] = [
+  {
+    q: "האם לתקן שגיאות כתיב?",
+    a: "לא. יש לתעתק את הכתוב כפי שהוא, גם כאשר קיימת שגיאת כתיב ברורה. אין להשלים אות או מילה חסרה לפי הדקדוק או לפי ההקשר.",
+  },
+  {
+    q: "האם להשלים קיצורים וראשי תיבות?",
+    a: "לא. יש להעתיק את הקיצור כפי שהוא מופיע, כולל גרש או גרשיים אם הם קיימים. אין להרחיב ראשי תיבות למילים מלאות.",
+  },
+  {
+    q: "האם לתעתק גרשיים, מקפים וסימני פיסוק?",
+    a: "כן. יש להעתיק סימני פיסוק שנראים בבירור. אין להוסיף פסיקים, נקודות או סימנים שאינם מופיעים במקור.",
+  },
+  {
+    q: "מה עושים כשהכתיבה עוברת לאנגלית?",
+    a: "יש להקליד את האנגלית בסדר הרגיל שלה, משמאל לימין. אין להפוך את סדר האותיות, גם אם המילה מופיעה בתוך שורה עברית. תווים בעברית נכתבים מימין לשמאל, תווים באנגלית וספרות נכתבים משמאל לימין — התוצאה צריכה להיראות כפי שהיא נראית בכתב.",
+    caption: "ניתוח השונות שבוצע הינו Two-way ANOVA",
+  },
+  {
+    q: "מה לעשות כשיש מילה, אות או שורה לא ברורה?",
+    a: 'אם כל השורה או רובה לא ברורות, ניתן לסמן בעזרת הכפתור "לא ניתן לקרוא". אם רק מילה אחת או אות אחת לא ברורות, ניתן לתעתק את מה שאפשר.',
+  },
+  {
+    q: "מה עושים אם חלק מהטקסט חתוך בקצה התמונה?",
+    a: "יש לתעתק רק את מה שנראה בפועל. אין להשלים מילים שנמצאות מחוץ לתמונה.",
+  },
+  {
+    q: "האם לתעתק ניקוד?",
+    a: "אין צורך.",
+  },
+  {
+    q: "האם לתעתק טקסט מודפס שמופיע לצד כתב היד?",
+    a: "כן.",
+  },
+];
+
+const ADVANCED_ITEMS: {
+  q: string;
+  a: string;
+  examples?: string[];
+  aExtra?: string;
+}[] = [
+  {
+    q: "איך לכתוב מתמטיקה?",
+    a: "מומלץ להבחין בין ביטוי פשוט לבין נוסחה מורכבת. ביטויים פשוטים יש להקליד באמצעות סימנים רגילים ככל האפשר:",
+    examples: ["2 + 3 = 5", "x²", "1/2", "a < b", "אחרת: H1"],
+    aExtra:
+      'נוסחה מורכבת שקשה לייצג בטקסט רגיל תסומן כ"לא עברית" — אין לתאר אותה במילים ואין לנחש סימנים שאינם ברורים.',
+  },
+  {
+    q: "מה עושים עם סימן שאינו קיים במקלדת?",
+    a: 'יש לבחור את הסימן הקרוב ביותר מתוך לוח הסימנים של המערכת. אם אין סימן מתאים, אפשר לסמן "לא עברית" — אך לא להחליף אותו באות או בסימן אחר על סמך ניחוש.',
+  },
+];
+
+function ExampleBox({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        fontFamily: "var(--font-serif)",
+        fontSize: 15,
+        direction: "rtl",
+        color: "var(--tl-ink)",
+        background: "var(--tl-surface)",
+        border: "0.5px solid var(--tl-border)",
+        borderRadius: 8,
+        padding: "8px 12px",
+        marginTop: 8,
+        lineHeight: 1.6,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function FaqItem({
+  q,
+  a,
+  caption,
+  examples,
+  aExtra,
+  isMobile,
+}: {
+  q: string;
+  a: string;
+  caption?: string;
+  examples?: string[];
+  aExtra?: string;
+  isMobile?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        borderBottom: "0.5px solid var(--tl-border)",
+        paddingBottom: isMobile ? 16 : 18,
+      }}
+    >
+      <div
+        style={{
+          fontSize: isMobile ? 15 : 16,
+          fontWeight: 600,
+          color: "var(--tl-ink)",
+          marginBottom: 6,
+        }}
+      >
+        {q}
+      </div>
+      <div
+        style={{
+          fontSize: isMobile ? 13.5 : 14.5,
+          color: "var(--tl-muted)",
+          lineHeight: 1.6,
+        }}
+      >
+        {a}
+      </div>
+      {examples && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          {examples.map((ex) => (
+            <span
+              key={ex}
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 14,
+                color: "var(--tl-ink)",
+                background: "var(--tl-surface)",
+                border: "0.5px solid var(--tl-border)",
+                borderRadius: 6,
+                padding: "3px 10px",
+              }}
+            >
+              {ex}
+            </span>
+          ))}
+        </div>
+      )}
+      {aExtra && (
+        <div
+          style={{
+            fontSize: isMobile ? 13.5 : 14.5,
+            color: "var(--tl-muted)",
+            lineHeight: 1.6,
+            marginTop: 8,
+          }}
+        >
+          {aExtra}
+        </div>
+      )}
+      {caption && <ExampleBox text={caption} />}
+    </div>
+  );
+}
+
 function RuleRow({
   t,
   d,
@@ -277,6 +438,52 @@ export function GuidelinesScreen() {
     </div>
   );
 
+  const faqBlock = (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: isMobile ? 19 : 22,
+          fontWeight: 500,
+          color: "var(--tl-ink)",
+          marginBottom: 18,
+        }}
+      >
+        שאלות נפוצות
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 18 }}>
+        {FAQ_ITEMS.map((item) => (
+          <FaqItem key={item.q} {...item} isMobile={isMobile} />
+        ))}
+      </div>
+    </div>
+  );
+
+  const advancedBlock = (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: isMobile ? 19 : 22,
+          fontWeight: 500,
+          color: "var(--tl-ink)",
+          marginBottom: 18,
+        }}
+      >
+        למתקדמים
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 18 }}>
+        {ADVANCED_ITEMS.map((item) => (
+          <FaqItem key={item.q} {...item} isMobile={isMobile} />
+        ))}
+      </div>
+    </div>
+  );
+
+  const divider = (
+    <div style={{ height: 1, background: "var(--tl-border)" }} />
+  );
+
   const pad = isMobile ? "24px 22px 30px" : "44px 56px 56px";
 
   if (isMobile) {
@@ -303,6 +510,10 @@ export function GuidelinesScreen() {
           <WorkedExample width={272} />
           {rulesBlock}
           {flagBlock}
+          {divider}
+          {faqBlock}
+          {divider}
+          {advancedBlock}
           <PrimaryBtn
             size="lg"
             onClick={() => navigate("/work")}
@@ -348,6 +559,22 @@ export function GuidelinesScreen() {
           }}
         />
         {flagBlock}
+        <div
+          style={{
+            height: 1,
+            background: "var(--tl-border)",
+            margin: "36px 0",
+          }}
+        />
+        {faqBlock}
+        <div
+          style={{
+            height: 1,
+            background: "var(--tl-border)",
+            margin: "36px 0",
+          }}
+        />
+        {advancedBlock}
         <div style={{ marginTop: 40 }}>
           <PrimaryBtn size="lg" onClick={() => navigate("/work")}>
             התחל לתעתק <Icon name="forward" size={18} color="#fff" />
