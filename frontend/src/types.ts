@@ -1,4 +1,4 @@
-export type LineStatus = 'eligible' | 'full' | 'done_by_you'
+export type LineStatus = 'eligible' | 'full' | 'done_by_you' | 'flagged'
 
 export interface BBox {
   x: number
