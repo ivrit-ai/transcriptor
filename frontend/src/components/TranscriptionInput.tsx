@@ -46,7 +46,7 @@ export function TranscriptionInput({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        dir="ltr"
+        dir="rtl"
         lang="he"
         placeholder="הקלד את הטקסט כאן…"
         rows={3}

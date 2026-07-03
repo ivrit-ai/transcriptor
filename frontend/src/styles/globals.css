@@ -204,8 +204,7 @@ body {
 .tl-textarea {
   font-family: var(--font-serif);
   font-size: 21px;
-  direction: ltr;
-  text-align: right;
+  direction: rtl;
   line-height: 1.45;
   color: var(--tl-ink);
   background: var(--tl-surface);
