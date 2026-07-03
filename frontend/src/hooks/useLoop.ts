@@ -209,7 +209,7 @@ export function useLoop(pageId?: string): LoopState {
     const line = linesRef.current[idx];
     if (!line || line.status === "full") return;
 
-    const isEdit = line.status === "done_by_you";
+    const isEdit = line.status === "done_by_you" || line.status === "flagged";
 
     setLines((ls) =>
       ls.map((l, i) =>
@@ -242,12 +242,14 @@ export function useLoop(pageId?: string): LoopState {
       const line = linesRef.current[idx];
       if (!line || line.status === "full") return;
 
+      const isReflag = line.status === "flagged";
+
       setLines((ls) =>
         ls.map((l, i) =>
           i === idx ? { ...l, status: "flagged", prior_kind: kind, your_text: '' } : l,
         ),
       );
-      setDone((d) => d + 1);
+      if (!isReflag) setDone((d) => d + 1);
 
       submitMutation.mutate({ lineId: line.id, body: { kind, text } });
       advance(idx);
