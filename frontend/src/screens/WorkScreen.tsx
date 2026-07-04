@@ -5,6 +5,7 @@ import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
+import { GuidelinesModal } from '../components/GuidelinesModal'
 import { FlagSelector } from '../components/FlagSelector'
 import { AnnotationViewer } from '../components/AnnotationViewer'
 import css from './WorkScreen.module.css'
@@ -374,6 +375,7 @@ export function WorkScreen() {
   const topResizeDrag = useRef<{ startY: number; startHeight: number } | null>(null)
   const rightResizeDrag = useRef<{ startX: number; startWidth: number } | null>(null)
   const [focusedRecalcKey, setFocusedRecalcKey] = useState(0)
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false)
 
   const wide = viewportW >= 960
 
@@ -605,21 +607,36 @@ export function WorkScreen() {
               <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
             </div>
 
-            <div
-              style={{
-                flexShrink: 0,
-                fontSize: 13,
-                fontWeight: 600,
-                color: "oklch(0.5 0.08 150)",
-                whiteSpace: "nowrap",
-                pointerEvents: "auto",
-              }}
-            >
-              <span style={{ direction: "ltr", display: "inline-block" }}>
-                {new Intl.NumberFormat("en-US").format(L.daily)}
-              </span>{" "}
-              היום
-            </div>            
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, pointerEvents: "auto" }}>
+              <button
+                onClick={() => setGuidelinesOpen(true)}
+                style={{
+                  fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
+                  color: "oklch(0.5 0.08 220)",
+                  background: "none", border: "0.5px solid oklch(0.5 0.08 220 / 0.3)",
+                  borderRadius: 8, padding: "4px 10px", cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "oklch(0.5 0.08 220 / 0.08)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "none")}
+              >
+                הנחיות לתעתוק
+              </button>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "oklch(0.5 0.08 150)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ direction: "ltr", display: "inline-block" }}>
+                  {new Intl.NumberFormat("en-US").format(L.daily)}
+                </span>{" "}
+                היום
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -701,6 +718,23 @@ export function WorkScreen() {
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
       />
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4, marginBottom: 2 }}>
+        <span style={{ fontSize: 12, color: "var(--tl-muted)", fontFamily: "var(--font-ui)" }}>
+          התלבטות? {" "}
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: "var(--font-ui)", fontSize: 12,
+              color: "oklch(0.5 0.08 220)", fontWeight: 600,
+              padding: 0, textDecoration: "none", display: "inline",
+            }}
+          >
+            הנחיות לתעתוק
+          </button>
+        </span>
+      </div>
 
       <SpecialCharsPanel taRef={taRef} input={L.input} setInput={L.setInput} />
 
@@ -831,13 +865,30 @@ export function WorkScreen() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
         </div>
-        <div style={{
-          flexShrink: 0, fontSize: 13, fontWeight: 600,
-          color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
-        }}>
-          <span style={{ direction: 'ltr', display: 'inline-block' }}>
-            {new Intl.NumberFormat('en-US').format(L.daily)}
-          </span> היום
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            הנחיות לתעתוק
+          </button>
+          <div style={{
+            fontSize: 13, fontWeight: 600,
+            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+          }}>
+            <span style={{ direction: 'ltr', display: 'inline-block' }}>
+              {new Intl.NumberFormat('en-US').format(L.daily)}
+            </span> היום
+          </div>
         </div>
       </div>
 
@@ -902,6 +953,37 @@ export function WorkScreen() {
   ) : (
     <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 14px', height: 36, flexShrink: 0,
+          fontFamily: 'var(--font-ui)',
+          background: 'var(--tl-page)',
+          borderBottom: '0.5px solid var(--tl-border)',
+        }}>
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '3px 8px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            הנחיות לתעתוק
+          </button>
+          <div style={{
+            fontSize: 12, fontWeight: 600,
+            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+          }}>
+            <span style={{ direction: 'ltr', display: 'inline-block' }}>
+              {new Intl.NumberFormat('en-US').format(L.daily)}
+            </span> היום
+          </div>
+        </div>
         <div style={{ flex: 1, position: 'relative' }}>
           {L.loading ? <Skeleton /> : stage}
         </div>
@@ -946,6 +1028,7 @@ export function WorkScreen() {
           onCancel={() => setSkipPagePending(false)}
         />
       )}
+      {guidelinesOpen && <GuidelinesModal onClose={() => setGuidelinesOpen(false)} />}
     </div>
   )
 }
