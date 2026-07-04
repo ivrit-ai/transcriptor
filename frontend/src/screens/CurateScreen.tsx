@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useMemo, useState, useRef, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
@@ -8,10 +8,51 @@ import { TopNav } from '../components/shared'
 import css from './CurateScreen.module.css'
 
 const PAGE_SIZE = 20
+const HOVER_DELAY_MS = 120
+
+// ── Hover preview panel ──────────────────────────────────────────────────────
+
+function PagePreviewPanel({ pageId, anchorY }: { pageId: string; anchorY: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.curate.pageLines(pageId),
+    queryFn: () => api.getCuratePageLines(pageId),
+    staleTime: 60_000,
+  })
+
+  const PANEL_H = 320
+  const MARGIN = 12
+  const viewH = window.innerHeight
+  const top = Math.min(Math.max(MARGIN, anchorY - PANEL_H / 2), viewH - PANEL_H - MARGIN)
+
+  return (
+    <div className={css.previewPanel} style={{ top }}>
+      {isLoading && <div className={css.previewLoading}>Loading…</div>}
+      {data && (
+        <img
+          className={css.previewImg}
+          src={data.image_url}
+          alt={data.external_id}
+          style={
+            data.image_rotation
+              ? { transform: `rotate(${data.image_rotation}deg)` }
+              : undefined
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Main screen ──────────────────────────────────────────────────────────────
 
 export function CurateScreen() {
   const navigate = useNavigate()
-  const [page, setPage] = useState(1)
+  const location = useLocation()
+  const initialPage = (location.state as { listPage?: number } | null)?.listPage ?? 1
+  const [page, setPage] = useState(initialPage)
+  const [hoveredPageId, setHoveredPageId] = useState<string | null>(null)
+  const [anchorY, setAnchorY] = useState(0)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: curators } = useQuery({
     queryKey: queryKeys.admin.curators,
@@ -42,6 +83,21 @@ export function CurateScreen() {
       state: { listPage: page, listIdx: idx, listData: pageData, unapprovedOnly: true },
     })
   }
+
+  const handleRowEnter = useCallback((pageId: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => {
+      setAnchorY(midY)
+      setHoveredPageId(pageId)
+    }, HOVER_DELAY_MS)
+  }, [])
+
+  const handleRowLeave = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setHoveredPageId(null)
+  }, [])
 
   return (
     <>
@@ -101,6 +157,8 @@ export function CurateScreen() {
               type="button"
               className={css.row}
               onClick={() => handleRowClick(row, i)}
+              onMouseEnter={(e) => handleRowEnter(row.page_id, e)}
+              onMouseLeave={handleRowLeave}
             >
               <span className={css.colPageId}>{row.page_id}</span>
               <span className={css.colBatchId}>{row.batch_id}</span>
@@ -118,6 +176,10 @@ export function CurateScreen() {
         </div>
       )}
     </div>
+
+    {hoveredPageId && (
+      <PagePreviewPanel pageId={hoveredPageId} anchorY={anchorY} />
+    )}
     </>
   )
 }

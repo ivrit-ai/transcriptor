@@ -1,10 +1,11 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
+import { GuidelinesModal } from '../components/GuidelinesModal'
 import { FlagSelector } from '../components/FlagSelector'
 import { AnnotationViewer } from '../components/AnnotationViewer'
 import css from './WorkScreen.module.css'
@@ -32,7 +33,11 @@ function ImmTicks({ lines, cursor, onJump }: {
   return (
     <div ref={scrollRef} style={{ display: 'flex', gap: 5, alignItems: 'center', overflow: 'auto',  width: '100%', flexShrink: 1 }}>
       {lines.map((l, i) => {
-        const done = l.status === 'done_by_you' || l.status === 'flagged'
+        const dotColor = i === cursor
+          ? 'var(--tl-spotlight)'
+          : l.status === 'flagged' ? 'oklch(0.6 0.18 25)'
+          : l.status === 'done_by_you' ? 'oklch(0.7 0.06 150)'
+          : 'rgba(216, 148, 60, 0.73)'
         return (
           <button
             key={l.id}
@@ -44,9 +49,7 @@ function ImmTicks({ lines, cursor, onJump }: {
             <span style={{
               display: 'block',
               width: i === cursor ? 16 : 7, height: 4, borderRadius: 2,
-              background: i === cursor
-                ? 'var(--tl-spotlight)'
-                : done ? 'oklch(0.7 0.06 150)' : 'rgba(216, 148, 60, 0.73)',
+              background: dotColor,
               transition: 'width .25s, background .25s',
             }} />
           </button>
@@ -217,6 +220,183 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
   )
 }
 
+// ── Special characters panel ──────────────────────────────────────────────────
+const SPECIAL_CHARS = [
+  { char: '√', label: 'שורש ריבועי' },
+  { char: '✓', label: 'וי (סימן אישור)' },
+  { char: '☐', label: 'תיבת סימון ריקה' },
+  { char: '←', label: 'חץ שמאל' },
+  { char: '→', label: 'חץ ימין' },
+  { char: '≠', label: 'לא שווה' },
+  { char: '≥', label: 'גדול או שווה' },
+  { char: '≤', label: 'קטן או שווה' },
+  { char: '∞', label: 'אינסוף' },
+  { char: '₪', label: 'שקל ישראלי חדש' },
+  { char: '½', label: 'חצי' },
+  { char: '¼', label: 'רבע' },
+  { char: '⅓', label: 'שליש' },
+  { char: '⅔', label: 'שני שליש' },
+  { char: '¾', label: 'שלושת רבעי' },
+  { char: '﬩', label: 'חיבור' },
+  { char: '°', label: 'מעלות' },
+  { char: 'β', label: 'בטא' },
+  { char: 'α', label: 'אלפא' },
+  { char: '①', label: 'אחת בעיגול' },
+  { char: '②', label: 'שתיים בעיגול' },
+  { char: '③', label: 'שלוש בעיגול' },
+  { char: '④', label: 'ארבע בעיגול' },
+  { char: '⑤', label: 'חמש בעיגול' },
+  { char: '⑥', label: 'שש בעיגול' },
+  { char: '⑦', label: 'שבע בעיגול' },
+  { char: '⑧', label: 'שמונה בעיגול' },
+  { char: '⑨', label: 'תשע בעיגול' },
+  { char: '±', label: 'פלוס מינוס' },
+]
+
+const NON_TRANSCRIPT_MARKS = [
+  { char: '((לא ברור))', label: 'מילה/אות לא ברורה' },
+  { char: '((שפה שונה))', label: 'כתוב בשפה שאינה עברית/אנגלית' },
+  { char: '((מחוק))', label: 'טקסט מחוק (מוקף בקו)' },
+  { char: '((חתימה))', label: 'חתימה שלא ניתן לתעתק' },
+]
+
+function SpecialCharsPanel({ taRef, input, setInput }: {
+  taRef: React.RefObject<HTMLTextAreaElement>
+  input: string
+  setInput: (v: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  // Saved cursor position — captured on textarea blur so that when mousedown
+  // on a char button blurs it (resetting selectionStart to 0 in most browsers)
+  // we still have the original position.
+  const savedCursor = useRef<{ start: number; end: number } | null>(null)
+
+  useEffect(() => {
+    const ta = taRef.current
+    if (!ta) return
+    const save = () => {
+      savedCursor.current = { start: ta.selectionStart ?? 0, end: ta.selectionEnd ?? 0 }
+    }
+    ta.addEventListener('blur', save)
+    return () => ta.removeEventListener('blur', save)
+  }, [taRef])
+  // Pending cursor position to restore after React commits the new value.
+  const pendingCursor = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const pos = pendingCursor.current
+    if (pos === null) return
+    pendingCursor.current = null
+    const ta = taRef.current
+    if (ta) {
+      ta.selectionStart = ta.selectionEnd = pos
+      ta.focus()
+    }
+  })
+
+  const insertChar = (char: string) => {
+    const ta = taRef.current
+    const saved = savedCursor.current
+    const start = saved ? saved.start : (ta ? (ta.selectionStart ?? input.length) : input.length)
+    const end = saved ? saved.end : (ta ? (ta.selectionEnd ?? input.length) : input.length)
+    savedCursor.current = null
+    const newVal = input.slice(0, start) + char + input.slice(end)
+    pendingCursor.current = start + char.length
+    setInput(newVal)
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontFamily: 'var(--font-ui)', fontSize: 12,
+          color: 'var(--tl-muted)',
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '2px 0',
+          transition: 'color 0.12s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--tl-ink)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--tl-muted)')}
+      >
+        <span style={{
+          display: 'inline-block', fontSize: 9,
+          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s',
+        }}>▶</span>
+        תווים מיוחדים
+      </button>
+      {open && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+          {SPECIAL_CHARS.map(({ char, label }) => (
+            <button
+              key={char}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => insertChar(char)}
+              title={label}
+              style={{
+                width: 34, height: 34,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '0.5px solid var(--tl-border)',
+                borderRadius: 7,
+                background: 'var(--tl-surface)',
+                cursor: 'pointer',
+                color: 'var(--tl-ink)',
+                fontSize: 17,
+                fontFamily: 'monospace',
+                transition: 'background 0.1s, border-color 0.1s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--tl-muted-fill)'
+                e.currentTarget.style.borderColor = 'var(--tl-accent)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'var(--tl-surface)'
+                e.currentTarget.style.borderColor = 'var(--tl-border)'
+              }}
+            >
+              {char}
+            </button>
+          ))}
+          {/* Divider + non‑transcript marks */}
+          <div style={{ width: '100%', height: 1, background: 'var(--tl-border)', margin: '4px 0' }} />
+          {NON_TRANSCRIPT_MARKS.map(({ char, label }) => (
+            <button
+              key={char}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => insertChar(char)}
+              title={label}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px',
+                border: '0.5px solid oklch(0.6 0.1 60 / 0.35)',
+                borderRadius: 7,
+                background: 'oklch(0.85 0.05 60 / 0.15)',
+                cursor: 'pointer',
+                color: 'oklch(0.5 0.1 60)',
+                fontSize: 13,
+                fontFamily: 'var(--font-ui)',
+                transition: 'background 0.1s, border-color 0.1s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'oklch(0.85 0.08 60 / 0.3)'
+                e.currentTarget.style.borderColor = 'oklch(0.6 0.1 60 / 0.6)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'oklch(0.85 0.05 60 / 0.15)'
+                e.currentTarget.style.borderColor = 'oklch(0.6 0.1 60 / 0.35)'
+              }}
+            >
+              {char}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export function WorkScreen() {
   const navigate = useNavigate()
@@ -254,6 +434,7 @@ export function WorkScreen() {
   const topResizeDrag = useRef<{ startY: number; startHeight: number } | null>(null)
   const rightResizeDrag = useRef<{ startX: number; startWidth: number } | null>(null)
   const [focusedRecalcKey, setFocusedRecalcKey] = useState(0)
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false)
 
   const wide = viewportW >= 960
 
@@ -293,7 +474,7 @@ export function WorkScreen() {
   const annotations = useMemo(
     () => L.lines.map(l => ({
       bbox: l.bbox,
-      lineStatus: (l.status === 'done_by_you' || l.status === 'flagged') ? 'processed' as const : 'initial' as const,
+      lineStatus: l.status === 'flagged' ? 'flagged' as const : l.status === 'done_by_you' ? 'processed' as const : 'initial' as const,
     })),
     [L.lines],
   )
@@ -485,21 +666,36 @@ export function WorkScreen() {
               <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
             </div>
 
-            <div
-              style={{
-                flexShrink: 0,
-                fontSize: 13,
-                fontWeight: 600,
-                color: "oklch(0.5 0.08 150)",
-                whiteSpace: "nowrap",
-                pointerEvents: "auto",
-              }}
-            >
-              <span style={{ direction: "ltr", display: "inline-block" }}>
-                {new Intl.NumberFormat("en-US").format(L.daily)}
-              </span>{" "}
-              היום
-            </div>            
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, pointerEvents: "auto" }}>
+              <button
+                onClick={() => setGuidelinesOpen(true)}
+                style={{
+                  fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
+                  color: "oklch(0.5 0.08 220)",
+                  background: "none", border: "0.5px solid oklch(0.5 0.08 220 / 0.3)",
+                  borderRadius: 8, padding: "4px 10px", cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "oklch(0.5 0.08 220 / 0.08)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "none")}
+              >
+                הנחיות לתעתוק
+              </button>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "oklch(0.5 0.08 150)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ direction: "ltr", display: "inline-block" }}>
+                  {new Intl.NumberFormat("en-US").format(L.daily)}
+                </span>{" "}
+                היום
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -582,6 +778,25 @@ export function WorkScreen() {
         onKeyDown={onKeyDown}
       />
 
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4, marginBottom: 2 }}>
+        <span style={{ fontSize: 12, color: "var(--tl-muted)", fontFamily: "var(--font-ui)" }}>
+          התלבטות? {" "}
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: "var(--font-ui)", fontSize: 12,
+              color: "oklch(0.5 0.08 220)", fontWeight: 600,
+              padding: 0, textDecoration: "none", display: "inline",
+            }}
+          >
+            הנחיות לתעתוק
+          </button>
+        </span>
+      </div>
+
+      <SpecialCharsPanel taRef={taRef} input={L.input} setInput={L.setInput} />
+
       {/* Nav arrows + flags — two groups separated by a divider */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 0,
@@ -593,20 +808,20 @@ export function WorkScreen() {
             className="tl-reason-inline"
             onClick={() => navigateTo(prevIdx)}
             disabled={!canGoBack}
-            title="שורה קודמת (Shift+↑)"
+            title="קטע קודם (Shift+↑)"
             style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
             <Icon name="back" size={13} color="var(--tl-muted)" />
-            הקודם
+            הקטע הקודם
           </button>
           <button
             className="tl-reason-inline"
             onClick={() => navigateTo(nextIdx)}
             disabled={!canGoNext}
-            title="שורה הבאה (Shift+↓)"
+            title="קטע הבא (Shift+↓)"
             style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
           >
-            הבא
+            הקטע הבא
             <Icon name="forward" size={13} color="var(--tl-muted)" />
           </button>
         </div>
@@ -630,6 +845,17 @@ export function WorkScreen() {
         />
       </div>
 
+      {/* Validation error */}
+      {L.submitError && (
+        <div style={{
+          fontFamily: 'var(--font-ui)', fontSize: 12, color: 'oklch(0.55 0.16 30)',
+          background: 'oklch(0.9 0.06 30 / 0.25)',
+          padding: '5px 10px', borderRadius: 6, marginBottom: 6,
+        }}>
+          {L.submitError}
+        </div>
+      )}
+
       {/* Submit + skip-page row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 16 }}>
         <button
@@ -649,7 +875,7 @@ export function WorkScreen() {
         <button
           className="tl-submit"
           onClick={L.submit}
-          disabled={!L.input.trim()}
+          disabled={!L.input.trim() || !!L.submitError}
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
@@ -709,13 +935,30 @@ export function WorkScreen() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <ImmTicks lines={L.lines} cursor={L.cursor} onJump={navigateTo} />
         </div>
-        <div style={{
-          flexShrink: 0, fontSize: 13, fontWeight: 600,
-          color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
-        }}>
-          <span style={{ direction: 'ltr', display: 'inline-block' }}>
-            {new Intl.NumberFormat('en-US').format(L.daily)}
-          </span> היום
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            הנחיות לתעתוק
+          </button>
+          <div style={{
+            fontSize: 13, fontWeight: 600,
+            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+          }}>
+            <span style={{ direction: 'ltr', display: 'inline-block' }}>
+              {new Intl.NumberFormat('en-US').format(L.daily)}
+            </span> היום
+          </div>
         </div>
       </div>
 
@@ -780,6 +1023,37 @@ export function WorkScreen() {
   ) : (
     <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 14px', height: 36, flexShrink: 0,
+          fontFamily: 'var(--font-ui)',
+          background: 'var(--tl-page)',
+          borderBottom: '0.5px solid var(--tl-border)',
+        }}>
+          <button
+            onClick={() => setGuidelinesOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '3px 8px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            הנחיות לתעתוק
+          </button>
+          <div style={{
+            fontSize: 12, fontWeight: 600,
+            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+          }}>
+            <span style={{ direction: 'ltr', display: 'inline-block' }}>
+              {new Intl.NumberFormat('en-US').format(L.daily)}
+            </span> היום
+          </div>
+        </div>
         <div style={{ flex: 1, position: 'relative' }}>
           {L.loading ? <Skeleton /> : stage}
         </div>
@@ -824,6 +1098,7 @@ export function WorkScreen() {
           onCancel={() => setSkipPagePending(false)}
         />
       )}
+      {guidelinesOpen && <GuidelinesModal onClose={() => setGuidelinesOpen(false)} />}
     </div>
   )
 }

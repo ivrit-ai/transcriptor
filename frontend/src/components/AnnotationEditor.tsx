@@ -19,7 +19,7 @@ import css from "./AnnotationEditor.module.css";
 export type AnnotationStatus = "clean" | "dirty" | "new" | "deleted";
 
 /** Line transcription progress for viewer styling */
-export type AnnotationLineStatus = "initial" | "processed";
+export type AnnotationLineStatus = "initial" | "processed" | "flagged";
 
 export interface Annotation {
   bbox: BBox;

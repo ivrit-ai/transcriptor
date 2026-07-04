@@ -2,31 +2,113 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TopNav, Icon, PrimaryBtn } from "../components/shared";
 import { SAMPLE_PAGE } from "../components/shared/ManuscriptPreview";
+import { RULES, FLAG_CARDS, FAQ_ITEMS, ADVANCED_ITEMS } from "../domain-knowledge/guidelinesData";
 
-const RULES = [
-  {
-    t: "מעתיקים בדיוק מה שרואים",
-    d: 'כולל שגיאות כתיב או קיצורים. אל תתקנו ואל "תשפרו" את הטקסט.',
-    ok: true,
-  },
-  {
-    t: "לא ממציאים מה שלא ברור",
-    d: "אם אות או מילה מטושטשת, עדיף לדווח מאשר לנחש.",
-    ok: false,
-  },
-  {
-    t: "לא מוסיפים פרשנות",
-    d: "בלי הערות, סוגריים או הסברים משלכם. רק הטקסט עצמו.",
-    ok: false,
-  },
-];
+function ExampleBox({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        fontFamily: "var(--font-serif)",
+        fontSize: 15,
+        direction: "rtl",
+        color: "var(--tl-ink)",
+        background: "var(--tl-surface)",
+        border: "0.5px solid var(--tl-border)",
+        borderRadius: 8,
+        padding: "8px 12px",
+        marginTop: 8,
+        lineHeight: 1.6,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
 
-const FLAG_CARDS = [
-  { label: "תמונה חתוכה", d: "השורה חתוכה בקצה או שחלק ממנה חסר בסריקה." },
-  { label: "לא עברית", d: "הטקסט כולו בשפה אחרת." },
-  { label: "לא טקסט", d: "איור, חותמת, קישוט או שוליים ריקים." },
-  { label: "לא מצליח לקרוא", d: "דהוי, מטושטש או בכתב יד שאי אפשר לפענח." },
-];
+function FaqItem({
+  q,
+  a,
+  caption,
+  examples,
+  aExtra,
+  isMobile,
+}: {
+  q: string;
+  a: string;
+  caption?: string;
+  examples?: string[];
+  aExtra?: string;
+  isMobile?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        borderBottom: "0.5px solid var(--tl-border)",
+        paddingBottom: isMobile ? 16 : 18,
+      }}
+    >
+      <div
+        style={{
+          fontSize: isMobile ? 15 : 16,
+          fontWeight: 600,
+          color: "var(--tl-ink)",
+          marginBottom: 6,
+        }}
+      >
+        {q}
+      </div>
+      <div
+        style={{
+          fontSize: isMobile ? 13.5 : 14.5,
+          color: "var(--tl-muted)",
+          lineHeight: 1.6,
+        }}
+      >
+        {a}
+      </div>
+      {examples && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          {examples.map((ex) => (
+            <span
+              key={ex}
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 14,
+                color: "var(--tl-ink)",
+                background: "var(--tl-surface)",
+                border: "0.5px solid var(--tl-border)",
+                borderRadius: 6,
+                padding: "3px 10px",
+              }}
+            >
+              {ex}
+            </span>
+          ))}
+        </div>
+      )}
+      {aExtra && (
+        <div
+          style={{
+            fontSize: isMobile ? 13.5 : 14.5,
+            color: "var(--tl-muted)",
+            lineHeight: 1.6,
+            marginTop: 8,
+          }}
+        >
+          {aExtra}
+        </div>
+      )}
+      {caption && <ExampleBox text={caption} />}
+    </div>
+  );
+}
 
 function RuleRow({
   t,
@@ -277,6 +359,52 @@ export function GuidelinesScreen() {
     </div>
   );
 
+  const faqBlock = (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: isMobile ? 19 : 22,
+          fontWeight: 500,
+          color: "var(--tl-ink)",
+          marginBottom: 18,
+        }}
+      >
+        שאלות נפוצות
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 18 }}>
+        {FAQ_ITEMS.map((item) => (
+          <FaqItem key={item.q} {...item} isMobile={isMobile} />
+        ))}
+      </div>
+    </div>
+  );
+
+  const advancedBlock = (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: isMobile ? 19 : 22,
+          fontWeight: 500,
+          color: "var(--tl-ink)",
+          marginBottom: 18,
+        }}
+      >
+        למתקדמים
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 16 : 18 }}>
+        {ADVANCED_ITEMS.map((item) => (
+          <FaqItem key={item.q} {...item} isMobile={isMobile} />
+        ))}
+      </div>
+    </div>
+  );
+
+  const divider = (
+    <div style={{ height: 1, background: "var(--tl-border)" }} />
+  );
+
   const pad = isMobile ? "24px 22px 30px" : "44px 56px 56px";
 
   if (isMobile) {
@@ -303,6 +431,10 @@ export function GuidelinesScreen() {
           <WorkedExample width={272} />
           {rulesBlock}
           {flagBlock}
+          {divider}
+          {faqBlock}
+          {divider}
+          {advancedBlock}
           <PrimaryBtn
             size="lg"
             onClick={() => navigate("/work")}
@@ -348,6 +480,22 @@ export function GuidelinesScreen() {
           }}
         />
         {flagBlock}
+        <div
+          style={{
+            height: 1,
+            background: "var(--tl-border)",
+            margin: "36px 0",
+          }}
+        />
+        {faqBlock}
+        <div
+          style={{
+            height: 1,
+            background: "var(--tl-border)",
+            margin: "36px 0",
+          }}
+        />
+        {advancedBlock}
         <div style={{ marginTop: 40 }}>
           <PrimaryBtn size="lg" onClick={() => navigate("/work")}>
             התחל לתעתק <Icon name="forward" size={18} color="#fff" />

@@ -40,7 +40,8 @@ def order_session_lines(lines: list[SessionLine], target: int = 3) -> list[dict]
     for line in sorted_lines:
         user_already_responded = line.user_transcription is not None
         if user_already_responded:
-            status = "done_by_you"
+            kind = line.user_transcription["kind"]
+            status = "done_by_you" if kind == "text" else "flagged"
         elif line.transcription_count >= target:
             status = "full"
         else:

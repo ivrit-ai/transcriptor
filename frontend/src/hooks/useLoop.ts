@@ -31,9 +31,12 @@ export interface SaveToast {
   kind: SaveToastKind;
 }
 
+export const ALLOWED_ESCAPES = ['לא ברור', 'שפה שונה', 'מחוק'] as const
+
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
   { kind: "cant_read", label: "טקסט לא ברור" },
   { kind: "not_text", label: "לא טקסט" },
+  { kind: "not_hebrew", label: "לא עברית" },
   { kind: "bad_crop", label: "התמונה חתוכה" },
   { kind: "other", label: "אחר" },
 ];
@@ -43,10 +46,10 @@ function linesFromDTO(dto: SessionDTO): LoopLine[] {
 }
 
 function firstEligibleIdx(lines: LoopLine[]): number {
-  const i = lines.findIndex(
-    (l) => l.status === "eligible" || l.status === "done_by_you",
-  );
-  return i === -1 ? 0 : i;
+  const eligible = lines.findIndex((l) => l.status === "eligible");
+  if (eligible !== -1) return eligible;
+  const doneByYou = lines.findIndex((l) => l.status === "done_by_you");
+  return doneByYou !== -1 ? doneByYou : 0;
 }
 
 function nextEligibleIdx(lines: LoopLine[], from: number): number {
@@ -83,6 +86,7 @@ export interface LoopState {
   finished: boolean;
   editing: boolean;
   toast: SaveToast | null;
+  submitError: string | null;
   FLAG_REASONS: typeof FLAG_REASONS;
 }
 
@@ -91,12 +95,17 @@ export function useLoop(pageId?: string): LoopState {
   const [lines, setLines] = useState<LoopLine[]>([]);
   const [cursor, setCursor] = useState(0);
   const [input, setInput] = useState("");
+  const setInputAndClearError = useCallback((v: string) => {
+    setInput(v)
+    setSubmitError(null)
+  }, [])
   const [daily, setDaily] = useState(0);
   const [done, setDone] = useState(0);
   const [eligibleTotal, setEligibleTotal] = useState(0);
   const [noSession, setNoSession] = useState(false);
   const [finished, setFinished] = useState(false);
   const [toast, setToast] = useState<SaveToast | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const linesRef = useRef<LoopLine[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,15 +209,33 @@ export function useLoop(pageId?: string): LoopState {
     setInput("");
   }, []);
 
+  const validateEscape = (t: string): string | null => {
+    const re = /\(\(([^)]*)\)\)/g
+    let match: RegExpExecArray | null
+    while ((match = re.exec(t)) !== null) {
+      const inner = match[1].trim()
+      if (inner && !ALLOWED_ESCAPES.includes(inner as typeof ALLOWED_ESCAPES[number])) {
+        return inner
+      }
+    }
+    return null
+  }
+
   const submit = useCallback(() => {
     const text = input.trim();
     if (!text) return;
+
+    const bad = validateEscape(text)
+    if (bad) {
+      setSubmitError(`הסוגריים הכפולים מכילים ערך לא חוקי: "${bad}". הערכים החוקיים: ${ALLOWED_ESCAPES.join(', ')}`)
+      return
+    }
 
     const idx = cursor;
     const line = linesRef.current[idx];
     if (!line || line.status === "full") return;
 
-    const isEdit = line.status === "done_by_you";
+    const isEdit = line.status === "done_by_you" || line.status === "flagged";
 
     setLines((ls) =>
       ls.map((l, i) =>
@@ -241,12 +268,14 @@ export function useLoop(pageId?: string): LoopState {
       const line = linesRef.current[idx];
       if (!line || line.status === "full") return;
 
+      const isReflag = line.status === "flagged";
+
       setLines((ls) =>
         ls.map((l, i) =>
           i === idx ? { ...l, status: "flagged", prior_kind: kind, your_text: '' } : l,
         ),
       );
-      setDone((d) => d + 1);
+      if (!isReflag) setDone((d) => d + 1);
 
       submitMutation.mutate({ lineId: line.id, body: { kind, text } });
       advance(idx);
@@ -293,7 +322,7 @@ export function useLoop(pageId?: string): LoopState {
     prev,
     next,
     input,
-    setInput,
+    setInput: setInputAndClearError,
     submit,
     flag,
     goTo,
@@ -308,6 +337,7 @@ export function useLoop(pageId?: string): LoopState {
     finished,
     editing,
     toast,
+    submitError,
     FLAG_REASONS,
   };
 }

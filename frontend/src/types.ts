@@ -1,4 +1,4 @@
-export type LineStatus = 'eligible' | 'full' | 'done_by_you'
+export type LineStatus = 'eligible' | 'full' | 'done_by_you' | 'flagged'
 
 export interface BBox {
   x: number
@@ -28,7 +28,6 @@ export interface SessionDTO {
   lines: SessionLine[]
 }
 
-// 'not_hebrew' is kept for backend/DB compatibility; no UI path produces it anymore
 export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text' | 'other'
 export type SubmitKind = 'text' | FlagKind
 

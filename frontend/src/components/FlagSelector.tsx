@@ -65,14 +65,14 @@ export function FlagSelector({
     return (
       <>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
+          <span style={{ fontSize: 13, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג על כל הקטע כי:</span>
           {FLAG_REASONS.map((r, i) =>
             r.kind === 'other' ? (
               <button
                 key={r.kind}
                 className="tl-reason-inline"
                 onClick={() => setOtherOpen(!otherOpen)}
-                title="אחר — פתח תיבת הסבר (Ctrl+4)"
+                title={`אחר — פתח תיבת הסבר (Ctrl+${i + 1})`}
                 style={activeFlagKind === 'other' || otherOpen ? {
                   background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
                   color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
@@ -80,7 +80,7 @@ export function FlagSelector({
                 } : undefined}
               >
                 {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 11, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
               </button>
             ) : (
               <button
@@ -95,7 +95,7 @@ export function FlagSelector({
                 } : undefined}
               >
                 {r.label}
-                <span dir="ltr" style={{ marginRight: 5, fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
+                <span dir="ltr" style={{ marginRight: 5, fontSize: 11, opacity: 0.5, fontFamily: 'var(--font-ui)' }}>^{i + 1}</span>
               </button>
             )
           )}

@@ -79,6 +79,7 @@ function computeBbox(points: number[]): BBox {
 
 function shapeStroke(a: Annotation, highlighted: boolean): string {
   if (highlighted) return "var(--tl-spotlight, #ffdd44)";
+  if (a.lineStatus === "flagged") return "oklch(0.6 0.18 25)";
   if (a.lineStatus === "processed") return "oklch(0.6 0.08 150)";
   return "oklch(0.7 0.1 80)";
 }
