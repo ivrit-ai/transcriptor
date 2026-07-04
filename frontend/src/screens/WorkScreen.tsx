@@ -231,12 +231,33 @@ const SPECIAL_CHARS = [
   { char: '≥', label: 'גדול או שווה' },
   { char: '≤', label: 'קטן או שווה' },
   { char: '∞', label: 'אינסוף' },
+  { char: '₪', label: 'שקל ישראלי חדש' },
+  { char: '½', label: 'חצי' },
+  { char: '¼', label: 'רבע' },
+  { char: '⅓', label: 'שליש' },
+  { char: '⅔', label: 'שני שליש' },
+  { char: '¾', label: 'שלושת רבעי' },
+  { char: '﬩', label: 'חיבור' },
+  { char: '°', label: 'מעלות' },
+  { char: 'β', label: 'בטא' },
+  { char: 'α', label: 'אלפא' },
+  { char: '①', label: 'אחת בעיגול' },
+  { char: '②', label: 'שתיים בעיגול' },
+  { char: '③', label: 'שלוש בעיגול' },
+  { char: '④', label: 'ארבע בעיגול' },
+  { char: '⑤', label: 'חמש בעיגול' },
+  { char: '⑥', label: 'שש בעיגול' },
+  { char: '⑦', label: 'שבע בעיגול' },
+  { char: '⑧', label: 'שמונה בעיגול' },
+  { char: '⑨', label: 'תשע בעיגול' },
+  { char: '±', label: 'פלוס מינוס' },
 ]
 
 const NON_TRANSCRIPT_MARKS = [
   { char: '((לא ברור))', label: 'מילה/אות לא ברורה' },
   { char: '((שפה שונה))', label: 'כתוב בשפה שאינה עברית/אנגלית' },
   { char: '((מחוק))', label: 'טקסט מחוק (מוקף בקו)' },
+  { char: '((חתימה))', label: 'חתימה שלא ניתן לתעתק' },
 ]
 
 function SpecialCharsPanel({ taRef, input, setInput }: {
