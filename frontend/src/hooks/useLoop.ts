@@ -31,6 +31,8 @@ export interface SaveToast {
   kind: SaveToastKind;
 }
 
+export const ALLOWED_ESCAPES = ['לא ברור', 'שפה שונה', 'מחוק'] as const
+
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
   { kind: "cant_read", label: "טקסט לא ברור" },
   { kind: "not_text", label: "לא טקסט" },
@@ -84,6 +86,7 @@ export interface LoopState {
   finished: boolean;
   editing: boolean;
   toast: SaveToast | null;
+  submitError: string | null;
   FLAG_REASONS: typeof FLAG_REASONS;
 }
 
@@ -92,12 +95,17 @@ export function useLoop(pageId?: string): LoopState {
   const [lines, setLines] = useState<LoopLine[]>([]);
   const [cursor, setCursor] = useState(0);
   const [input, setInput] = useState("");
+  const setInputAndClearError = useCallback((v: string) => {
+    setInput(v)
+    setSubmitError(null)
+  }, [])
   const [daily, setDaily] = useState(0);
   const [done, setDone] = useState(0);
   const [eligibleTotal, setEligibleTotal] = useState(0);
   const [noSession, setNoSession] = useState(false);
   const [finished, setFinished] = useState(false);
   const [toast, setToast] = useState<SaveToast | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const linesRef = useRef<LoopLine[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,9 +209,27 @@ export function useLoop(pageId?: string): LoopState {
     setInput("");
   }, []);
 
+  const validateEscape = (t: string): string | null => {
+    const re = /\(\(([^)]*)\)\)/g
+    let match: RegExpExecArray | null
+    while ((match = re.exec(t)) !== null) {
+      const inner = match[1].trim()
+      if (inner && !ALLOWED_ESCAPES.includes(inner as typeof ALLOWED_ESCAPES[number])) {
+        return inner
+      }
+    }
+    return null
+  }
+
   const submit = useCallback(() => {
     const text = input.trim();
     if (!text) return;
+
+    const bad = validateEscape(text)
+    if (bad) {
+      setSubmitError(`הסוגריים הכפולים מכילים ערך לא חוקי: "${bad}". הערכים החוקיים: ${ALLOWED_ESCAPES.join(', ')}`)
+      return
+    }
 
     const idx = cursor;
     const line = linesRef.current[idx];
@@ -296,7 +322,7 @@ export function useLoop(pageId?: string): LoopState {
     prev,
     next,
     input,
-    setInput,
+    setInput: setInputAndClearError,
     submit,
     flag,
     goTo,
@@ -311,6 +337,7 @@ export function useLoop(pageId?: string): LoopState {
     finished,
     editing,
     toast,
+    submitError,
     FLAG_REASONS,
   };
 }

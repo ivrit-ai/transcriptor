@@ -65,7 +65,7 @@ export function FlagSelector({
     return (
       <>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג כי:</span>
+          <span style={{ fontSize: 13, color: 'var(--tl-muted)', whiteSpace: 'nowrap', marginLeft: 2 }}>לדלג על כל הקטע כי:</span>
           {FLAG_REASONS.map((r, i) =>
             r.kind === 'other' ? (
               <button

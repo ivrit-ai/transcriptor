@@ -233,6 +233,12 @@ const SPECIAL_CHARS = [
   { char: '∞', label: 'אינסוף' },
 ]
 
+const NON_TRANSCRIPT_MARKS = [
+  { char: '((לא ברור))', label: 'מילה/אות לא ברורה' },
+  { char: '((שפה שונה))', label: 'כתוב בשפה שאינה עברית/אנגלית' },
+  { char: '((מחוק))', label: 'טקסט מחוק (מוקף בקו)' },
+]
+
 function SpecialCharsPanel({ taRef, input, setInput }: {
   taRef: React.RefObject<HTMLTextAreaElement>
   input: string
@@ -327,6 +333,38 @@ function SpecialCharsPanel({ taRef, input, setInput }: {
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'var(--tl-surface)'
                 e.currentTarget.style.borderColor = 'var(--tl-border)'
+              }}
+            >
+              {char}
+            </button>
+          ))}
+          {/* Divider + non‑transcript marks */}
+          <div style={{ width: '100%', height: 1, background: 'var(--tl-border)', margin: '4px 0' }} />
+          {NON_TRANSCRIPT_MARKS.map(({ char, label }) => (
+            <button
+              key={char}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => insertChar(char)}
+              title={label}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px',
+                border: '0.5px solid oklch(0.6 0.1 60 / 0.35)',
+                borderRadius: 7,
+                background: 'oklch(0.85 0.05 60 / 0.15)',
+                cursor: 'pointer',
+                color: 'oklch(0.5 0.1 60)',
+                fontSize: 13,
+                fontFamily: 'var(--font-ui)',
+                transition: 'background 0.1s, border-color 0.1s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'oklch(0.85 0.08 60 / 0.3)'
+                e.currentTarget.style.borderColor = 'oklch(0.6 0.1 60 / 0.6)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'oklch(0.85 0.05 60 / 0.15)'
+                e.currentTarget.style.borderColor = 'oklch(0.6 0.1 60 / 0.35)'
               }}
             >
               {char}
@@ -749,20 +787,20 @@ export function WorkScreen() {
             className="tl-reason-inline"
             onClick={() => navigateTo(prevIdx)}
             disabled={!canGoBack}
-            title="שורה קודמת (Shift+↑)"
+            title="קטע קודם (Shift+↑)"
             style={{ opacity: canGoBack ? 1 : 0.3, gap: 5 }}
           >
             <Icon name="back" size={13} color="var(--tl-muted)" />
-            הקודם
+            הקטע הקודם
           </button>
           <button
             className="tl-reason-inline"
             onClick={() => navigateTo(nextIdx)}
             disabled={!canGoNext}
-            title="שורה הבאה (Shift+↓)"
+            title="קטע הבא (Shift+↓)"
             style={{ opacity: canGoNext ? 1 : 0.3, gap: 5 }}
           >
-            הבא
+            הקטע הבא
             <Icon name="forward" size={13} color="var(--tl-muted)" />
           </button>
         </div>
@@ -786,6 +824,17 @@ export function WorkScreen() {
         />
       </div>
 
+      {/* Validation error */}
+      {L.submitError && (
+        <div style={{
+          fontFamily: 'var(--font-ui)', fontSize: 12, color: 'oklch(0.55 0.16 30)',
+          background: 'oklch(0.9 0.06 30 / 0.25)',
+          padding: '5px 10px', borderRadius: 6, marginBottom: 6,
+        }}>
+          {L.submitError}
+        </div>
+      )}
+
       {/* Submit + skip-page row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 16 }}>
         <button
@@ -805,7 +854,7 @@ export function WorkScreen() {
         <button
           className="tl-submit"
           onClick={L.submit}
-          disabled={!L.input.trim()}
+          disabled={!L.input.trim() || !!L.submitError}
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
