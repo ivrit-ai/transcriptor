@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter } from './types'
 
 const BASE = ''
 
@@ -152,10 +152,16 @@ export const api = {
   startImport: (body: ImportStartBody): Promise<ImportStatusDTO | null> =>
     request<ImportStatusDTO>('/api/admin/import', { method: 'POST', body: JSON.stringify(body) }),
 
-  getAdminPages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
-    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
+  // Flat, paginated, optionally status-filtered page list. Shared by
+  // CurateListScreen (filtered browsing) and CuratePageScreen (unfiltered
+  // dataset-wide prev/next navigation).
+  getPages: (page = 1, pageSize = 50, statuses: PageStatusFilter[] = []): Promise<AdminDatasetDTO | null> => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    for (const s of statuses) params.append('status', s)
+    return request<AdminDatasetDTO>(`/api/admin/pages?${params.toString()}`)
+  },
 
-  getAdminPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
+  getPageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
     request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
 
   getCurators: (): Promise<Array<{ user_id: string; email: string }> | null> =>
@@ -170,13 +176,7 @@ export const api = {
       body: JSON.stringify({ role }),
     }),
 
-  getCuratePages: (page = 1, pageSize = 50): Promise<AdminDatasetDTO | null> =>
-    request<AdminDatasetDTO>(`/api/admin/pages?page=${page}&page_size=${pageSize}`),
-
-  getCuratePageLines: (pageId: string): Promise<AdminPageLinesDTO | null> =>
-    request<AdminPageLinesDTO>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`),
-
-  updateCuratePageLines: (pageId: string, body: UpdatePageLinesBody): Promise<UpdatePageLinesResponse | null> =>
+  updatePageLines: (pageId: string, body: UpdatePageLinesBody): Promise<UpdatePageLinesResponse | null> =>
     request<UpdatePageLinesResponse>(`/api/admin/page_lines?page_id=${encodeURIComponent(pageId)}`, {
       method: 'PUT',
       body: JSON.stringify(body),

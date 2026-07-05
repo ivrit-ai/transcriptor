@@ -90,6 +90,8 @@ export interface AdminQueueDTO {
 
 // ── Dataset (admin page browser) DTOs ────────────────────────────────────────
 
+export type PageStatusFilter = 'approved' | 'rejected'
+
 export interface AdminDatasetRowDTO {
   page_id: string
   page_external_id: string
@@ -134,6 +136,11 @@ export interface AdminPageLinesDTO {
   image_rotation: number
   approved: boolean
   rejected: boolean
+  // 0-based position of this page within the full, unfiltered, stably
+  // ordered dataset — used by CuratePageScreen to navigate prev/next across
+  // the whole dataset regardless of which filtered list the user arrived from.
+  rank: number
+  dataset_total: number
   lines: AdminPageLineDTO[]
 }
 

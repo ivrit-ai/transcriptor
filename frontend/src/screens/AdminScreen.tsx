@@ -3,7 +3,6 @@ import { useQueries, useQuery, useMutation } from '@tanstack/react-query'
 import { queryKeys, queryClient } from '../queries'
 import { api } from '../api'
 import type { AdminStatsDTO, AdminCoverageDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
-import { DatasetTab } from './DatasetTab'
 import { UsersTab } from './UsersTab'
 import { TopNav } from '../components/shared'
 import css from './AdminScreen.module.css'
@@ -11,7 +10,7 @@ import css from './AdminScreen.module.css'
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
 
-type Tab = 'overview' | 'users' | 'dataset' | 'coverage' | 'import'
+type Tab = 'overview' | 'users' | 'coverage' | 'import'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -523,7 +522,6 @@ export function AdminScreen() {
   const TABS: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: `Users${users.length ? ` (${users.length})` : ''}` },
-    { id: 'dataset', label: 'Dataset' },
     { id: 'coverage', label: 'Coverage & Queue' },
     { id: 'import', label: 'Import' },
   ]
@@ -555,9 +553,6 @@ export function AdminScreen() {
         )}
         {!loading && tab === 'users' && (
           <UsersTab users={users} />
-        )}
-        {tab === 'dataset' && (
-          <DatasetTab />
         )}
         {!loading && tab === 'coverage' && queue && (
           <CoverageTab coverage={coverage} queue={queue} />
