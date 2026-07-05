@@ -109,6 +109,7 @@ export function useLoop(pageId?: string): LoopState {
 
   const linesRef = useRef<LoopLine[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lineStartTime = useRef<number>(Date.now());
 
   linesRef.current = lines;
 
@@ -207,6 +208,7 @@ export function useLoop(pageId?: string): LoopState {
       setCursor(next);
     }
     setInput("");
+    lineStartTime.current = Date.now();
   }, []);
 
   const validateEscape = (t: string): string | null => {
@@ -258,7 +260,8 @@ export function useLoop(pageId?: string): LoopState {
       setDone((d) => d + 1);
     }
 
-    submitMutation.mutate({ lineId: line.id, body: { kind: "text", text } });
+    const time_spent_ms = Date.now() - lineStartTime.current;
+    submitMutation.mutate({ lineId: line.id, body: { kind: "text", text, time_spent_ms } });
     advance(idx);
   }, [input, cursor, submitMutation, advance]);
 
@@ -277,7 +280,8 @@ export function useLoop(pageId?: string): LoopState {
       );
       if (!isReflag) setDone((d) => d + 1);
 
-      submitMutation.mutate({ lineId: line.id, body: { kind, text } });
+      const time_spent_ms = Date.now() - lineStartTime.current;
+      submitMutation.mutate({ lineId: line.id, body: { kind, text, time_spent_ms } });
       advance(idx);
     },
     [cursor, submitMutation, advance],
@@ -288,6 +292,7 @@ export function useLoop(pageId?: string): LoopState {
     if (i < 0 || i >= current.length) return;
     setFinished(false);
     setCursor(i);
+    lineStartTime.current = Date.now();
     const l = current[i];
     setInput(l.status === "done_by_you" ? (l.your_text ?? "") : "");
   }, []);

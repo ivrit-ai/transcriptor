@@ -91,6 +91,8 @@ def submit_response(
     line_id: uuid.UUID,
     kind: TranscriptionKind,
     text: str | None,
+    time_spent_ms: int | None = None,
+    user_agent: str | None = None,
 ) -> SubmitResult:
     _validate_kind_text(kind, text)
 
@@ -119,10 +121,17 @@ def submit_response(
         if should_increment_count(True):
             line.transcription_count += 1
 
+    payload: dict = {"kind": kind.value, "is_edit": is_edit}
+    if time_spent_ms is not None:
+        payload["time_spent_ms"] = time_spent_ms
+    if user_agent:
+        payload["user_agent"] = user_agent
+
     session.add(Event(
         user_id=user.id,
         line_id=line_id,
-        event_type="edited" if is_edit else "submitted",
+        event_type="edited" if is_edit else kind.value,
+        payload=payload,
     ))
 
     _upsert_user_progress(session, user.id, line.page_id, line_id, target=3)
