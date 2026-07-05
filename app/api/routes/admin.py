@@ -2,9 +2,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_admin, require_curator
@@ -253,48 +253,75 @@ def admin_coverage(
     ]
 
 
+_VALID_PAGE_STATUSES = {"approved", "rejected"}
+
+
 @router.get("/pages")
 def admin_pages(
     _: Annotated[User, Depends(require_curator)],
     db: Annotated[Session, Depends(get_db)],
     page: int = 1,
     page_size: int = 50,
+    status: Annotated[list[str] | None, Query()] = None,
 ) -> dict:
     """
     Flat paginated list of manuscript pages ordered by (batch, page).
     Each item carries its batch info for display.
+
+    `status` is a repeatable filter (`?status=approved&status=rejected`).
+    Omitted/empty means no filtering (all pages). When multiple values are
+    given they are OR'd together (e.g. both -> approved OR rejected).
     """
     page = max(1, page)
     page_size = max(1, min(page_size, 200))
     offset = (page - 1) * page_size
 
-    total: int = db.execute(select(func.count(Page.id))).scalar_one()
-    approved_count: int = db.execute(
-        select(func.count(Page.id)).where(Page.approved.is_(True))
-    ).scalar_one()
+    statuses = set(status or [])
+    invalid = statuses - _VALID_PAGE_STATUSES
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status filter(s): {', '.join(sorted(invalid))}",
+        )
+
+    status_filter = None
+    if statuses:
+        conds = []
+        if "approved" in statuses:
+            conds.append(Page.approved.is_(True))
+        if "rejected" in statuses:
+            conds.append(Page.rejected.is_(True))
+        status_filter = or_(*conds)
+
+    count_query = select(func.count(Page.id))
+    approved_count_query = select(func.count(Page.id)).where(Page.approved.is_(True))
+    rows_query = (
+        select(
+            Page.id,
+            Page.external_id,
+            Page.image_path,
+            Page.approved,
+            Page.approved_by,
+            Page.rejected,
+            Page.rejected_by,
+            Page.updated_at,
+            Batch.id.label("batch_id"),
+            Batch.external_id.label("batch_external_id"),
+            Batch.source,
+        )
+        .join(Batch, Batch.id == Page.batch_id)
+        .order_by(Batch.external_id, Page.external_id)
+    )
+    if status_filter is not None:
+        count_query = count_query.where(status_filter)
+        approved_count_query = approved_count_query.where(status_filter)
+        rows_query = rows_query.where(status_filter)
+
+    total: int = db.execute(count_query).scalar_one()
+    approved_count: int = db.execute(approved_count_query).scalar_one()
 
     rows = (
-        db.execute(
-            select(
-                Page.id,
-                Page.external_id,
-                Page.image_path,
-                Page.approved,
-                Page.approved_by,
-                Page.rejected,
-                Page.rejected_by,
-                Page.updated_at,
-                Batch.id.label("batch_id"),
-                Batch.external_id.label("batch_external_id"),
-                Batch.source,
-            )
-            .join(Batch, Batch.id == Page.batch_id)
-            .order_by(Batch.external_id, Page.external_id)
-            .offset(offset)
-            .limit(page_size)
-        )
-        .mappings()
-        .all()
+        db.execute(rows_query.offset(offset).limit(page_size)).mappings().all()
     )
 
     items = [
@@ -347,6 +374,26 @@ def admin_page_lines(
         .all()
     )
 
+    # Global 0-based position of this page within the *unfiltered*, stably
+    # ordered (batch_external_id, page_external_id) dataset. Lets the curate
+    # screen navigate prev/next across the whole dataset without depending on
+    # whatever filter produced the list the user arrived from.
+    batch_external_id = page.batch.external_id
+    rank: int = db.execute(
+        select(func.count(Page.id))
+        .join(Batch, Batch.id == Page.batch_id)
+        .where(
+            or_(
+                Batch.external_id < batch_external_id,
+                and_(
+                    Batch.external_id == batch_external_id,
+                    Page.external_id < page.external_id,
+                ),
+            )
+        )
+    ).scalar_one()
+    dataset_total: int = db.execute(select(func.count(Page.id))).scalar_one()
+
     return {
         "page_id": str(page.id),
         "external_id": page.external_id,
@@ -358,6 +405,8 @@ def admin_page_lines(
         "image_rotation": page.image_rotation,
         "approved": page.approved,
         "rejected": page.rejected,
+        "rank": rank,
+        "dataset_total": dataset_total,
         "lines": [
             {
                 "id": str(line.id),

@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
+import type { PageStatusFilter } from './types'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,13 +29,12 @@ export const queryKeys = {
     curators: ['admin', 'curators'] as const,
     importStatus: ['admin', 'importStatus'] as const,
     importLogs: (tail: number) => ['admin', 'importLogs', tail] as const,
-    pages: (page: number, pageSize: number) => ['admin', 'pages', page, pageSize] as const,
-    pageLines: (pageId: string) => ['admin', 'pageLines', pageId] as const,
   },
-  curate: {
-    pages: (page: number, pageSize: number) => ['curate', 'pages', page, pageSize] as const,
-    pageLines: (pageId: string) => ['curate', 'pageLines', pageId] as const,
-  },
+  // Shared by CurateListScreen (filtered browsing) and CuratePageScreen
+  // (unfiltered dataset-wide prev/next navigation) — same fetch, same cache.
+  pages: (page: number, pageSize: number, statuses: PageStatusFilter[] = []) =>
+    ['pages', page, pageSize, [...statuses].sort()] as const,
+  pageLines: (pageId: string) => ['pageLines', pageId] as const,
   leaderboard: {
     allTime: ['leaderboard', 'allTime'] as const,
     week:    ['leaderboard', 'week']    as const,

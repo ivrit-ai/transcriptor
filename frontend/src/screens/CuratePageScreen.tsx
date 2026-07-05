@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys, queryClient } from "../queries";
 import { api } from "../api";
-import type { AdminDatasetDTO, AdminPageLinesDTO, BBox } from "../types";
+import type { AdminPageLinesDTO, BBox } from "../types";
 import { AnnotationEditor } from "../components/AnnotationEditor";
 import type { Annotation } from "../components/AnnotationEditor";
 import { TopNav } from "../components/shared";
@@ -83,7 +83,7 @@ function applyRotationToLines(
   }));
 }
 
-const CURATE_PAGE_SIZE = 20;
+const PAGE_SIZE = 20;
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -95,19 +95,12 @@ export function CuratePageScreen() {
   const navState =
     (location.state as {
       listPage?: number;
-      listIdx?: number;
-      listData?: AdminDatasetDTO;
-      unapprovedOnly?: boolean;
     } | null) ?? null;
 
-  
   const [error, setError] = useState<string | null>(null);
   const [currentRotation, setCurrentRotation] = useState(0);
   const [approved, setApproved] = useState(false);
   const [rejected, setRejected] = useState(false);
-  const [unapprovedOnly, setUnapprovedOnly] = useState(
-    navState?.unapprovedOnly ?? true,
-  );
   const [localLines, setLocalLines] = useState<
     AdminPageLinesDTO["lines"] | null
   >(null);
@@ -121,8 +114,8 @@ export function CuratePageScreen() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: queryKeys.curate.pageLines(pageId ?? ""),
-    queryFn: () => api.getCuratePageLines(pageId!),
+    queryKey: queryKeys.pageLines(pageId ?? ""),
+    queryFn: () => api.getPageLines(pageId!),
     staleTime: 30_000,
     enabled: !!pageId,
   });
@@ -141,22 +134,10 @@ export function CuratePageScreen() {
   const imgW = page?.width_px ?? 1;
   const imgH = page?.height_px ?? 1;
 
-  // ── Shared pages list query ───────────────────────────────────────────────
-
+  // `listPage` is only a hint for "← Back To List" to resume near where the
+  // user came from — it has no bearing on Prev/Next below, which always walk
+  // the full, unfiltered dataset via `serverData.rank`/`dataset_total`.
   const listPageNum = navState?.listPage ?? 1;
-
-  const { data: pagesData } = useQuery({
-    queryKey: queryKeys.curate.pages(listPageNum, CURATE_PAGE_SIZE),
-    queryFn: () => api.getCuratePages(listPageNum, CURATE_PAGE_SIZE),
-    staleTime: 30_000,
-    placeholderData: (prev) => prev,
-  });
-
-  const effectiveListData = pagesData ?? navState?.listData ?? null;
-  const effectiveListIdx =
-    navState?.listIdx ??
-    effectiveListData?.items.findIndex((item) => item.page_id === pageId) ??
-    -1;
 
   // ── Build annotations for AnnotationEditor ─────────────────────────────
 
@@ -237,7 +218,7 @@ export function CuratePageScreen() {
 
         if (!rotationChanged && !approvedChanged && !linesChanged) return;
 
-        const body: Parameters<typeof api.updateCuratePageLines>[1] = {};
+        const body: Parameters<typeof api.updatePageLines>[1] = {};
 
         // Always send lines when rotation changed OR lines were edited.
         if (rotationChanged || linesChanged) {
@@ -259,7 +240,7 @@ export function CuratePageScreen() {
           body.approved = opts.approved;
         }
 
-        const result = await api.updateCuratePageLines(pageId, body);
+        const result = await api.updatePageLines(pageId, body);
         if (result) {
           const nextLines =
             result.line_ids && result.line_ids.length === linesForSave!.length
@@ -275,7 +256,7 @@ export function CuratePageScreen() {
 
           // Update pageLines cache
           queryClient.setQueryData(
-            queryKeys.curate.pageLines(pageId),
+            queryKeys.pageLines(pageId),
             (prev: typeof serverData) =>
               prev
                 ? {
@@ -288,24 +269,9 @@ export function CuratePageScreen() {
                 : prev,
           );
 
-          // Update pages list cache so navigation reflects the new approved status
-          queryClient.setQueryData(
-            queryKeys.curate.pages(listPageNum, CURATE_PAGE_SIZE),
-            (prev: AdminDatasetDTO | undefined) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                items: prev.items.map((item) =>
-                  item.page_id === pageId
-                    ? { ...item, approved: result.approved, rejected: result.rejected }
-                    : item,
-                ),
-              };
-            },
-          );
-
-          // Invalidate all pages queries so CurateScreen gets fresh data on return
-          queryClient.invalidateQueries({ queryKey: ["curate", "pages"] });
+          // Invalidate all pages-list queries (every page/filter combo) so
+          // CurateListScreen gets fresh data on return.
+          queryClient.invalidateQueries({ queryKey: ["pages"] });
         }
       } catch (e) {
         console.error(e);
@@ -314,7 +280,7 @@ export function CuratePageScreen() {
         setSaving(false);
       }
     },
-    [page, pageId, localLines, actualLines, listPageNum],
+    [page, pageId, localLines, actualLines],
   );
 
   const handleSave = useCallback(() => {
@@ -400,46 +366,46 @@ export function CuratePageScreen() {
   }, [rotateBy]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
+  //
+  // Prev/Next always walk the full, unfiltered dataset by absolute rank
+  // (0-based position in the stable (batch_external_id, page_external_id)
+  // order — see `admin_page_lines` on the backend). This is what makes
+  // boundary-crossing correct: incrementing/decrementing `rank` and fetching
+  // whichever server page contains it is pure arithmetic, never an
+  // array-bounds scan confined to a single already-loaded page.
 
-  const navigateToPage = useCallback(
-    (targetPageId: string) => {
-      const targetIdx =
-        effectiveListData?.items.findIndex(
-          (item) => item.page_id === targetPageId,
-        ) ?? -1;
-      navigate(`/curate/${targetPageId}`, {
-        state: {
-          listPage: listPageNum,
-          listIdx: targetIdx,
-          listData: effectiveListData,
-          unapprovedOnly,
-        },
+  const goToRank = useCallback(
+    async (targetRank: number) => {
+      if (!page) return;
+      const total = page.dataset_total;
+      if (targetRank < 0 || targetRank >= total) return;
+
+      const targetServerPage = Math.floor(targetRank / PAGE_SIZE) + 1;
+      const targetLocalIdx = targetRank % PAGE_SIZE;
+
+      const targetPageData = await queryClient.fetchQuery({
+        queryKey: queryKeys.pages(targetServerPage, PAGE_SIZE, []),
+        queryFn: () => api.getPages(targetServerPage, PAGE_SIZE, []),
+      });
+      const targetItem = targetPageData?.items[targetLocalIdx];
+      if (!targetItem) return;
+
+      navigate(`/curate/${targetItem.page_id}`, {
+        state: { listPage: listPageNum },
       });
     },
-    [navigate, listPageNum, effectiveListData, unapprovedOnly],
+    [page, navigate, listPageNum],
   );
 
   const goPrev = useCallback(() => {
-    if (!effectiveListData) return;
-    const items = effectiveListData.items;
-    for (let i = effectiveListIdx - 1; i >= 0; i--) {
-      if (!unapprovedOnly || !items[i].approved) {
-        navigateToPage(items[i].page_id);
-        return;
-      }
-    }
-  }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage]);
+    if (!page) return;
+    goToRank(page.rank - 1);
+  }, [page, goToRank]);
 
   const goNext = useCallback(() => {
-    if (!effectiveListData) return;
-    const items = effectiveListData.items;
-    for (let i = effectiveListIdx + 1; i < items.length; i++) {
-      if (!unapprovedOnly || !items[i].approved) {
-        navigateToPage(items[i].page_id);
-        return;
-      }
-    }
-  }, [effectiveListData, effectiveListIdx, unapprovedOnly, navigateToPage]);
+    if (!page) return;
+    goToRank(page.rank + 1);
+  }, [page, goToRank]);
 
   const approveSaveNext = useCallback(async () => {
     if (annotationDirty) return;
@@ -685,7 +651,7 @@ export function CuratePageScreen() {
                   type="button"
                   className={css.actionBtn}
                   onClick={goPrev}
-                  disabled={!effectiveListData}
+                  disabled={!page || page.rank <= 0}
                 >
                   ← Prev <span className={css.keyHint}>←</span>
                 </button>
@@ -693,24 +659,11 @@ export function CuratePageScreen() {
                   type="button"
                   className={css.actionBtn}
                   onClick={goNext}
-                  disabled={!effectiveListData}
+                  disabled={!page || page.rank >= page.dataset_total - 1}
                 >
                   Next → <span className={css.keyHint}>→</span>
                 </button>
               </div>
-            </div>
-
-            <div className={css.actionsSection}>
-              <label className={css.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={unapprovedOnly}
-                  onChange={(e) => {
-                    setUnapprovedOnly(e.target.checked);
-                  }}
-                />
-                Navigate Unapproved Only
-              </label>
             </div>
 
             <div className={css.actionsSection}>
