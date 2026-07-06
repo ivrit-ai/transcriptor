@@ -17,7 +17,7 @@ CACHE_TTL = 60.0
 def _anonymize(display_name: str) -> str:
     """Keep only the first letter of each name part; mask the rest with *."""
     if not display_name:
-        return display_name
+        return ""
     parts = display_name.split()
     masked = []
     for part in parts:
