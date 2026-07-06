@@ -571,11 +571,15 @@ export function WorkScreen() {
   }, [])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit: Ctrl/Cmd+Enter
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // Submit: Enter (without shift)
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       L.submit()
       return
+    }
+    // New line: Shift+Enter (default textarea behavior prevented above for bare Enter)
+    if (e.key === 'Enter' && e.shiftKey) {
+      return // let the default behavior insert a newline
     }
     // Adjacent line: Shift+ArrowDown
     if (e.key === 'ArrowDown' && e.shiftKey) {
@@ -778,7 +782,10 @@ export function WorkScreen() {
         onKeyDown={onKeyDown}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4, marginBottom: 2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, marginBottom: 2 }}>
+        <span style={{ fontSize: 12, color: "var(--tl-muted)", fontFamily: "var(--font-ui)" }}>
+          לירידת שורה <span style={{ fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--tl-muted)' }}>Shift+Enter</span>
+        </span>
         <span style={{ fontSize: 12, color: "var(--tl-muted)", fontFamily: "var(--font-ui)" }}>
           התלבטות? {" "}
           <button
@@ -879,7 +886,7 @@ export function WorkScreen() {
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
           <Icon name="forward" size={16} color="#fff" />
-          <span className="tl-kbd">Ctrl/Cmd + Enter</span>
+          <span className="tl-kbd">Enter</span>
         </button>
       </div>
     </div>
