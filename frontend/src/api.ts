@@ -98,7 +98,7 @@ export const api = {
 
   submitResponse: (
     lineId: string,
-    body: { kind: SubmitKind; text?: string }
+    body: { kind: SubmitKind; text?: string; time_spent_ms?: number }
   ): Promise<LineStatusDTO | null> =>
     import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
       ? Promise.resolve(null)
