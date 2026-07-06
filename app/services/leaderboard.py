@@ -14,6 +14,20 @@ _streak_cache: dict = {"data": None, "expires_at": 0.0}
 CACHE_TTL = 60.0
 
 
+def _anonymize(display_name: str) -> str:
+    """Keep only the first letter of each name part; mask the rest with *."""
+    if not display_name:
+        return ""
+    parts = display_name.split()
+    masked = []
+    for part in parts:
+        if len(part) <= 1:
+            masked.append(part)
+        else:
+            masked.append(part[0] + "*" * (len(part) - 1))
+    return " ".join(masked)
+
+
 def get_leaderboard(session: Session, ttl: float = CACHE_TTL, since: datetime | None = None) -> list[dict]:
     cache = _cache_week if since is not None else _cache
     now = time.time()
@@ -40,7 +54,7 @@ def _query_leaderboard(session: Session, since: datetime | None = None) -> list[
     if since is not None:
         stmt = stmt.where(Transcription.created_at >= since)
     rows = session.execute(stmt).all()
-    return [{"display_name": r.display_name, "count": r.count} for r in rows]
+    return [{"display_name": _anonymize(r.display_name), "count": r.count} for r in rows]
 
 
 def _compute_streak(active_days: set[date], today: date) -> int:
@@ -98,7 +112,7 @@ def _query_streak_leaders(session: Session, limit: int) -> list[dict]:
     for display_name, active_days in days_by_user.values():
         streak = _compute_streak(active_days, today)
         if streak > 0:
-            results.append({"display_name": display_name, "streak": streak})
+            results.append({"display_name": _anonymize(display_name), "streak": streak})
 
     results.sort(key=lambda x: x["streak"], reverse=True)
     return results[:limit]
