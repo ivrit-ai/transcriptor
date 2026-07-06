@@ -190,7 +190,7 @@ export function useLoop(pageId?: string): LoopState {
   const submitMutation = useMutation({
     mutationFn: (params: {
       lineId: string;
-      body: { kind: SubmitKind; text?: string };
+      body: { kind: SubmitKind; text?: string; time_spent_ms?: number };
     }) => api.submitResponse(params.lineId, params.body),
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 4000),

@@ -6,7 +6,7 @@ import { Icon } from './Icon'
 import { useSession } from '../../contexts/SessionContext'
 import { useIsCurator, useIsAdmin } from '../../guards/useGuardChecks'
 
-type NavId = 'work' | 'guide' | 'progress' | 'leaderboard' | 'curate' | 'admin'
+type NavId = 'work' | 'guide' | 'progress' | 'leaderboard' | 'curate' | 'admin' | 'about'
 
 interface TopNavProps {
   active?: NavId
