@@ -39,6 +39,22 @@ function AuthForm({ isMobile }: { isMobile?: boolean }) {
         <GoogleMark /> המשך עם Google
       </button>
 
+      <p style={{
+        fontFamily: 'var(--font-ui)', fontSize: 12,
+        color: 'var(--tl-muted)', margin: '12px 0 0', lineHeight: 1.6, textAlign: 'center',
+      }}>
+        השתתפות בפרויקט מהווה הסכמה{' '}
+        <a
+          href="https://www.ivrit.ai/en/privacy/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--tl-muted)', textDecoration: 'underline' }}
+        >
+          לתנאי השימוש של ivrit.ai
+        </a>
+        {' '}ולשימוש בנתונים לצורך אימון מודלים.
+      </p>
+
       {isMobile && (
         <div style={{
           marginTop: 32, padding: '20px 18px',
