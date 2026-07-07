@@ -881,7 +881,7 @@ export function WorkScreen() {
         </button>
         <button
           className="tl-submit"
-          onClick={L.submit}
+          onClick={() => { L.submit(); taRef.current?.focus() }}
           disabled={!L.input.trim() || !!L.submitError}
         >
           <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
