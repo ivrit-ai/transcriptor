@@ -1,6 +1,7 @@
 import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '../api'
 import { queryKeys } from '../queries'
 import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
@@ -405,6 +406,12 @@ export function WorkScreen() {
   const { pageId } = useParams()
   const L = useLoop(pageId)
   const queryClient = useQueryClient()
+
+  const { data: rankData } = useQuery({
+    queryKey: queryKeys.rank.me,
+    queryFn: api.getMyRank,
+    refetchInterval: 60_000,
+  })
 
   // "Next page" / "skip to another page": from a specific page, hand back to the
   // general auto-dispatch flow; otherwise just refetch the next session.
@@ -958,13 +965,21 @@ export function WorkScreen() {
           >
             הנחיות לתעתוק
           </button>
-          <div style={{
-            fontSize: 13, fontWeight: 600,
-            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
-          }}>
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>
-              {new Intl.NumberFormat('en-US').format(L.daily)}
-            </span> היום
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+            <div style={{
+              fontSize: 13, fontWeight: 600,
+              color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+            }}>
+              <span style={{ direction: 'ltr', display: 'inline-block' }}>
+                {new Intl.NumberFormat('en-US').format(L.daily)}
+              </span> היום
+            </div>
+            <div style={{
+              fontSize: 11, color: 'var(--tl-muted)', whiteSpace: 'nowrap',
+              visibility: (rankData?.show_on_leaderboard && rankData.lines_to_next !== null) ? 'visible' : 'hidden',
+            }}>
+              עוד {rankData?.lines_to_next} שורות למקום #{rankData?.target_rank}
+            </div>
           </div>
         </div>
       </div>
@@ -1052,13 +1067,21 @@ export function WorkScreen() {
           >
             הנחיות לתעתוק
           </button>
-          <div style={{
-            fontSize: 12, fontWeight: 600,
-            color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
-          }}>
-            <span style={{ direction: 'ltr', display: 'inline-block' }}>
-              {new Intl.NumberFormat('en-US').format(L.daily)}
-            </span> היום
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+            <div style={{
+              fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 150)', whiteSpace: 'nowrap',
+            }}>
+              <span style={{ direction: 'ltr', display: 'inline-block' }}>
+                {new Intl.NumberFormat('en-US').format(L.daily)}
+              </span> היום
+            </div>
+            <div style={{
+              fontSize: 10, color: 'var(--tl-muted)', whiteSpace: 'nowrap',
+              visibility: (rankData?.show_on_leaderboard && rankData.lines_to_next !== null) ? 'visible' : 'hidden',
+            }}>
+              עוד {rankData?.lines_to_next} למקום #{rankData?.target_rank}
+            </div>
           </div>
         </div>
         <div style={{ flex: 1, position: 'relative' }}>

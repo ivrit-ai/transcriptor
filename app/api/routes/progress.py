@@ -20,6 +20,70 @@ _DAILY_WINDOW_DAYS = 70  # ≈10 weeks of heatmap history
 _DOCUMENTS_LIMIT = 60
 
 
+@router.get("/me/rank")
+def my_rank(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    user_count = db.execute(
+        select(func.count(Transcription.id)).where(
+            Transcription.user_id == user.id,
+            Transcription.kind == TranscriptionKind.text,
+        )
+    ).scalar_one()
+
+    # Per-user counts for all OTHER leaderboard-visible users
+    other_sq = (
+        select(func.count(Transcription.id).label("cnt"))
+        .join(User, User.id == Transcription.user_id)
+        .where(
+            Transcription.kind == TranscriptionKind.text,
+            User.show_on_leaderboard == True,
+            User.id != user.id,
+        )
+        .group_by(Transcription.user_id)
+        .subquery()
+    )
+
+    # Single pass for users_above and next_threshold (avoids evaluating the
+    # grouped aggregation twice).
+    row = db.execute(
+        select(
+            func.count().label("users_above"),
+            func.min(other_sq.c.cnt).label("next_threshold"),
+        )
+        .select_from(other_sq)
+        .where(other_sq.c.cnt > user_count)
+    ).one()
+
+    users_above: int = row.users_above
+    next_threshold: int | None = row.next_threshold
+
+    if next_threshold is not None:
+        lines_to_next = next_threshold - user_count
+        # target_rank accounts for ties: count only users strictly above
+        # next_threshold so that reaching it lands you at the correct position.
+        target_rank = (
+            db.execute(
+                select(func.count())
+                .select_from(other_sq)
+                .where(other_sq.c.cnt > next_threshold)
+            ).scalar_one()
+            + 1
+        )
+    else:
+        lines_to_next = None
+        target_rank = None
+
+    return {
+        "rank": users_above + 1,
+        "count": user_count,
+        "lines_to_next": lines_to_next,
+        "target_rank": target_rank,
+        "show_on_leaderboard": bool(user.show_on_leaderboard),
+    }
+
+
 @router.get("/me/progress")
 def my_progress(
     user: Annotated[User, Depends(get_current_user)],
