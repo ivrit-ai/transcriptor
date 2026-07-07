@@ -407,10 +407,17 @@ export function WorkScreen() {
   const L = useLoop(pageId)
   const queryClient = useQueryClient()
 
+  const [rankEnabled, setRankEnabled] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setRankEnabled(true), 5_000)
+    return () => clearTimeout(t)
+  }, [])
+
   const { data: rankData } = useQuery({
     queryKey: queryKeys.rank.me,
     queryFn: api.getMyRank,
     refetchInterval: 60_000,
+    enabled: rankEnabled,
   })
 
   // "Next page" / "skip to another page": from a specific page, hand back to the
