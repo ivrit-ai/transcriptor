@@ -1,8 +1,10 @@
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
@@ -256,6 +258,31 @@ def admin_coverage(
 _VALID_PAGE_STATUSES = {"approved", "rejected"}
 
 
+@router.get("/batches")
+def admin_batches(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict]:
+    rows = (
+        db.execute(
+            select(Batch.id, Batch.external_id, Batch.source, Batch.license).order_by(
+                Batch.external_id
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        {
+            "id": str(r["id"]),
+            "external_id": r["external_id"],
+            "source": r["source"],
+            "license": r["license"],
+        }
+        for r in rows
+    ]
+
+
 @router.get("/pages")
 def admin_pages(
     _: Annotated[User, Depends(require_curator)],
@@ -263,6 +290,7 @@ def admin_pages(
     page: int = 1,
     page_size: int = 50,
     status: Annotated[list[str] | None, Query()] = None,
+    batch_id: str | None = Query(None),
 ) -> dict:
     """
     Flat paginated list of manuscript pages ordered by (batch, page).
@@ -284,6 +312,13 @@ def admin_pages(
             detail=f"Invalid status filter(s): {', '.join(sorted(invalid))}",
         )
 
+    batch_uuid: uuid.UUID | None = None
+    if batch_id is not None:
+        try:
+            batch_uuid = uuid.UUID(batch_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid batch_id") from e
+
     status_filter = None
     if statuses:
         conds = []
@@ -292,6 +327,19 @@ def admin_pages(
         if "rejected" in statuses:
             conds.append(Page.rejected.is_(True))
         status_filter = or_(*conds)
+
+    total_lines_sq = (
+        select(func.count(Line.id))
+        .where(Line.page_id == Page.id)
+        .correlate(Page)
+        .scalar_subquery()
+    )
+    annotated_lines_sq = (
+        select(func.count(Line.id))
+        .where(Line.page_id == Page.id, Line.transcription_count >= 1)
+        .correlate(Page)
+        .scalar_subquery()
+    )
 
     count_query = select(func.count(Page.id))
     approved_count_query = select(func.count(Page.id)).where(Page.approved.is_(True))
@@ -308,10 +356,18 @@ def admin_pages(
             Batch.id.label("batch_id"),
             Batch.external_id.label("batch_external_id"),
             Batch.source,
+            total_lines_sq.label("total_lines"),
+            annotated_lines_sq.label("annotated_lines"),
         )
         .join(Batch, Batch.id == Page.batch_id)
         .order_by(Batch.external_id, Page.external_id)
     )
+
+    if batch_uuid is not None:
+        count_query = count_query.where(Page.batch_id == batch_uuid)
+        approved_count_query = approved_count_query.where(Page.batch_id == batch_uuid)
+        rows_query = rows_query.where(Page.batch_id == batch_uuid)
+
     if status_filter is not None:
         count_query = count_query.where(status_filter)
         approved_count_query = approved_count_query.where(status_filter)
@@ -337,6 +393,8 @@ def admin_pages(
             "batch_id": str(r["batch_id"]),
             "batch_external_id": r["batch_external_id"],
             "source": r["source"],
+            "total_lines": r["total_lines"],
+            "annotated_lines": r["annotated_lines"],
         }
         for r in rows
     ]
@@ -373,6 +431,40 @@ def admin_page_lines(
         .scalars()
         .all()
     )
+
+    line_ids = [line.id for line in lines]
+    txn_rows = (
+        db.execute(
+            select(
+                Transcription.line_id,
+                Transcription.user_id,
+                Transcription.kind,
+                Transcription.text,
+                Transcription.created_at,
+                Transcription.updated_at,
+                User.email,
+                User.display_name,
+            )
+            .join(User, User.id == Transcription.user_id)
+            .where(Transcription.line_id.in_(line_ids))
+        )
+        .mappings()
+        .all()
+    )
+
+    txn_by_line: dict[uuid.UUID, list[dict]] = {}
+    for t in txn_rows:
+        txn_by_line.setdefault(t["line_id"], []).append(
+            {
+                "user_id": str(t["user_id"]),
+                "display_name": t["display_name"],
+                "email": t["email"],
+                "kind": t["kind"],
+                "text": t["text"],
+                "created_at": t["created_at"].isoformat(),
+                "updated_at": t["updated_at"].isoformat(),
+            }
+        )
 
     # Global 0-based position of this page within the *unfiltered*, stably
     # ordered (batch_external_id, page_external_id) dataset. Lets the curate
@@ -416,6 +508,7 @@ def admin_page_lines(
                 "polygon": line.polygon,
                 "detection_confidence": line.detection_confidence,
                 "transcription_count": line.transcription_count,
+                "transcriptions": txn_by_line.get(line.id, []),
             }
             for line in lines
         ],
@@ -505,6 +598,95 @@ def update_page_lines(
         "rejected": page.rejected,
         "line_ids": update_line_ids,
     }
+
+
+@router.get("/export")
+def admin_export(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> StreamingResponse:
+    q = (
+        select(
+            Line.id.label("line_id"),
+            Line.external_id.label("line_external_id"),
+            Line.line_index,
+            Line.bbox,
+            Line.polygon,
+            Line.detection_confidence,
+            Page.id.label("page_id"),
+            Page.external_id.label("page_external_id"),
+            Page.document_name,
+            Page.image_path,
+            Batch.id.label("batch_id"),
+            Batch.external_id.label("batch_external_id"),
+            Batch.source,
+            Batch.license,
+            Transcription.user_id,
+            Transcription.kind,
+            Transcription.text,
+            Transcription.created_at.label("txn_created_at"),
+            Transcription.updated_at.label("txn_updated_at"),
+            User.email,
+            User.display_name,
+        )
+        .join(Page, Page.id == Line.page_id)
+        .join(Batch, Batch.id == Page.batch_id)
+        .join(Transcription, Transcription.line_id == Line.id)
+        .join(User, User.id == Transcription.user_id)
+        .where(Line.transcription_count >= 1)
+        .order_by(Batch.external_id, Page.external_id, Line.line_index, Transcription.user_id)
+        .execution_options(yield_per=200)
+    )
+
+    def generate():
+        current_line_id = None
+        current_record: dict | None = None
+        for row in db.execute(q).mappings():
+            lid = row["line_id"]
+            if lid != current_line_id:
+                if current_record is not None:
+                    yield json.dumps(current_record, ensure_ascii=False) + "\n"
+                current_line_id = lid
+                current_record = {
+                    "line_id": str(lid),
+                    "external_id": row["line_external_id"],
+                    "line_index": row["line_index"],
+                    "bbox": row["bbox"],
+                    "polygon": row["polygon"],
+                    "detection_confidence": row["detection_confidence"],
+                    "page": {
+                        "id": str(row["page_id"]),
+                        "external_id": row["page_external_id"],
+                        "document_name": row["document_name"],
+                        "image_path": row["image_path"],
+                    },
+                    "batch": {
+                        "id": str(row["batch_id"]),
+                        "external_id": row["batch_external_id"],
+                        "source": row["source"],
+                        "license": row["license"],
+                    },
+                    "transcriptions": [],
+                }
+            current_record["transcriptions"].append(  # type: ignore[index]
+                {
+                    "user_id": str(row["user_id"]),
+                    "email": row["email"],
+                    "display_name": row["display_name"],
+                    "kind": row["kind"],
+                    "text": row["text"],
+                    "created_at": row["txn_created_at"].isoformat(),
+                    "updated_at": row["txn_updated_at"].isoformat(),
+                }
+            )
+        if current_record is not None:
+            yield json.dumps(current_record, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="transcriptor_export.jsonl"'},
+    )
 
 
 @router.get("/queue")
