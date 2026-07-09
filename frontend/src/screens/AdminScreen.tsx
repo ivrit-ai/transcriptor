@@ -44,8 +44,10 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
       const a = document.createElement('a')
       a.href = url
       a.download = 'transcriptor_export.jsonl'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 100)
     } catch (e) {
       setExportError(e instanceof Error ? e.message : 'Export failed')
     } finally {

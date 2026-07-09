@@ -135,9 +135,9 @@ export interface AdminBatchDTO {
 export interface AdminPageDTO {
   id: string
   external_id: string
-  document_name: string
+  document_name?: string
   image_path: string
-  image_rotation: number
+  image_rotation?: number
   approved: boolean
   rejected: boolean
   total_lines: number

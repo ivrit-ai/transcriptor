@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_admin, require_curator
+from app.api.deps import _effective_role, get_db, require_admin, require_curator
+from app.db import SessionLocal
 from app.models.batch import Batch
 from app.models.line import Line
 from app.models.page import Page
@@ -285,7 +286,7 @@ def admin_batches(
 
 @router.get("/pages")
 def admin_pages(
-    _: Annotated[User, Depends(require_curator)],
+    caller: Annotated[User, Depends(require_curator)],
     db: Annotated[Session, Depends(get_db)],
     page: int = 1,
     page_size: int = 50,
@@ -314,6 +315,8 @@ def admin_pages(
 
     batch_uuid: uuid.UUID | None = None
     if batch_id is not None:
+        if _effective_role(caller) != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
         try:
             batch_uuid = uuid.UUID(batch_id)
         except ValueError as e:
@@ -603,7 +606,6 @@ def update_page_lines(
 @router.get("/export")
 def admin_export(
     _: Annotated[User, Depends(require_admin)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> StreamingResponse:
     q = (
         select(
@@ -635,52 +637,54 @@ def admin_export(
         .join(User, User.id == Transcription.user_id)
         .where(Line.transcription_count >= 1)
         .order_by(Batch.external_id, Page.external_id, Line.line_index, Transcription.user_id)
-        .execution_options(yield_per=200)
     )
 
     def generate():
-        current_line_id = None
-        current_record: dict | None = None
-        for row in db.execute(q).mappings():
-            lid = row["line_id"]
-            if lid != current_line_id:
-                if current_record is not None:
-                    yield json.dumps(current_record, ensure_ascii=False) + "\n"
-                current_line_id = lid
-                current_record = {
-                    "line_id": str(lid),
-                    "external_id": row["line_external_id"],
-                    "line_index": row["line_index"],
-                    "bbox": row["bbox"],
-                    "polygon": row["polygon"],
-                    "detection_confidence": row["detection_confidence"],
-                    "page": {
-                        "id": str(row["page_id"]),
-                        "external_id": row["page_external_id"],
-                        "document_name": row["document_name"],
-                        "image_path": row["image_path"],
-                    },
-                    "batch": {
-                        "id": str(row["batch_id"]),
-                        "external_id": row["batch_external_id"],
-                        "source": row["source"],
-                        "license": row["license"],
-                    },
-                    "transcriptions": [],
-                }
-            current_record["transcriptions"].append(  # type: ignore[index]
-                {
-                    "user_id": str(row["user_id"]),
-                    "email": row["email"],
-                    "display_name": row["display_name"],
-                    "kind": row["kind"],
-                    "text": row["text"],
-                    "created_at": row["txn_created_at"].isoformat(),
-                    "updated_at": row["txn_updated_at"].isoformat(),
-                }
-            )
-        if current_record is not None:
-            yield json.dumps(current_record, ensure_ascii=False) + "\n"
+        # Opens its own session so the DI-managed session is not closed
+        # before Starlette begins iterating this generator.
+        with SessionLocal() as db:
+            current_line_id = None
+            current_record: dict | None = None
+            for row in db.execute(q).mappings():
+                lid = row["line_id"]
+                if lid != current_line_id:
+                    if current_record is not None:
+                        yield json.dumps(current_record, ensure_ascii=False) + "\n"
+                    current_line_id = lid
+                    current_record = {
+                        "line_id": str(lid),
+                        "external_id": row["line_external_id"],
+                        "line_index": row["line_index"],
+                        "bbox": row["bbox"],
+                        "polygon": row["polygon"],
+                        "detection_confidence": row["detection_confidence"],
+                        "page": {
+                            "id": str(row["page_id"]),
+                            "external_id": row["page_external_id"],
+                            "document_name": row["document_name"],
+                            "image_path": row["image_path"],
+                        },
+                        "batch": {
+                            "id": str(row["batch_id"]),
+                            "external_id": row["batch_external_id"],
+                            "source": row["source"],
+                            "license": row["license"],
+                        },
+                        "transcriptions": [],
+                    }
+                current_record["transcriptions"].append(  # type: ignore[index]
+                    {
+                        "user_id": str(row["user_id"]),
+                        "email": row["email"],
+                        "display_name": row["display_name"],
+                        "kind": row["kind"].value,
+                        "text": row["text"],
+                        "created_at": row["txn_created_at"].isoformat(),
+                        "updated_at": row["txn_updated_at"].isoformat(),
+                    }
+                )
+            if current_record is not None:
+                yield json.dumps(current_record, ensure_ascii=False) + "\n"
 
     return StreamingResponse(
         generate(),
