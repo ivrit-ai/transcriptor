@@ -391,7 +391,6 @@ def admin_pages(
 
     if status_filter is not None:
         count_query = count_query.where(status_filter)
-        approved_count_query = approved_count_query.where(status_filter)
         rows_query = rows_query.where(status_filter)
 
     total: int = db.execute(count_query).scalar_one()
@@ -571,18 +570,26 @@ def update_page_lines(
     if body.rotation is not None:
         page.image_rotation = body.rotation
 
-    if body.rejected is not None:
+    if body.rejected is not None and body.approved is not None:
         if body.rejected and body.approved:
             raise HTTPException(
                 status_code=422,
                 detail="cannot specify both approved and rejected",
             )
+
+    if body.rejected is not None:
         page.rejected = body.rejected
         page.rejected_by = _.id if body.rejected else None
+        if body.rejected:
+            page.approved = False
+            page.approved_by = None
 
     if body.approved is not None:
         page.approved = body.approved
         page.approved_by = _.id if body.approved else None
+        if body.approved:
+            page.rejected = False
+            page.rejected_by = None
 
     update_line_ids: list[str] | None = None
 

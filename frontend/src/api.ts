@@ -203,9 +203,22 @@ export const api = {
   getBatches: (): Promise<AdminBatchDTO[] | null> =>
     request<AdminBatchDTO[]>('/api/admin/batches'),
 
-  getBatchPages: (batchId: string, page: number, perPage: number): Promise<{ pages: AdminPageDTO[]; total: number } | null> => {
-    const params = new URLSearchParams({ batch_id: batchId, page: String(page), per_page: String(perPage) })
-    return request<{ pages: AdminPageDTO[]; total: number }>(`/api/admin/pages?${params.toString()}`)
+  getBatchPages: async (batchId: string, page: number, perPage: number): Promise<{ pages: AdminPageDTO[]; total: number } | null> => {
+    const params = new URLSearchParams({ batch_id: batchId, page: String(page), page_size: String(perPage) })
+    const raw = await request<{ items: Array<Record<string, unknown>>; total: number }>(`/api/admin/pages?${params.toString()}`)
+    if (!raw) return null
+    return {
+      pages: raw.items.map((r) => ({
+        id: r['page_id'] as string,
+        external_id: r['page_external_id'] as string,
+        image_path: r['image_path'] as string,
+        approved: r['approved'] as boolean,
+        rejected: r['rejected'] as boolean,
+        total_lines: r['total_lines'] as number,
+        annotated_lines: r['annotated_lines'] as number,
+      })),
+      total: raw.total,
+    }
   },
 
   exportDataset: async (): Promise<Blob> => {

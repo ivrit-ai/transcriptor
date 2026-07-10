@@ -9,7 +9,7 @@ export function rotateBbox(bbox: BBox, rotation: number, imgW: number, imgH: num
 }
 
 export function rotatePolygon(poly: unknown, rotation: number, imgW: number, imgH: number): unknown {
-  if (!poly) return null
+  if (!poly) return poly
   const r = ((rotation % 360) + 360) % 360
   if (r === 0) return poly
   if (Array.isArray(poly) && poly.length > 0) {

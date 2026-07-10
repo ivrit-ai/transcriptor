@@ -242,6 +242,7 @@ export function BrowseTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; q
   if (view.mode === 'pages') {
     return (
       <PageListView
+        key={view.batchId}
         batchId={view.batchId}
         batchLabel={view.batchLabel}
         onBack={() => setView({ mode: 'batches' })}
