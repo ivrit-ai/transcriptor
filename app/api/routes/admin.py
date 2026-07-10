@@ -91,6 +91,23 @@ def admin_stats(
         round(100.0 * complete_lines / total_lines, 1) if total_lines else 0.0
     )
 
+    total_words: int = db.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    func.array_length(
+                        func.string_to_array(func.btrim(Transcription.text), " "), 1
+                    )
+                ),
+                0,
+            )
+        ).where(
+            Transcription.kind == TranscriptionKind.text,
+            Transcription.text.isnot(None),
+            func.btrim(Transcription.text) != "",
+        )
+    ).scalar_one()
+
     return {
         "total_users": total_users,
         "active_today": active_today,
@@ -98,6 +115,7 @@ def admin_stats(
         "total_transcriptions": total_transcriptions,
         "text_transcriptions": text_transcriptions,
         "overall_completion_pct": completion_pct,
+        "total_words": int(total_words),
     }
 
 
@@ -723,14 +741,33 @@ def admin_queue(
         .one()
     )
 
+    # pages_started: at least one line touched
+    pages_started: int = db.execute(
+        select(func.count(func.distinct(Line.page_id))).where(
+            Line.transcription_count > 0
+        )
+    ).scalar_one()
+
+    # pages_covered: every line has >= 1 transcription
+    pages_covered: int = db.execute(
+        select(func.count(Page.id)).where(
+            select(Line.id).where(Line.page_id == Page.id).exists(),
+            ~select(Line.id)
+            .where(Line.page_id == Page.id, Line.transcription_count < 1)
+            .exists(),
+        )
+    ).scalar_one()
+
+    # pages_complete: every line has >= COMPLETION_TARGET transcriptions
     pages_complete: int = db.execute(
         select(func.count(Page.id)).where(
+            select(Line.id).where(Line.page_id == Page.id).exists(),
             ~select(Line.id)
             .where(
                 Line.page_id == Page.id,
                 Line.transcription_count < _COMPLETION_TARGET,
             )
-            .exists()
+            .exists(),
         )
     ).scalar_one()
 
@@ -749,8 +786,11 @@ def admin_queue(
     return {
         "total_lines": line_stats["total"],
         "lines_untouched": line_stats["untouched"],
+        "lines_with_any": line_stats["total"] - line_stats["untouched"],
         "lines_in_progress": line_stats["in_progress"],
         "lines_complete": line_stats["complete"],
+        "pages_started": pages_started,
+        "pages_covered": pages_covered,
         "pages_complete": pages_complete,
         "batches_complete": batches_complete,
     }

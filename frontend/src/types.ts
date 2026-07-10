@@ -51,6 +51,7 @@ export interface AdminStatsDTO {
   total_transcriptions: number
   text_transcriptions: number
   overall_completion_pct: number
+  total_words: number
 }
 
 export type UserRole = 'user' | 'curator' | 'admin'
@@ -82,8 +83,11 @@ export interface AdminCoverageDTO {
 export interface AdminQueueDTO {
   total_lines: number
   lines_untouched: number
+  lines_with_any: number
   lines_in_progress: number
   lines_complete: number
+  pages_started: number
+  pages_covered: number
   pages_complete: number
   batches_complete: number
 }

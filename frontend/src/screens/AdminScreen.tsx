@@ -58,18 +58,34 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
   return (
     <>
       <div>
-        <div className={css.sectionTitle}>Annotation Progress</div>
+        <div className={css.sectionTitle}>Volunteers</div>
         <div className={css.statRow}>
-          <StatCard value={fmt(stats.total_users)} label="Total volunteers" />
+          <StatCard value={fmt(stats.total_users)} label="Total registered" />
           <StatCard value={fmt(stats.active_today)} label="Active today" />
           <StatCard value={fmt(stats.active_this_week)} label="Active this week" />
-          <StatCard value={fmt(stats.text_transcriptions)} label="Text transcriptions" />
-          <StatCard value={fmt(stats.total_transcriptions)} label="Total submissions" />
-          <StatCard
-            value={pct(stats.overall_completion_pct)}
-            label="Lines complete"
-            accent="oklch(0.58 0.1 150)"
-          />
+          <StatCard value={fmt(stats.text_transcriptions)} label="Text submissions" />
+          <StatCard value={fmt(stats.total_transcriptions)} label="Total submissions (all kinds)" />
+          <StatCard value={fmt(stats.total_words)} label="Total words transcribed" />
+        </div>
+      </div>
+
+      <div>
+        <div className={css.sectionTitle}>Lines</div>
+        <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <StatCard value={fmt(queue.total_lines)} label="Total lines" />
+          <StatCard value={fmt(queue.lines_with_any)} label="Lines with ≥1 transcript" />
+          <StatCard value={fmt(queue.lines_complete)} label="Lines with ≥3 transcripts" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={pct(stats.overall_completion_pct)} label="Lines complete (≥3)" accent="oklch(0.58 0.1 150)" />
+        </div>
+      </div>
+
+      <div>
+        <div className={css.sectionTitle}>Pages</div>
+        <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <StatCard value={fmt(queue.pages_started)} label="Pages started (≥1 line touched)" />
+          <StatCard value={fmt(queue.pages_covered)} label="Pages fully covered (all lines ≥1)" />
+          <StatCard value={fmt(queue.pages_complete)} label="Pages complete (all lines ≥3)" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" accent="oklch(0.58 0.1 150)" />
         </div>
       </div>
 
@@ -97,20 +113,14 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.74 0.1 55)' }} />
-              In progress: {fmt(queue.lines_in_progress)}
+              In progress (1–2 transcripts): {fmt(queue.lines_in_progress)}
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.58 0.1 150)' }} />
-              Complete: {fmt(queue.lines_complete)}
+              Complete (≥3 transcripts): {fmt(queue.lines_complete)}
             </span>
           </div>
         </div>
-      </div>
-
-      <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <StatCard value={fmt(queue.total_lines)} label="Total lines" />
-        <StatCard value={fmt(queue.pages_complete)} label="Pages fully complete" />
-        <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" />
       </div>
 
       <div>
