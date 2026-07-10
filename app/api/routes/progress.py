@@ -1,4 +1,7 @@
+import bisect
+import time
 from datetime import UTC, date, datetime, timedelta
+from threading import Lock
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -18,6 +21,83 @@ router = APIRouter()
 _DAILY_GOAL = 30  # placeholder until per-user goals are stored
 _DAILY_WINDOW_DAYS = 70  # ≈10 weeks of heatmap history
 _DOCUMENTS_LIMIT = 60
+
+# ── Rank cache ────────────────────────────────────────────────────────────────
+# Stores per-user transcription counts for all leaderboard-visible users.
+# Shared across all requests; refreshed at most once per TTL window.
+
+_rank_cache_lock = Lock()
+_rank_cache_counts: list[int] = []        # sorted ascending
+_rank_cache_by_uid: dict[str, int] = {}   # user_id (str) -> count
+_rank_cache_at: float = 0.0
+_RANK_CACHE_TTL = 120.0  # seconds
+
+
+def _get_rank_cache(db: Session) -> tuple[list[int], dict[str, int]]:
+    global _rank_cache_counts, _rank_cache_by_uid, _rank_cache_at
+    now = time.monotonic()
+    with _rank_cache_lock:
+        if now - _rank_cache_at < _RANK_CACHE_TTL:
+            return _rank_cache_counts, _rank_cache_by_uid
+        rows = db.execute(
+            select(User.id, func.count(Transcription.id).label("cnt"))
+            .join(Transcription, Transcription.user_id == User.id)
+            .where(
+                Transcription.kind == TranscriptionKind.text,
+                User.show_on_leaderboard == True,
+            )
+            .group_by(User.id)
+        ).all()
+        by_uid: dict[str, int] = {str(uid): int(cnt) for uid, cnt in rows}
+        counts = sorted(by_uid.values())
+        _rank_cache_counts = counts
+        _rank_cache_by_uid = by_uid
+        _rank_cache_at = now
+        return counts, by_uid
+
+
+@router.get("/me/rank")
+def my_rank(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    # Cheap: single indexed COUNT for the current user's live count.
+    user_count = db.execute(
+        select(func.count(Transcription.id)).where(
+            Transcription.user_id == user.id,
+            Transcription.kind == TranscriptionKind.text,
+        )
+    ).scalar_one()
+
+    counts, by_uid = _get_rank_cache(db)
+
+    # Build a view of the cache that excludes the current user so their own
+    # score doesn't affect their rank among others.
+    uid_str = str(user.id)
+    other_counts = counts
+    if uid_str in by_uid:
+        idx = bisect.bisect_left(counts, by_uid[uid_str])
+        other_counts = counts[:idx] + counts[idx + 1:]
+
+    # Pure-Python rank computation — no more SQL after the cache hit.
+    above = [c for c in other_counts if c > user_count]
+    users_above = len(above)
+
+    if above:
+        next_threshold = min(above)
+        lines_to_next = next_threshold - user_count
+        target_rank = sum(1 for c in other_counts if c > next_threshold) + 1
+    else:
+        lines_to_next = None
+        target_rank = None
+
+    return {
+        "rank": users_above + 1,
+        "count": user_count,
+        "lines_to_next": lines_to_next,
+        "target_rank": target_rank,
+        "show_on_leaderboard": bool(user.show_on_leaderboard),
+    }
 
 
 @router.get("/me/progress")

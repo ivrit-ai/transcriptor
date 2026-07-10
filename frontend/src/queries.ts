@@ -40,4 +40,5 @@ export const queryKeys = {
     week:    ['leaderboard', 'week']    as const,
     streaks: ['leaderboard', 'streaks'] as const,
   },
+  rank: { me: ['rank', 'me'] as const },
 }

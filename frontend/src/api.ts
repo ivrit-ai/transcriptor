@@ -75,6 +75,14 @@ export interface DocumentDTO {
   skipped: boolean
 }
 
+export interface MyRankDTO {
+  rank: number
+  count: number
+  lines_to_next: number | null
+  target_rank: number | null
+  show_on_leaderboard: boolean
+}
+
 export interface CommunityDTO {
   lines: number
   pages: number
@@ -115,6 +123,11 @@ export const api = {
 
   getProfile: (): Promise<ProfileDTO | null> =>
     request<ProfileDTO>('/api/me/profile'),
+
+  getMyRank: (): Promise<MyRankDTO | null> =>
+    import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
+      ? Promise.resolve({ rank: 3, count: 42, lines_to_next: 5, target_rank: 2, show_on_leaderboard: true })
+      : request<MyRankDTO>('/api/me/rank'),
 
   getMyDocuments: (): Promise<DocumentDTO[] | null> =>
     request<DocumentDTO[]>('/api/me/documents'),
