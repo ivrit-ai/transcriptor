@@ -1161,11 +1161,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
-    { name = "boto3" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "numpy" },
-    { name = "pillow" },
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "pyjwt", extra = ["crypto"] },
@@ -1176,21 +1173,21 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "numpy" },
-    { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+]
+scripts = [
+    { name = "boto3" },
+    { name = "numpy" },
+    { name = "pillow" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.14.0" },
-    { name = "boto3", specifier = ">=1.35.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.28.0" },
-    { name = "numpy", specifier = ">=2.4.6" },
-    { name = "pillow", specifier = ">=12.2.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9.0" },
@@ -1201,11 +1198,14 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "numpy", specifier = ">=2.4.6" },
-    { name = "pillow", specifier = ">=12.2.0" },
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
+]
+scripts = [
+    { name = "boto3", specifier = ">=1.35.0" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "pillow", specifier = ">=12.2.0" },
 ]
 
 [[package]]

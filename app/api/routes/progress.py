@@ -39,6 +39,10 @@ def _get_rank_cache(db: Session) -> tuple[list[int], dict[str, int]]:
     with _rank_cache_lock:
         if now - _rank_cache_at < _RANK_CACHE_TTL:
             return _rank_cache_counts, _rank_cache_by_uid
+    # DB query outside the lock so other threads are not blocked during I/O.
+    # On exception, update _rank_cache_at so callers back off for a full TTL
+    # rather than hammering a down DB on every request.
+    try:
         rows = db.execute(
             select(User.id, func.count(Transcription.id).label("cnt"))
             .join(Transcription, Transcription.user_id == User.id)
@@ -48,8 +52,13 @@ def _get_rank_cache(db: Session) -> tuple[list[int], dict[str, int]]:
             )
             .group_by(User.id)
         ).all()
-        by_uid: dict[str, int] = {str(uid): int(cnt) for uid, cnt in rows}
-        counts = sorted(by_uid.values())
+    except Exception:
+        with _rank_cache_lock:
+            _rank_cache_at = now
+        raise
+    by_uid: dict[str, int] = {str(uid): int(cnt) for uid, cnt in rows}
+    counts = sorted(by_uid.values())
+    with _rank_cache_lock:
         _rank_cache_counts = counts
         _rank_cache_by_uid = by_uid
         _rank_cache_at = now

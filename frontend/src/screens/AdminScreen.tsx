@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react'
 import { useQueries, useQuery, useMutation } from '@tanstack/react-query'
 import { queryKeys, queryClient } from '../queries'
 import { api } from '../api'
-import type { AdminStatsDTO, AdminCoverageDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
+import type { AdminStatsDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
 import { UsersTab } from './UsersTab'
+import { BrowseTab } from './BrowseTab'
 import { TopNav } from '../components/shared'
 import css from './AdminScreen.module.css'
 
@@ -26,26 +27,65 @@ function StatCard({ value, label, accent }: { value: string | number; label: str
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
 function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueueDTO }) {
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
   const total = queue.total_lines || 1
   const untouchedW = (queue.lines_untouched / total * 100).toFixed(1)
   const inProgressW = (queue.lines_in_progress / total * 100).toFixed(1)
   const completeW = (queue.lines_complete / total * 100).toFixed(1)
 
+  const handleExport = async () => {
+    setExportLoading(true)
+    setExportError(null)
+    try {
+      const blob = await api.exportDataset()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'transcriptor_export.jsonl'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 100)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
     <>
       <div>
-        <div className={css.sectionTitle}>Annotation Progress</div>
+        <div className={css.sectionTitle}>Volunteers</div>
         <div className={css.statRow}>
-          <StatCard value={fmt(stats.total_users)} label="Total volunteers" />
+          <StatCard value={fmt(stats.total_users)} label="Total registered" />
           <StatCard value={fmt(stats.active_today)} label="Active today" />
           <StatCard value={fmt(stats.active_this_week)} label="Active this week" />
-          <StatCard value={fmt(stats.text_transcriptions)} label="Text transcriptions" />
-          <StatCard value={fmt(stats.total_transcriptions)} label="Total submissions" />
-          <StatCard
-            value={pct(stats.overall_completion_pct)}
-            label="Lines complete"
-            accent="oklch(0.58 0.1 150)"
-          />
+          <StatCard value={fmt(stats.text_transcriptions)} label="Text submissions" />
+          <StatCard value={fmt(stats.total_transcriptions)} label="Total submissions (all kinds)" />
+          <StatCard value={fmt(stats.total_words)} label="Total words transcribed" />
+        </div>
+      </div>
+
+      <div>
+        <div className={css.sectionTitle}>Lines</div>
+        <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <StatCard value={fmt(queue.total_lines)} label="Total lines" />
+          <StatCard value={fmt(queue.lines_with_any)} label="Lines with ≥1 transcript" />
+          <StatCard value={fmt(queue.lines_complete)} label="Lines with ≥3 transcripts" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={pct(stats.overall_completion_pct)} label="Lines complete (≥3)" accent="oklch(0.58 0.1 150)" />
+        </div>
+      </div>
+
+      <div>
+        <div className={css.sectionTitle}>Pages</div>
+        <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <StatCard value={fmt(queue.pages_started)} label="Pages started (≥1 line touched)" />
+          <StatCard value={fmt(queue.pages_covered)} label="Pages fully covered (all lines ≥1)" />
+          <StatCard value={fmt(queue.pages_complete)} label="Pages complete (all lines ≥3)" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" accent="oklch(0.58 0.1 150)" />
         </div>
       </div>
 
@@ -73,95 +113,42 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.74 0.1 55)' }} />
-              In progress: {fmt(queue.lines_in_progress)}
+              In progress (1–2 transcripts): {fmt(queue.lines_in_progress)}
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.58 0.1 150)' }} />
-              Complete: {fmt(queue.lines_complete)}
+              Complete (≥3 transcripts): {fmt(queue.lines_complete)}
             </span>
           </div>
         </div>
       </div>
 
-      <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <StatCard value={fmt(queue.total_lines)} label="Total lines" />
-        <StatCard value={fmt(queue.pages_complete)} label="Pages fully complete" />
-        <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" />
-      </div>
-    </>
-  )
-}
-
-// ── Coverage & Queue Tab ──────────────────────────────────────────────────────
-
-function CoverageTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; queue: AdminQueueDTO }) {
-  const total = queue.total_lines || 1
-  const untouchedW = (queue.lines_untouched / total * 100).toFixed(1)
-  const inProgressW = (queue.lines_in_progress / total * 100).toFixed(1)
-  const completeW = (queue.lines_complete / total * 100).toFixed(1)
-
-  return (
-    <>
       <div>
-        <div className={css.sectionTitle}>Queue Health</div>
+        <div className={css.sectionTitle}>Export Dataset</div>
         <div className={css.queueBarWrap}>
-          <div className={css.queueBar}>
-            <div className={css.queueSegment} style={{ width: `${untouchedW}%`, background: 'var(--tl-muted-fill)' }} />
-            <div className={css.queueSegment} style={{ width: `${inProgressW}%`, background: 'oklch(0.74 0.1 55)' }} />
-            <div className={css.queueSegment} style={{ width: `${completeW}%`, background: 'oklch(0.58 0.1 150)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button
+              onClick={handleExport}
+              disabled={exportLoading}
+              style={{
+                padding: '9px 22px',
+                fontSize: 13,
+                fontWeight: 600,
+                borderRadius: 8,
+                border: 'none',
+                background: exportLoading ? 'var(--tl-muted-fill)' : 'var(--tl-accent)',
+                color: exportLoading ? 'var(--tl-muted)' : '#fff',
+                cursor: exportLoading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              {exportLoading ? 'Preparing…' : 'Download JSONL'}
+            </button>
+            {exportError && (
+              <span style={{ fontSize: 13, color: 'oklch(0.55 0.18 25)' }}>{exportError}</span>
+            )}
           </div>
-          <div className={css.queueLegend}>
-            <span><span className={css.queueLegendDot} style={{ background: 'var(--tl-muted-fill)' }} />Untouched: {fmt(queue.lines_untouched)}</span>
-            <span><span className={css.queueLegendDot} style={{ background: 'oklch(0.74 0.1 55)' }} />In progress: {fmt(queue.lines_in_progress)}</span>
-            <span><span className={css.queueLegendDot} style={{ background: 'oklch(0.58 0.1 150)' }} />Complete: {fmt(queue.lines_complete)}</span>
-            <span style={{ marginLeft: 'auto' }}>Pages done: {fmt(queue.pages_complete)} · Manuscripts done: {fmt(queue.batches_complete)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div className={css.sectionTitle}>Coverage by Manuscript</div>
-        <div className={css.tableWrap}>
-          <table className={css.table}>
-            <thead>
-              <tr>
-                <th>Manuscript ID</th>
-                <th>Source</th>
-                <th style={{ textAlign: 'right' }}>Pages</th>
-                <th style={{ textAlign: 'right' }}>Lines</th>
-                <th>Completion</th>
-                <th style={{ textAlign: 'right' }}>Done</th>
-              </tr>
-            </thead>
-            <tbody>
-              {coverage.map(b => {
-                const done = b.completion_pct >= 100
-                return (
-                  <tr key={b.batch_id}>
-                    <td style={{ fontWeight: 500 }}>{b.external_id}</td>
-                    <td className={css.muted}>{b.source}</td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total_pages)}</td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total_lines)}</td>
-                    <td>
-                      <span className={css.progressBar}>
-                        <span
-                          className={`${css.progressFill} ${done ? css.progressFillComplete : ''}`}
-                          style={{ width: `${Math.min(100, b.completion_pct)}%` }}
-                        />
-                      </span>
-                      {pct(b.completion_pct)}
-                    </td>
-                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(b.lines_complete)} / {fmt(b.total_lines)}
-                    </td>
-                  </tr>
-                )
-              })}
-              {coverage.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>No manuscripts loaded</td></tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </>
@@ -555,7 +542,7 @@ export function AdminScreen() {
           <UsersTab users={users} />
         )}
         {!loading && tab === 'coverage' && queue && (
-          <CoverageTab coverage={coverage} queue={queue} />
+          <BrowseTab coverage={coverage} queue={queue} />
         )}
         {tab === 'import' && (
           <ImportTab />

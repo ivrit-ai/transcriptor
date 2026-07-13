@@ -43,6 +43,7 @@ def export_dataset(session: Session) -> list[dict]:
                 "id": str(page.id),
                 "external_id": page.external_id,
                 "image_path": page.image_path,
+                "image_rotation": page.image_rotation,
                 "width_px": page.width_px,
                 "height_px": page.height_px,
             },

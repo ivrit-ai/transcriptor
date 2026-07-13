@@ -51,6 +51,7 @@ export interface AdminStatsDTO {
   total_transcriptions: number
   text_transcriptions: number
   overall_completion_pct: number
+  total_words: number
 }
 
 export type UserRole = 'user' | 'curator' | 'admin'
@@ -82,8 +83,11 @@ export interface AdminCoverageDTO {
 export interface AdminQueueDTO {
   total_lines: number
   lines_untouched: number
+  lines_with_any: number
   lines_in_progress: number
   lines_complete: number
+  pages_started: number
+  pages_covered: number
   pages_complete: number
   batches_complete: number
 }
@@ -115,6 +119,35 @@ export interface AdminDatasetDTO {
   total_pages: number
 }
 
+export interface AdminTranscriptionDTO {
+  user_id: string
+  display_name: string
+  email: string
+  kind: string
+  text: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminBatchDTO {
+  id: string
+  external_id: string
+  source: string
+  license: string
+}
+
+export interface AdminPageDTO {
+  id: string
+  external_id: string
+  document_name?: string
+  image_path: string
+  image_rotation?: number
+  approved: boolean
+  rejected: boolean
+  total_lines: number
+  annotated_lines: number
+}
+
 export interface AdminPageLineDTO {
   id: string
   external_id?: string
@@ -123,6 +156,7 @@ export interface AdminPageLineDTO {
   polygon?: unknown
   transcription_count: number
   detection_confidence?: number | null
+  transcriptions?: AdminTranscriptionDTO[]
 }
 
 export interface AdminPageLinesDTO {
