@@ -644,6 +644,7 @@ def admin_export(
             Page.external_id.label("page_external_id"),
             Page.document_name,
             Page.image_path,
+            Page.image_rotation,
             Batch.id.label("batch_id"),
             Batch.external_id.label("batch_external_id"),
             Batch.source,
@@ -653,13 +654,10 @@ def admin_export(
             Transcription.text,
             Transcription.created_at.label("txn_created_at"),
             Transcription.updated_at.label("txn_updated_at"),
-            User.email,
-            User.display_name,
         )
         .join(Page, Page.id == Line.page_id)
         .join(Batch, Batch.id == Page.batch_id)
         .join(Transcription, Transcription.line_id == Line.id)
-        .join(User, User.id == Transcription.user_id)
         .where(Line.transcription_count >= 1)
         .order_by(Batch.external_id, Page.external_id, Line.line_index, Transcription.user_id)
     )
@@ -688,6 +686,7 @@ def admin_export(
                             "external_id": row["page_external_id"],
                             "document_name": row["document_name"],
                             "image_path": row["image_path"],
+                            "image_rotation": row["image_rotation"],
                         },
                         "batch": {
                             "id": str(row["batch_id"]),
@@ -700,8 +699,6 @@ def admin_export(
                 current_record["transcriptions"].append(  # type: ignore[index]
                     {
                         "user_id": str(row["user_id"]),
-                        "email": row["email"],
-                        "display_name": row["display_name"],
                         "kind": row["kind"].value,
                         "text": row["text"],
                         "created_at": row["txn_created_at"].isoformat(),
