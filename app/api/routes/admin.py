@@ -6,12 +6,14 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Session
 
 from app.api.deps import _effective_role, get_db, require_admin, require_curator
 from app.db import SessionLocal
 from app.models.batch import Batch
+from app.models.event import Event
 from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
@@ -797,6 +799,99 @@ def admin_queue(
         "pages_covered": pages_covered,
         "pages_complete": pages_complete,
         "batches_complete": batches_complete,
+    }
+
+
+# ── User-reported problems ────────────────────────────────────────────────────
+#
+# Backed by `Event` rows with event_type="reported_problem" (see
+# app/api/routes/session.py::report_problem) rather than a dedicated table.
+# page_id/batch_id live inside Event.payload (JSONB) for these events, so we
+# extract them with a `->>` cast to join back to Page/Batch; Event.line_id is
+# a real FK column and joins directly to Line when the reporter was focused
+# on a specific line.
+
+
+@router.get("/reports")
+def admin_reports(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    offset = (page - 1) * page_size
+
+    payload_page_id = cast(Event.payload["page_id"].astext, PG_UUID)
+
+    total: int = db.execute(
+        select(func.count(Event.id)).where(Event.event_type == "reported_problem")
+    ).scalar_one()
+
+    rows = (
+        db.execute(
+            select(
+                Event.id,
+                Event.created_at,
+                Event.payload,
+                Event.line_id,
+                User.id.label("user_id"),
+                User.display_name,
+                User.email,
+                Page.id.label("page_id"),
+                Page.external_id.label("page_external_id"),
+                Page.document_name,
+                Batch.id.label("batch_id"),
+                Batch.external_id.label("batch_external_id"),
+                Line.external_id.label("line_external_id"),
+                Line.line_index,
+            )
+            .join(User, User.id == Event.user_id)
+            .outerjoin(Page, Page.id == payload_page_id)
+            .outerjoin(Batch, Batch.id == Page.batch_id)
+            .outerjoin(Line, Line.id == Event.line_id)
+            .where(Event.event_type == "reported_problem")
+            .order_by(Event.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        .mappings()
+        .all()
+    )
+
+    items = [
+        {
+            "event_id": str(r["id"]),
+            "created_at": r["created_at"].isoformat(),
+            "description": (r["payload"] or {}).get("description"),
+            "user_id": str(r["user_id"]),
+            "display_name": r["display_name"],
+            "email": r["email"],
+            "page_id": str(r["page_id"])
+            if r["page_id"]
+            else (r["payload"] or {}).get("page_id"),
+            "page_external_id": r["page_external_id"]
+            or (r["payload"] or {}).get("page_external_id"),
+            "document_name": r["document_name"],
+            "batch_id": str(r["batch_id"])
+            if r["batch_id"]
+            else (r["payload"] or {}).get("batch_id"),
+            "batch_external_id": r["batch_external_id"]
+            or (r["payload"] or {}).get("batch_external_id"),
+            "line_id": str(r["line_id"]) if r["line_id"] else None,
+            "line_external_id": r["line_external_id"],
+            "line_index": r["line_index"],
+        }
+        for r in rows
+    ]
+
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": (total + page_size - 1) // page_size if page_size else 0,
     }
 
 

@@ -97,6 +97,19 @@
   width: fit-content;
 }
 
+.pageCardCurateLink {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tl-accent);
+  text-decoration: none;
+}
+
+.pageCardCurateLink:hover {
+  text-decoration: underline;
+}
+
 .pager {
   display: flex;
   align-items: center;

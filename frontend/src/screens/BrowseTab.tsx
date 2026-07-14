@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { queryKeys } from '../queries'
 import { api } from '../api'
 import { rotateBbox } from '../utils/bbox'
@@ -63,10 +64,18 @@ function PageListView({
         <>
           <div className={browseCss.pageGrid}>
             {pages.map((p) => (
-              <button
+              <div
                 key={p.id}
                 className={browseCss.pageCard}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelectPage(p.id, p.external_id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onSelectPage(p.id, p.external_id)
+                  }
+                }}
               >
                 <div className={browseCss.pageCardId}>{p.external_id}</div>
                 <div className={browseCss.pageCardMeta}>
@@ -75,7 +84,14 @@ function PageListView({
                 {p.approved && (
                   <span className={browseCss.pageCardBadge}>Approved</span>
                 )}
-              </button>
+                <Link
+                  to={`/curate/${p.id}`}
+                  className={browseCss.pageCardCurateLink}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Curate →
+                </Link>
+              </div>
             ))}
           </div>
 

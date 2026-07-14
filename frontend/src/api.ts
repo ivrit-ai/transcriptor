@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, AdminBatchDTO, AdminPageDTO } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, AdminBatchDTO, AdminPageDTO, ReportProblemBody, AdminReportsDTO } from './types'
 
 const BASE = ''
 
@@ -199,6 +199,19 @@ export const api = {
     import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
       ? Promise.resolve(null)
       : request<null>(`/api/pages/${pageId}/skip`, { method: 'POST' }),
+
+  reportProblem: (pageId: string, body: ReportProblemBody): Promise<{ event_id: string } | null> =>
+    import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
+      ? Promise.resolve(null)
+      : request<{ event_id: string }>(`/api/pages/${pageId}/report`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+
+  getAdminReports: (page = 1, pageSize = 50): Promise<AdminReportsDTO | null> => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    return request<AdminReportsDTO>(`/api/admin/reports?${params.toString()}`)
+  },
 
   getBatches: (): Promise<AdminBatchDTO[] | null> =>
     request<AdminBatchDTO[]>('/api/admin/batches'),

@@ -200,6 +200,38 @@ export interface UpdatePageLinesResponse {
   line_ids: string[] | null
 }
 
+// ── User-reported problems ───────────────────────────────────────────────────
+
+export interface ReportProblemBody {
+  description: string
+  line_id?: string
+}
+
+export interface AdminReportRowDTO {
+  event_id: string
+  created_at: string
+  description: string | null
+  user_id: string
+  display_name: string
+  email: string
+  page_id: string | null
+  page_external_id: string | null
+  document_name: string | null
+  batch_id: string | null
+  batch_external_id: string | null
+  line_id: string | null
+  line_external_id: string | null
+  line_index: number | null
+}
+
+export interface AdminReportsDTO {
+  items: AdminReportRowDTO[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
+
 // ── Import DTOs ───────────────────────────────────────────────────────────────
 
 export type ImportMode = 'local-folder' | 'default-s3' | 'custom-s3'

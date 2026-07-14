@@ -31,6 +31,7 @@ export const queryKeys = {
     importLogs: (tail: number) => ['admin', 'importLogs', tail] as const,
     batches: ['admin', 'batches'] as const,
     batchPages: (batchId: string, page: number, perPage: number) => ['admin', 'batchPages', batchId, page, perPage] as const,
+    reports: (page: number, pageSize: number) => ['admin', 'reports', page, pageSize] as const,
   },
   // Shared by CurateListScreen (filtered browsing) and CuratePageScreen
   // (unfiltered dataset-wide prev/next navigation) — same fetch, same cache.
