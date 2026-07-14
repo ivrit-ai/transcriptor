@@ -98,7 +98,7 @@ export function LandingScreen() {
           }}>תעתקו כתבי יד עבריים</h1>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 26 }}>
             <PrimaryBtn size="lg" onClick={onStart} style={{ width: '100%', justifyContent: 'center' }}>
-              התחל לתעתק <Icon name="forward" size={17} color="#fff" />
+              התחלו לתעתק <Icon name="forward" size={17} color="#fff" />
             </PrimaryBtn>
             <GhostBtn size="lg" onClick={onLearn} style={{ width: '100%', justifyContent: 'center' }}>
               איך זה עובד
@@ -162,7 +162,7 @@ export function LandingScreen() {
           }}>תעתקו כתבי יד עבריים</h1>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <PrimaryBtn size="lg" onClick={onStart}>
-              התחל לתעתק <Icon name="forward" size={18} color="#fff" />
+              התחלו לתעתק <Icon name="forward" size={18} color="#fff" />
             </PrimaryBtn>
             <GhostBtn size="lg" onClick={onLearn}>איך זה עובד</GhostBtn>
           </div>

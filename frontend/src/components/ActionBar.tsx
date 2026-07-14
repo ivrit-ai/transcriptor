@@ -17,15 +17,15 @@ export function ActionBar({ onSubmit, onFlagOpen, canSubmit }: ActionBarProps) {
       >
         ⚑ לא קריא / דיווח
       </button>
-      <span className={styles.hint}>לחץ F בשדה ריק לדיווח</span>
+      <span className={styles.hint}>לחצו F בשדה ריק לדיווח</span>
       <button
         type="button"
         className={styles.submitBtn}
         onClick={onSubmit}
         disabled={!canSubmit}
-        aria-label="שלח תעתוק והמשך לשורה הבאה"
+        aria-label="שילחו תעתוק והמשיכו לשורה הבאה"
       >
-        שלח והמשך ←
+        שילחו והמשיכו ←
       </button>
     </div>
   )

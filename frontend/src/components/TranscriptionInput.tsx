@@ -48,7 +48,7 @@ export function TranscriptionInput({
         onKeyDown={handleKeyDown}
         dir="rtl"
         lang="he"
-        placeholder="הקלד את הטקסט כאן…"
+        placeholder="הקלידו את הטקסט כאן…"
         rows={3}
         aria-label="שדה תעתוק"
       />
