@@ -266,7 +266,7 @@ function SpecialCharsPanel({ taRef, input, setInput }: {
   input: string
   setInput: (v: string) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   // Saved cursor position — captured on textarea blur so that when mousedown
   // on a char button blurs it (resetting selectionStart to 0 in most browsers)
   // we still have the original position.
