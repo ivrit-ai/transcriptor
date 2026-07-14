@@ -700,7 +700,7 @@ export function AnnotationViewer({
         )}
         <button
           onClick={fitToViewport}
-          aria-label="הצג את כל התמונה"
+          aria-label="הציגו את כל התמונה"
           style={{
             display: "inline-flex",
             alignItems: "center",

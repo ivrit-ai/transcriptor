@@ -19,19 +19,19 @@ function tenureLabel(joinedAt: string): string {
   const joined = new Date(joinedAt)
   if (Number.isNaN(joined.getTime())) return ''
   const days = Math.max(0, Math.floor((Date.now() - joined.getTime()) / 86_400_000))
-  if (days <= 0) return 'הצטרפת היום'
-  if (days === 1) return 'הצטרפת אתמול'
-  if (days < 7) return `הצטרפת לפני ${days} ימים`
+  if (days <= 0) return 'הצטרפתם היום'
+  if (days === 1) return 'הצטרפתם אתמול'
+  if (days < 7) return `הצטרפתם לפני ${days} ימים`
   if (days < 30) {
     const weeks = Math.floor(days / 7)
-    return weeks === 1 ? 'הצטרפת לפני שבוע' : `הצטרפת לפני ${weeks} שבועות`
+    return weeks === 1 ? 'הצטרפתם לפני שבוע' : `הצטרפתם לפני ${weeks} שבועות`
   }
   if (days < 365) {
     const months = Math.floor(days / 30)
-    return months === 1 ? 'הצטרפת לפני חודש' : `הצטרפת לפני ${months} חודשים`
+    return months === 1 ? 'הצטרפתם לפני חודש' : `הצטרפתם לפני ${months} חודשים`
   }
   const years = Math.floor(days / 365)
-  return years === 1 ? 'הצטרפת לפני שנה' : `הצטרפת לפני ${years} שנים`
+  return years === 1 ? 'הצטרפתם לפני שנה' : `הצטרפתם לפני ${years} שנים`
 }
 
 const HEATMAP_COLORS = ['var(--tl-muted-fill)', 'oklch(0.86 0.06 60)', 'oklch(0.74 0.1 55)', 'oklch(0.62 0.12 50)']
@@ -187,9 +187,9 @@ function ContribGrid({
 }
 
 function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: number; onOpen: () => void }) {
-  const title = doc.skipped ? 'עמוד שדילגת עליו — לחץ לפתיחה מחדש'
-    : doc.done ? 'עמוד שהושלם — לחץ לצפייה'
-    : 'המשך לעבוד על העמוד הזה'
+  const title = doc.skipped ? 'עמוד שדילגתם עליו — לחצו לפתיחה מחדש'
+    : doc.done ? 'עמוד שהושלם — לחצו לצפייה'
+    : 'המשיכו לעבוד על העמוד הזה'
 
   return (
     <div
@@ -213,7 +213,7 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
         />
         {doc.status == 'skipped' && (
           <span
-            title="דילגת על עמוד זה"
+            title="דילגתם על עמוד זה"
             style={{
               position: 'absolute', top: 0, insetInlineStart: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -241,7 +241,7 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
         )}
         {doc.status === 'done' && (
           <span
-            title="סיימת עמוד זה"
+            title="סיימתם עמוד זה"
             style={{
               position: 'absolute', top: 0, insetInlineStart: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -270,7 +270,7 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
           <>בעבודה · </>
         )}
         {doc.status === 'skipped' && (
-          <>דילגת · </>
+          <>דילגתם · </>
         )}
         {doc.status === 'done' && (
           <>הושלם · </>
@@ -294,7 +294,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
 
   const header = (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
-      כתבי היד שתעתקת
+      כתבי היד שתעתקתם
     </div>
   )
 
@@ -317,7 +317,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
   } else if (docs.length === 0) {
     body = (
       <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', padding: '8px 0 4px' }}>
-        עדיין לא תיעדת עמודים — התחילו לתעתק וכתבי היד שלכם יופיעו כאן.
+        עדיין לא תיעדתם עמודים — התחילו לתעתק וכתבי היד שלכם יופיעו כאן.
       </div>
     )
   } else {
@@ -381,7 +381,7 @@ export function ProgressScreen() {
           fontWeight: 500, color: 'var(--tl-ink)', margin: 0,
         }}>שלום, {ME.name}</h1>
         <p style={{ fontFamily: 'var(--font-ui)', fontSize: isMobile ? 14 : 15, color: 'var(--tl-muted)', margin: '4px 0 0' }}>
-          {ME.today >= ME.goal ? 'השלמת את היעד היומי — כל הכבוד' : `עוד ${ME.goal - ME.today} שורות להשלמת היעד היומי`}
+          {ME.today >= ME.goal ? 'השלמתם את היעד היומי — כל הכבוד' : `עוד ${ME.goal - ME.today} שורות להשלמת היעד היומי`}
         </p>
         {tenureLabel(ME.joined_at) && (
           <p style={{ fontFamily: 'var(--font-ui)', fontSize: isMobile ? 12 : 13, color: 'var(--tl-muted)', opacity: 0.85, margin: '2px 0 0' }}>
@@ -435,7 +435,7 @@ export function ProgressScreen() {
     }}>
       <div>
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? 19 : 22, fontWeight: 500, color: '#fff' }}>
-          ממשיכים מאיפה שעצרת
+          להמשיך מאיפה שעצרת
         </div>
         <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'rgba(255,255,255,0.82)', marginTop: 3 }}>
           המשיכו לתרום לתיעוד כתבי היד
@@ -446,7 +446,7 @@ export function ProgressScreen() {
         onClick={() => navigate('/work')}
         style={{ width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}
       >
-        המשך לתעתק <Icon name="forward" size={17} color="var(--tl-accent-text)" />
+        המשיכו לתעתק <Icon name="forward" size={17} color="var(--tl-accent-text)" />
       </button>
     </div>
   )

@@ -206,7 +206,7 @@ export function AboutScreen() {
                   תרומת כתב יד ↗
                 </a>
                 <PrimaryBtn size="md" onClick={() => navigate('/work')}>
-                  התחל לתרום עכשיו
+                  התחלו לתרום עכשיו
                 </PrimaryBtn>
               </div>
             </div>

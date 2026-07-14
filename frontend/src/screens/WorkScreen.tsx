@@ -197,7 +197,7 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
               fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
               color: '#fff', background: 'var(--tl-accent)',
             }}
-          >שלח ועבור</button>
+          >שילחו ועברו</button>
           <button
             onClick={onMoveOnly}
             style={{
@@ -207,7 +207,7 @@ function NavConfirmDialog({ onSubmitAndMove, onMoveOnly, onCancel, message }: {
               background: 'var(--tl-muted-fill)',
               border: '0.5px solid var(--tl-border)',
             }}
-          >עבור בלי לשלוח</button>
+          >עברו בלי לשלוח</button>
         </div>
         <button
           onClick={onCancel}
@@ -791,7 +791,7 @@ export function WorkScreen() {
         dir="rtl"
         lang="he"
         value={L.input}
-        placeholder="הקלד את הטקסט מהשורה המודגשת…"
+        placeholder="הקלידו את הטקסט מהשורה המודגשת…"
         onChange={(e) => L.setInput(e.target.value)}
         onKeyDown={onKeyDown}
       />
@@ -891,14 +891,14 @@ export function WorkScreen() {
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--tl-muted)')}
         >
           <Icon name="back" size={13} color="currentColor" />
-          עבור לעמוד אחר
+          עברו לעמוד אחר
         </button>
         <button
           className="tl-submit"
           onClick={() => { L.submit(); taRef.current?.focus() }}
           disabled={!L.input.trim() || !!L.submitError}
         >
-          <span>{L.editing ? 'עדכן והמשך' : 'שלח והמשך'}</span>
+          <span>{L.editing ? 'עדכנו והמשיכו' : 'שילחו והמשיכו'}</span>
           <Icon name="forward" size={16} color="#fff" />
           <span className="tl-kbd">Enter</span>
         </button>

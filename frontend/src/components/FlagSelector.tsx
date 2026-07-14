@@ -72,7 +72,7 @@ export function FlagSelector({
                 key={r.kind}
                 className="tl-reason-inline"
                 onClick={() => setOtherOpen(!otherOpen)}
-                title={`אחר — פתח תיבת הסבר (Ctrl+${i + 1})`}
+                title={`אחר — פתחו תיבת הסבר (Ctrl+${i + 1})`}
                 style={activeFlagKind === 'other' || otherOpen ? {
                   background: activeFlagKind === 'other' ? 'oklch(0.96 0.03 15)' : 'var(--tl-muted-fill)',
                   color: activeFlagKind === 'other' ? 'oklch(0.42 0.14 15)' : 'var(--tl-ink)',
@@ -133,7 +133,7 @@ export function FlagSelector({
                 transition: 'background 0.12s, color 0.12s',
                 flexShrink: 0,
               }}
-            >שלח</button>
+            >שילחו</button>
           </div>
         )}
       </>
@@ -246,7 +246,7 @@ export function FlagSelector({
               flexShrink: 0,
               minHeight: 44,
             }}
-          >שלח</button>
+          >שילחו</button>
         </div>
       )}
     </div>

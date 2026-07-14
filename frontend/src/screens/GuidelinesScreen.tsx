@@ -440,7 +440,7 @@ export function GuidelinesScreen() {
             onClick={() => navigate("/work")}
             style={{ width: "100%", justifyContent: "center" }}
           >
-            התחל לתעתק <Icon name="forward" size={17} color="#fff" />
+            התחלו לתעתק <Icon name="forward" size={17} color="#fff" />
           </PrimaryBtn>
         </div>
       </div>
@@ -498,7 +498,7 @@ export function GuidelinesScreen() {
         {advancedBlock}
         <div style={{ marginTop: 40 }}>
           <PrimaryBtn size="lg" onClick={() => navigate("/work")}>
-            התחל לתעתק <Icon name="forward" size={18} color="#fff" />
+            התחלו לתעתק <Icon name="forward" size={18} color="#fff" />
           </PrimaryBtn>
         </div>
       </div>

@@ -98,7 +98,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
           {isMobile ? (
             <button
               onClick={() => setMobileMenuOpen(p => !p)}
-              aria-label={mobileMenuOpen ? 'סגור תפריט' : 'פתח תפריט'}
+              aria-label={mobileMenuOpen ? 'סגורו תפריט' : 'פתחו תפריט'}
               style={{
                 background: 'none',
                 border: 'none',
@@ -207,7 +207,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
                   </>
                 )}
                 <PrimaryBtn size="sm" onClick={() => navigate(isAuthenticated ? '/work' : '/auth')}>
-                  {isAuthenticated ? 'המשך' : 'התחל'}
+                  {isAuthenticated ? 'המשיכו' : 'התחילו'}
                 </PrimaryBtn>
               </div>
             </>

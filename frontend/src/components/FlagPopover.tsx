@@ -66,7 +66,7 @@ export function FlagPopover({ isOpen, onClose, onSelect }: FlagPopoverProps) {
         aria-label="סיבת דיווח"
         style={{ position: 'fixed', bottom: '80px', right: '1rem' }}
       >
-        <div className={styles.title}>בחר סיבה</div>
+        <div className={styles.title}>בחרו סיבה</div>
         {FLAG_OPTIONS.map((opt, idx) => (
           <button
             key={opt.kind}
