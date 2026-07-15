@@ -96,6 +96,14 @@ export interface AdminQueueDTO {
 
 export type PageStatusFilter = 'approved' | 'rejected'
 
+// Independent, case-insensitive "contains" filters on the human-readable
+// manuscript/page ids. Distinct from each other and from `status`.
+export interface PageListFilters {
+  batchId?: string
+  pageId?: string
+  batchExternalId?: string
+}
+
 export interface AdminDatasetRowDTO {
   page_id: string
   page_external_id: string

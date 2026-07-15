@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, AdminBatchDTO, AdminPageDTO, ReportProblemBody, AdminReportsDTO } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, PageListFilters, AdminBatchDTO, AdminPageDTO, ReportProblemBody, AdminReportsDTO } from './types'
 
 const BASE = ''
 
@@ -168,9 +168,17 @@ export const api = {
   // Flat, paginated, optionally status-filtered page list. Shared by
   // CurateListScreen (filtered browsing) and CuratePageScreen (unfiltered
   // dataset-wide prev/next navigation).
-  getPages: (page = 1, pageSize = 50, statuses: PageStatusFilter[] = []): Promise<AdminDatasetDTO | null> => {
+  getPages: (
+    page = 1,
+    pageSize = 50,
+    statuses: PageStatusFilter[] = [],
+    filters: PageListFilters = {},
+  ): Promise<AdminDatasetDTO | null> => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     for (const s of statuses) params.append('status', s)
+    if (filters.batchId) params.append('batch_id', filters.batchId)
+    if (filters.pageId) params.append('page_id', filters.pageId)
+    if (filters.batchExternalId) params.append('batch_external_id', filters.batchExternalId)
     return request<AdminDatasetDTO>(`/api/admin/pages?${params.toString()}`)
   },
 

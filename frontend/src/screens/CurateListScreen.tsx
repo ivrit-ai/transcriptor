@@ -3,12 +3,101 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
-import type { PageStatusFilter } from '../types'
+import type { PageStatusFilter, PageListFilters } from '../types'
 import { TopNav, PageLinesPreview } from '../components/shared'
 import css from './CurateListScreen.module.css'
 
 const PAGE_SIZE = 20
 const MAX_TRANSCRIPTIONS = 3
+
+// ── Internal-id filter field (batch_id / page_id UUID) ──────────────────────
+//
+// Draft input is uncommitted until "Filter" is clicked (or Enter pressed);
+// "Clear" resets both the draft and the applied filter. Two independent
+// instances of this (batch id, page id) are rendered side by side and combine
+// as an AND with each other and with the status checkboxes.
+
+function IdFilterField({
+  label,
+  placeholder,
+  draft,
+  applied,
+  onDraftChange,
+  onApply,
+  onClear,
+}: {
+  label: string
+  placeholder: string
+  draft: string
+  applied: string
+  onDraftChange: (v: string) => void
+  onApply: () => void
+  onClear: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13, color: 'var(--tl-muted)' }}>{label}</span>
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onApply()
+        }}
+        placeholder={placeholder}
+        style={{
+          padding: '4px 8px',
+          fontSize: 13,
+          fontFamily: 'var(--font-ui)',
+          borderRadius: 6,
+          border: '0.5px solid var(--tl-border)',
+          background: 'var(--tl-surface)',
+          color: 'var(--tl-ink)',
+          outline: 'none',
+          width: 140,
+        }}
+      />
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={!draft.trim()}
+        style={{
+          padding: '4px 10px',
+          fontSize: 12,
+          fontWeight: 500,
+          fontFamily: 'var(--font-ui)',
+          borderRadius: 6,
+          border: '0.5px solid var(--tl-accent)',
+          background: 'var(--tl-accent)',
+          color: '#fff',
+          cursor: draft.trim() ? 'pointer' : 'not-allowed',
+          opacity: draft.trim() ? 1 : 0.5,
+        }}
+      >
+        Filter
+      </button>
+      {applied && (
+        <button
+          type="button"
+          onClick={onClear}
+          style={{
+            padding: '4px 10px',
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: 'var(--font-ui)',
+            borderRadius: 6,
+            border: '0.5px solid var(--tl-border)',
+            background: 'var(--tl-surface)',
+            color: 'var(--tl-muted)',
+            cursor: 'pointer',
+          }}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  )
+}
 
 // ── Main screen ──────────────────────────────────────────────────────────────
 //
@@ -24,6 +113,58 @@ export function CurateListScreen() {
   const [globalIdx, setGlobalIdx] = useState(0)
   const [statuses, setStatuses] = useState<PageStatusFilter[]>([])
   const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
+
+  // Internal Batch ID / Page ID (UUID) filters — independent of each other
+  // and of `statuses`. Uncommitted "draft" text only takes effect once the
+  // user clicks "Filter" (or presses Enter); "Clear" resets both.
+  const [batchIdDraft, setBatchIdDraft] = useState('')
+  const [batchIdFilter, setBatchIdFilter] = useState('')
+  const [pageIdDraft, setPageIdDraft] = useState('')
+  const [pageIdFilter, setPageIdFilter] = useState('')
+  const [extBatchIdDraft, setExtBatchIdDraft] = useState('')
+  const [extBatchIdFilter, setExtBatchIdFilter] = useState('')
+
+  const filters: PageListFilters = useMemo(
+    () => ({
+      batchId: batchIdFilter || undefined,
+      pageId: pageIdFilter || undefined,
+      batchExternalId: extBatchIdFilter || undefined,
+    }),
+    [batchIdFilter, pageIdFilter, extBatchIdFilter],
+  )
+
+  const applyBatchFilter = useCallback(() => {
+    setBatchIdFilter(batchIdDraft.trim())
+    setGlobalIdx(0)
+  }, [batchIdDraft])
+
+  const clearBatchFilter = useCallback(() => {
+    setBatchIdDraft('')
+    setBatchIdFilter('')
+    setGlobalIdx(0)
+  }, [])
+
+  const applyPageFilter = useCallback(() => {
+    setPageIdFilter(pageIdDraft.trim())
+    setGlobalIdx(0)
+  }, [pageIdDraft])
+
+  const clearPageFilter = useCallback(() => {
+    setPageIdDraft('')
+    setPageIdFilter('')
+    setGlobalIdx(0)
+  }, [])
+
+  const applyExtBatchFilter = useCallback(() => {
+    setExtBatchIdFilter(extBatchIdDraft.trim())
+    setGlobalIdx(0)
+  }, [extBatchIdDraft])
+
+  const clearExtBatchFilter = useCallback(() => {
+    setExtBatchIdDraft('')
+    setExtBatchIdFilter('')
+    setGlobalIdx(0)
+  }, [])
 
   const listRef = useRef<HTMLDivElement>(null)
   const lastTotalRef = useRef(0)
@@ -43,8 +184,8 @@ export function CurateListScreen() {
   }, [curators])
 
   const { data: pageData, isFetching } = useQuery({
-    queryKey: queryKeys.pages(neededServerPage, PAGE_SIZE, statuses),
-    queryFn: () => api.getPages(neededServerPage, PAGE_SIZE, statuses),
+    queryKey: queryKeys.pages(neededServerPage, PAGE_SIZE, statuses, filters),
+    queryFn: () => api.getPages(neededServerPage, PAGE_SIZE, statuses, filters),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   })
@@ -113,6 +254,33 @@ export function CurateListScreen() {
             )}
           </div>
           <div className={css.filters}>
+            <IdFilterField
+              label="Batch ID"
+              placeholder="UUID"
+              draft={batchIdDraft}
+              applied={batchIdFilter}
+              onDraftChange={setBatchIdDraft}
+              onApply={applyBatchFilter}
+              onClear={clearBatchFilter}
+            />
+            <IdFilterField
+              label="Page ID"
+              placeholder="UUID"
+              draft={pageIdDraft}
+              applied={pageIdFilter}
+              onDraftChange={setPageIdDraft}
+              onApply={applyPageFilter}
+              onClear={clearPageFilter}
+            />
+            <IdFilterField
+              label="External Batch ID"
+              placeholder="e.g. nli-batch-2024"
+              draft={extBatchIdDraft}
+              applied={extBatchIdFilter}
+              onDraftChange={setExtBatchIdDraft}
+              onApply={applyExtBatchFilter}
+              onClear={clearExtBatchFilter}
+            />
             <label className={css.filterCheck}>
               <input
                 type="checkbox"
@@ -152,7 +320,7 @@ export function CurateListScreen() {
               <div className={css.rowList}>
                 <div className={css.headerRow}>
                   <span className={css.colExternalId}>Page</span>
-                  <span className={css.colBatchId}>Batch</span>
+                  <span className={css.colBatchId}>Batch ID</span>
                   <span className={css.colApproved}>Approved?</span>
                   <span className={css.colApprovedBy}>Approved By</span>
                   <span className={css.colRejected}>Rejected?</span>
@@ -170,7 +338,7 @@ export function CurateListScreen() {
                       onClick={() => goTo((neededServerPage - 1) * PAGE_SIZE + i)}
                     >
                       <span className={css.colExternalId}>{row.page_external_id}</span>
-                      <span className={css.colBatchId}>{row.batch_external_id}</span>
+                      <span className={css.colBatchId}>{row.batch_id}</span>
                       <span className={css.colApproved}>{row.approved ? '✓' : '—'}</span>
                       <span className={css.colApprovedBy}>{curatorMap.get(row.approved_by ?? '') ?? row.approved_by ?? '—'}</span>
                       <span className={css.colRejected}>{row.rejected ? '✗' : '—'}</span>
@@ -286,7 +454,7 @@ export function CurateListScreen() {
               <>
                 <div className={css.previewMeta}>
                   {preview.external_id}
-                  <span className={css.previewMetaBatch}>{selectedRow.batch_external_id}</span>
+                  <span className={css.previewMetaBatch}>{selectedRow.batch_id}</span>
                 </div>
                 <PageLinesPreview
                   imageUrl={preview.image_url}
