@@ -96,6 +96,14 @@ export interface AdminQueueDTO {
 
 export type PageStatusFilter = 'approved' | 'rejected'
 
+// Independent, case-insensitive "contains" filters on the human-readable
+// manuscript/page ids. Distinct from each other and from `status`.
+export interface PageListFilters {
+  batchId?: string
+  pageId?: string
+  batchExternalId?: string
+}
+
 export interface AdminDatasetRowDTO {
   page_id: string
   page_external_id: string
@@ -198,6 +206,38 @@ export interface UpdatePageLinesResponse {
   approved: boolean
   rejected: boolean
   line_ids: string[] | null
+}
+
+// ── User-reported problems ───────────────────────────────────────────────────
+
+export interface ReportProblemBody {
+  description: string
+  line_id?: string
+}
+
+export interface AdminReportRowDTO {
+  event_id: string
+  created_at: string
+  description: string | null
+  user_id: string
+  display_name: string
+  email: string
+  page_id: string | null
+  page_external_id: string | null
+  document_name: string | null
+  batch_id: string | null
+  batch_external_id: string | null
+  line_id: string | null
+  line_external_id: string | null
+  line_index: number | null
+}
+
+export interface AdminReportsDTO {
+  items: AdminReportRowDTO[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
 }
 
 // ── Import DTOs ───────────────────────────────────────────────────────────────

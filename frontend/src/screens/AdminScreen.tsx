@@ -5,13 +5,14 @@ import { api } from '../api'
 import type { AdminStatsDTO, AdminQueueDTO, ImportStartBody, ImportMode } from '../types'
 import { UsersTab } from './UsersTab'
 import { BrowseTab } from './BrowseTab'
+import { ReportsTab } from './ReportsTab'
 import { TopNav } from '../components/shared'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
 
-type Tab = 'overview' | 'users' | 'coverage' | 'import'
+type Tab = 'overview' | 'users' | 'coverage' | 'reports' | 'import'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -510,6 +511,7 @@ export function AdminScreen() {
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: `Users${users.length ? ` (${users.length})` : ''}` },
     { id: 'coverage', label: 'Coverage & Queue' },
+    { id: 'reports', label: 'Reported Problems' },
     { id: 'import', label: 'Import' },
   ]
 
@@ -543,6 +545,9 @@ export function AdminScreen() {
         )}
         {!loading && tab === 'coverage' && queue && (
           <BrowseTab coverage={coverage} queue={queue} />
+        )}
+        {tab === 'reports' && (
+          <ReportsTab />
         )}
         {tab === 'import' && (
           <ImportTab />

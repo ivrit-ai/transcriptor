@@ -7,6 +7,7 @@ import { useLoop } from '../hooks/useLoop'
 import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
 import { GuidelinesModal } from '../components/GuidelinesModal'
+import { ReportProblemModal } from '../components/ReportProblemModal'
 import { FlagSelector } from '../components/FlagSelector'
 import { AnnotationViewer } from '../components/AnnotationViewer'
 import css from './WorkScreen.module.css'
@@ -449,6 +450,7 @@ export function WorkScreen() {
   const rightResizeDrag = useRef<{ startX: number; startWidth: number } | null>(null)
   const [focusedRecalcKey, setFocusedRecalcKey] = useState(0)
   const [guidelinesOpen, setGuidelinesOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const wide = viewportW >= 960
 
@@ -972,6 +974,23 @@ export function WorkScreen() {
           >
             הנחיות לתעתוק
           </button>
+          <button
+            onClick={() => setReportOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.55 0.15 30)',
+              background: 'none', border: '0.5px solid oklch(0.55 0.15 30 / 0.3)',
+              borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.55 0.15 30 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <Icon name="flag" size={12} color="oklch(0.55 0.15 30)" />
+            דווח על בעיה
+          </button>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
             <div style={{
               fontSize: 13, fontWeight: 600,
@@ -1074,6 +1093,23 @@ export function WorkScreen() {
           >
             הנחיות לתעתוק
           </button>
+          <button
+            onClick={() => setReportOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.55 0.15 30)',
+              background: 'none', border: '0.5px solid oklch(0.55 0.15 30 / 0.3)',
+              borderRadius: 8, padding: '3px 8px', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.55 0.15 30 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <Icon name="flag" size={11} color="oklch(0.55 0.15 30)" />
+            דווח על בעיה
+          </button>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
             <div style={{
               fontSize: 12, fontWeight: 600,
@@ -1136,6 +1172,13 @@ export function WorkScreen() {
         />
       )}
       {guidelinesOpen && <GuidelinesModal onClose={() => setGuidelinesOpen(false)} />}
+      {reportOpen && page && (
+        <ReportProblemModal
+          pageId={page.page_id}
+          lineId={L.current?.id}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   )
 }

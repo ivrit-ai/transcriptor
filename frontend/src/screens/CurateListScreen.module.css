@@ -30,6 +30,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .filterCheck {
@@ -161,7 +162,7 @@
 }
 
 .colBatchId {
-  flex: 0 0 110px;
+  flex: 0 0 220px;
   min-width: 0;
   font-family: var(--font-mono, monospace);
   font-size: 12px;
