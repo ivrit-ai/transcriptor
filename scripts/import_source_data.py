@@ -196,6 +196,7 @@ def import_source_data(
             continue
 
         metadata = json.loads(metadata_path.read_text())
+        submitter_fingerprint = metadata.get("submitter_fingerprint") if metadata else None
 
         # Upsert Batch
         batch = session.execute(
@@ -207,6 +208,7 @@ def import_source_data(
                 source=source,
                 license=license_,
                 source_metadata=metadata if metadata else None,
+                submitter_fingerprint=submitter_fingerprint,
             )
             session.add(batch)
             session.flush()
@@ -214,6 +216,7 @@ def import_source_data(
         else:
             batch.source = source
             batch.license = license_
+            batch.submitter_fingerprint = submitter_fingerprint
             if metadata:
                 batch.source_metadata = metadata
 
