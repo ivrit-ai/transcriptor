@@ -112,7 +112,7 @@ export function CurateListScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [globalIdx, setGlobalIdx] = useState(0)
-  const [statuses, setStatuses] = useState<PageStatusFilter[]>([])
+  const [statusFilter, setStatusFilter] = useState<PageStatusFilter | 'unreviewed' | ''>('')
   const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
 
   // Internal Batch ID / Page ID (UUID) filters — independent of each other
@@ -198,6 +198,13 @@ export function CurateListScreen() {
     return m
   }, [curators])
 
+  const statuses = useMemo(() => {
+    if (statusFilter === 'approved') return ['approved'] as PageStatusFilter[]
+    if (statusFilter === 'rejected') return ['rejected'] as PageStatusFilter[]
+    if (statusFilter === 'unreviewed') return ['unreviewed'] as PageStatusFilter[]
+    return [] as PageStatusFilter[]
+  }, [statusFilter])
+
   const { data: pageData, isFetching } = useQuery({
     queryKey: queryKeys.pages(neededServerPage, PAGE_SIZE, statuses, filters),
     queryFn: () => api.getPages(neededServerPage, PAGE_SIZE, statuses, filters),
@@ -227,11 +234,6 @@ export function CurateListScreen() {
     const clamped = Math.max(0, Math.min(next, clampedMax))
     setGlobalIdx(clamped)
   }, [clampedMax])
-
-  const toggleStatus = useCallback((s: PageStatusFilter) => {
-    setStatuses((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
-    setGlobalIdx(0)
-  }, [])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); goTo(globalIdx + 1) }
@@ -306,20 +308,29 @@ export function CurateListScreen() {
               onClear={clearSubmitterEmailFilter}
             />
             <label className={css.filterCheck}>
-              <input
-                type="checkbox"
-                checked={statuses.includes('approved')}
-                onChange={() => toggleStatus('approved')}
-              />
-              Only approved
-            </label>
-            <label className={css.filterCheck}>
-              <input
-                type="checkbox"
-                checked={statuses.includes('rejected')}
-                onChange={() => toggleStatus('rejected')}
-              />
-              Only rejected
+              Status
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as PageStatusFilter | 'unreviewed' | '')
+                  setGlobalIdx(0)
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-ui)',
+                  borderRadius: 6,
+                  border: '0.5px solid var(--tl-border)',
+                  background: 'var(--tl-surface)',
+                  color: 'var(--tl-ink)',
+                  outline: 'none',
+                }}
+              >
+                <option value="">All</option>
+                <option value="unreviewed">Unreviewed</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </label>
           </div>
         </div>

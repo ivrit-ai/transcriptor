@@ -278,7 +278,7 @@ def admin_coverage(
     ]
 
 
-_VALID_PAGE_STATUSES = {"approved", "rejected"}
+_VALID_PAGE_STATUSES = {"approved", "rejected", "unreviewed"}
 
 
 @router.get("/batches")
@@ -326,6 +326,9 @@ def admin_pages(
     Omitted/empty means no filtering (all pages). When multiple values are
     given they are OR'd together (e.g. both -> approved OR rejected).
 
+    `unreviewed` as a status value means pages where both `approved` and
+    `rejected` are false. It can be combined with other statuses.
+
     `batch_id` and `page_id` are exact-match filters on the system-internal
     UUIDs of the batch and page respectively. `batch_external_id` is a
     case-insensitive "contains" filter on the human-readable batch id.
@@ -366,7 +369,10 @@ def admin_pages(
             conds.append(Page.approved.is_(True))
         if "rejected" in statuses:
             conds.append(Page.rejected.is_(True))
-        status_filter = or_(*conds)
+        if "unreviewed" in statuses:
+            conds.append(Page.approved.is_(False) & Page.rejected.is_(False))
+        if conds:
+            status_filter = or_(*conds)
 
     total_lines_sq = (
         select(func.count(Line.id))
