@@ -171,6 +171,7 @@ function ImportTab() {
   const [license, setLicense] = useState('CC-BY-4.0')
   const [dataPath, setDataPath] = useState('')
   const [clearExisting, setClearExisting] = useState(false)
+  const [metadataOnly, setMetadataOnly] = useState(false)
   const [s3Key, setS3Key] = useState('')
   const [s3Secret, setS3Secret] = useState('')
   const [s3Region, setS3Region] = useState('')
@@ -225,6 +226,7 @@ function ImportTab() {
       source: source.trim(),
       license: license.trim(),
       clear_existing: clearExisting,
+      metadata_only: metadataOnly,
       data_path: mode === 'default-s3' && !dataPath.trim() ? null : dataPath.trim() || null,
       ...(mode === 'custom-s3'
         ? { s3_key: s3Key.trim(), s3_secret: s3Secret.trim(), s3_region: s3Region.trim() }
@@ -277,6 +279,7 @@ function ImportTab() {
                 <div><span className={css.muted}>Path: </span>{importStatus.data_path}</div>
               )}
               <div><span className={css.muted}>Clear existing: </span>{importStatus.clear_existing ? 'Yes' : 'No'}</div>
+              <div><span className={css.muted}>Metadata only: </span>{importStatus.metadata_only ? 'Yes' : 'No'}</div>
               {importStatus.started_at && (
                 <div><span className={css.muted}>Started: </span>{new Date(importStatus.started_at).toLocaleString()}</div>
               )}
@@ -402,8 +405,21 @@ function ImportTab() {
                 type="checkbox"
                 checked={clearExisting}
                 onChange={e => setClearExisting(e.target.checked)}
+                disabled={metadataOnly}
               />
               Clear existing submissions in manifest before import
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={metadataOnly}
+                onChange={e => {
+                  setMetadataOnly(e.target.checked)
+                  if (e.target.checked) setClearExisting(false)
+                }}
+              />
+              Update metadata only for existing submissions
             </label>
 
             {error && (

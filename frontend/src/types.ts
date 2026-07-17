@@ -102,6 +102,7 @@ export interface PageListFilters {
   batchId?: string
   pageId?: string
   batchExternalId?: string
+  submitterEmail?: string
 }
 
 export interface AdminDatasetRowDTO {
@@ -252,6 +253,7 @@ export interface ImportStatusDTO {
   license: string | null
   data_path: string | null
   clear_existing: boolean
+  metadata_only: boolean
   started_at: string | null
   finished_at: string | null
   exit_code: number | null
@@ -264,6 +266,7 @@ export interface ImportStartBody {
   license: string
   data_path?: string | null
   clear_existing: boolean
+  metadata_only: boolean
   s3_key?: string | null
   s3_secret?: string | null
   s3_region?: string | null

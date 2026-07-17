@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     local_data_dir: str = "data_sample"
     images_serve_origin: str = ""
     admin_emails: list[str] = []
+    submitter_fingerprint_salt: str = ""
 
     @field_validator("admin_emails", mode="before")
     @classmethod

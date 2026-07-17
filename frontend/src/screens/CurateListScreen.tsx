@@ -123,14 +123,17 @@ export function CurateListScreen() {
   const [pageIdFilter, setPageIdFilter] = useState('')
   const [extBatchIdDraft, setExtBatchIdDraft] = useState('')
   const [extBatchIdFilter, setExtBatchIdFilter] = useState('')
+  const [submitterEmailDraft, setSubmitterEmailDraft] = useState('')
+  const [submitterEmailFilter, setSubmitterEmailFilter] = useState('')
 
   const filters: PageListFilters = useMemo(
     () => ({
       batchId: batchIdFilter || undefined,
       pageId: pageIdFilter || undefined,
       batchExternalId: extBatchIdFilter || undefined,
+      submitterEmail: submitterEmailFilter || undefined,
     }),
-    [batchIdFilter, pageIdFilter, extBatchIdFilter],
+    [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter],
   )
 
   const applyBatchFilter = useCallback(() => {
@@ -163,6 +166,17 @@ export function CurateListScreen() {
   const clearExtBatchFilter = useCallback(() => {
     setExtBatchIdDraft('')
     setExtBatchIdFilter('')
+    setGlobalIdx(0)
+  }, [])
+
+  const applySubmitterEmailFilter = useCallback(() => {
+    setSubmitterEmailFilter(submitterEmailDraft.trim())
+    setGlobalIdx(0)
+  }, [submitterEmailDraft])
+
+  const clearSubmitterEmailFilter = useCallback(() => {
+    setSubmitterEmailDraft('')
+    setSubmitterEmailFilter('')
     setGlobalIdx(0)
   }, [])
 
@@ -280,6 +294,15 @@ export function CurateListScreen() {
               onDraftChange={setExtBatchIdDraft}
               onApply={applyExtBatchFilter}
               onClear={clearExtBatchFilter}
+            />
+            <IdFilterField
+              label="Submitter Email"
+              placeholder="user@example.com"
+              draft={submitterEmailDraft}
+              applied={submitterEmailFilter}
+              onDraftChange={setSubmitterEmailDraft}
+              onApply={applySubmitterEmailFilter}
+              onClear={clearSubmitterEmailFilter}
             />
             <label className={css.filterCheck}>
               <input
