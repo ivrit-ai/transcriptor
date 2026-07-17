@@ -94,7 +94,7 @@ export interface AdminQueueDTO {
 
 // ── Dataset (admin page browser) DTOs ────────────────────────────────────────
 
-export type PageStatusFilter = 'approved' | 'rejected'
+export type PageStatusFilter = 'approved' | 'rejected' | 'unreviewed'
 
 // Independent, case-insensitive "contains" filters on the human-readable
 // manuscript/page ids. Distinct from each other and from `status`.
