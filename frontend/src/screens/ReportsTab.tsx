@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { queryKeys } from '../queries'
 import { api } from '../api'
 import css from './AdminScreen.module.css'
@@ -28,6 +28,7 @@ const pagerBtnStyle: React.CSSProperties = {
 
 export function ReportsTab() {
   const [page, setPage] = useState(1)
+  const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.admin.reports(page, PAGE_SIZE),
@@ -59,6 +60,7 @@ export function ReportsTab() {
               <th>Description</th>
               <th>Page</th>
               <th>Line</th>
+              <th aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -87,11 +89,22 @@ export function ReportsTab() {
                 <td className={css.muted}>
                   {r.line_id ? (r.line_external_id ?? `#${r.line_index ?? ''}`) : '—'}
                 </td>
+                <td style={{ position: 'relative', textAlign: 'right' }}>
+                  <details className={css.rowActions}>
+                    <summary aria-label={`Actions for ${r.email}`}>...</summary>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/curate?submitterEmail=${encodeURIComponent(r.email)}`)}
+                    >
+                      Contributed By This User
+                    </button>
+                  </details>
+                </td>
               </tr>
             ))}
             {items.length === 0 && !isLoading && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>
                   No reports yet
                 </td>
               </tr>

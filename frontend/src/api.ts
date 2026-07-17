@@ -75,6 +75,17 @@ export interface DocumentDTO {
   skipped: boolean
 }
 
+export interface ContributedPageDTO {
+  page_id: string
+  document_name: string
+  page_label: string
+  image_url: string
+  width_px: number
+  height_px: number
+  image_rotation: number
+  approved: boolean
+}
+
 export interface MyRankDTO {
   rank: number
   count: number
@@ -132,6 +143,9 @@ export const api = {
   getMyDocuments: (): Promise<DocumentDTO[] | null> =>
     request<DocumentDTO[]>('/api/me/documents'),
 
+  getMyContributedPages: (): Promise<ContributedPageDTO[] | null> =>
+    request<ContributedPageDTO[]>('/api/me/contributed-pages'),
+
   getCommunityStats: (): Promise<CommunityDTO | null> =>
     request<CommunityDTO>('/api/community'),
 
@@ -179,6 +193,7 @@ export const api = {
     if (filters.batchId) params.append('batch_id', filters.batchId)
     if (filters.pageId) params.append('page_id', filters.pageId)
     if (filters.batchExternalId) params.append('batch_external_id', filters.batchExternalId)
+    if (filters.submitterEmail) params.append('submitter_email', filters.submitterEmail)
     return request<AdminDatasetDTO>(`/api/admin/pages?${params.toString()}`)
   },
 
@@ -215,6 +230,12 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(body),
         }),
+
+  reportGeneralProblem: (body: Pick<ReportProblemBody, 'description'>): Promise<{ event_id: string } | null> =>
+    request<{ event_id: string }>('/api/report', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   getAdminReports: (page = 1, pageSize = 50): Promise<AdminReportsDTO | null> => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })

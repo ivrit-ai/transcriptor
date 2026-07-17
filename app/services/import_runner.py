@@ -100,6 +100,7 @@ class RunState:
     license: str | None = None
     data_path: str | None = None  # local path or s3://bucket/prefix (no creds)
     clear_existing: bool = False
+    metadata_only: bool = False
     pid: int | None = None
     started_at: str | None = None
     finished_at: str | None = None
@@ -114,6 +115,7 @@ class RunState:
             "license": self.license,
             "data_path": self.data_path,
             "clear_existing": self.clear_existing,
+            "metadata_only": self.metadata_only,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "exit_code": self.exit_code,
@@ -153,6 +155,7 @@ def _read_state() -> RunState | None:
         license=raw.get("license"),
         data_path=raw.get("data_path"),
         clear_existing=raw.get("clear_existing", False),
+        metadata_only=raw.get("metadata_only", False),
         pid=raw.get("pid"),
         started_at=raw.get("started_at"),
         finished_at=raw.get("finished_at"),
@@ -169,6 +172,7 @@ def _write_state(state: RunState) -> None:
         "license": state.license,
         "data_path": state.data_path,
         "clear_existing": state.clear_existing,
+        "metadata_only": state.metadata_only,
         "pid": state.pid,
         "started_at": state.started_at,
         "finished_at": state.finished_at,
@@ -242,6 +246,7 @@ def _watch_process(proc: subprocess.Popen, state: RunState) -> None:
         license=state.license,
         data_path=state.data_path,
         clear_existing=state.clear_existing,
+        metadata_only=state.metadata_only,
         pid=state.pid,
         started_at=state.started_at,
         finished_at=datetime.now(UTC).isoformat(),
@@ -280,6 +285,7 @@ def _build_invocation(
     s3_secret: str | None,
     s3_region: str | None,
     clear_existing: bool,
+    metadata_only: bool,
 ) -> tuple[list[str], dict[str, str], str]:
     """Return (argv, extra_env, public_data_path).
 
@@ -326,6 +332,7 @@ def _build_invocation(
         "uv",
         "run",
         "python",
+        "-u",
         str(_SCRIPT_PATH),
         resolved,
         "--source",
@@ -335,6 +342,8 @@ def _build_invocation(
     ]
     if clear_existing:
         argv.append("--clear-existing")
+    if metadata_only:
+        argv.append("--metadata-only")
 
     return argv, extra_env, resolved
 
@@ -349,6 +358,7 @@ def start_import(
     s3_secret: str | None = None,
     s3_region: str | None = None,
     clear_existing: bool = False,
+    metadata_only: bool = False,
 ) -> RunState:
     """Spawn the import subprocess.
 
@@ -360,6 +370,9 @@ def start_import(
         ImportAlreadyRunning: if another import is active or the lock is held.
         ImportConfigError: if the supplied parameters are invalid.
     """
+    if clear_existing and metadata_only:
+        raise ImportConfigError("metadata_only cannot be used with clear_existing")
+
     _ensure_work_dir()
 
     # Validate / build argv before touching the lock so we fail fast on bad
@@ -373,6 +386,7 @@ def start_import(
         s3_secret=s3_secret,
         s3_region=s3_region,
         clear_existing=clear_existing,
+        metadata_only=metadata_only,
     )
 
     # --- critical section: exclusively locked ---
@@ -420,6 +434,7 @@ def start_import(
             license=license_,
             data_path=public_path,
             clear_existing=clear_existing,
+            metadata_only=metadata_only,
             pid=proc.pid,
             started_at=datetime.now(UTC).isoformat(),
         )

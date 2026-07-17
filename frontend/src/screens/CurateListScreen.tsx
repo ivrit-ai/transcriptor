@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
@@ -110,6 +110,7 @@ function IdFilterField({
 
 export function CurateListScreen() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [globalIdx, setGlobalIdx] = useState(0)
   const [statuses, setStatuses] = useState<PageStatusFilter[]>([])
   const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
@@ -123,14 +124,17 @@ export function CurateListScreen() {
   const [pageIdFilter, setPageIdFilter] = useState('')
   const [extBatchIdDraft, setExtBatchIdDraft] = useState('')
   const [extBatchIdFilter, setExtBatchIdFilter] = useState('')
+  const [submitterEmailDraft, setSubmitterEmailDraft] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
+  const [submitterEmailFilter, setSubmitterEmailFilter] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
 
   const filters: PageListFilters = useMemo(
     () => ({
       batchId: batchIdFilter || undefined,
       pageId: pageIdFilter || undefined,
       batchExternalId: extBatchIdFilter || undefined,
+      submitterEmail: submitterEmailFilter || undefined,
     }),
-    [batchIdFilter, pageIdFilter, extBatchIdFilter],
+    [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter],
   )
 
   const applyBatchFilter = useCallback(() => {
@@ -163,6 +167,17 @@ export function CurateListScreen() {
   const clearExtBatchFilter = useCallback(() => {
     setExtBatchIdDraft('')
     setExtBatchIdFilter('')
+    setGlobalIdx(0)
+  }, [])
+
+  const applySubmitterEmailFilter = useCallback(() => {
+    setSubmitterEmailFilter(submitterEmailDraft.trim())
+    setGlobalIdx(0)
+  }, [submitterEmailDraft])
+
+  const clearSubmitterEmailFilter = useCallback(() => {
+    setSubmitterEmailDraft('')
+    setSubmitterEmailFilter('')
     setGlobalIdx(0)
   }, [])
 
@@ -280,6 +295,15 @@ export function CurateListScreen() {
               onDraftChange={setExtBatchIdDraft}
               onApply={applyExtBatchFilter}
               onClear={clearExtBatchFilter}
+            />
+            <IdFilterField
+              label="Submitter Email"
+              placeholder="user@example.com"
+              draft={submitterEmailDraft}
+              applied={submitterEmailFilter}
+              onDraftChange={setSubmitterEmailDraft}
+              onApply={applySubmitterEmailFilter}
+              onClear={clearSubmitterEmailFilter}
             />
             <label className={css.filterCheck}>
               <input

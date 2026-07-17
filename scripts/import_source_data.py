@@ -149,6 +149,48 @@ def clear_existing_submissions(session: Session, root: Path) -> None:
     session.flush()
     print(f"Cleared {len(batches)} submissions ({len(page_ids)} pages)")
 
+
+def update_existing_submission_metadata(session: Session, root: Path) -> None:
+    """Update metadata for manifest submissions that already have a batch."""
+    submissions_csv = root / "submissions.csv"
+    if not submissions_csv.exists():
+        print(f"ERROR: {submissions_csv} not found")
+        sys.exit(1)
+
+    with open(submissions_csv, newline="") as f:
+        submissions = list(csv.DictReader(f))
+
+    updated = 0
+    missing_metadata = 0
+    not_imported = 0
+    for submission in submissions:
+        submission_id = submission["submission_id"]
+        batch = session.execute(
+            select(Batch).where(Batch.external_id == submission_id)
+        ).scalar_one_or_none()
+        if batch is None:
+            not_imported += 1
+            continue
+
+        metadata_path = root / submission_id / "metadata.json"
+        if not metadata_path.exists():
+            missing_metadata += 1
+            print(f"  WARN: metadata.json missing for {submission_id}, skipping")
+            continue
+
+        metadata = json.loads(metadata_path.read_text())
+        batch.source_metadata = metadata
+        batch.submitter_fingerprint = metadata.get("submitter_fingerprint")
+        updated += 1
+
+    session.flush()
+    print(
+        "Updated metadata for "
+        f"{updated} existing submissions "
+        f"({not_imported} not imported, {missing_metadata} missing metadata)"
+    )
+
+
 # ── Import logic ────────────────────────────────────────────────────────────
 
 def import_source_data(
@@ -196,6 +238,7 @@ def import_source_data(
             continue
 
         metadata = json.loads(metadata_path.read_text())
+        submitter_fingerprint = metadata.get("submitter_fingerprint") if metadata else None
 
         # Upsert Batch
         batch = session.execute(
@@ -207,6 +250,7 @@ def import_source_data(
                 source=source,
                 license=license_,
                 source_metadata=metadata if metadata else None,
+                submitter_fingerprint=submitter_fingerprint,
             )
             session.add(batch)
             session.flush()
@@ -214,6 +258,7 @@ def import_source_data(
         else:
             batch.source = source
             batch.license = license_
+            batch.submitter_fingerprint = submitter_fingerprint
             if metadata:
                 batch.source_metadata = metadata
 
@@ -348,8 +393,15 @@ def main() -> None:
         action="store_true",
         help="Delete all submissions (and cascading data) listed in the manifest before importing",
     )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="Update metadata on existing submissions without importing or deleting data",
+    )
 
     args = parser.parse_args()
+    if args.metadata_only and args.clear_existing:
+        parser.error("--metadata-only cannot be used with --clear-existing")
 
     # S3 credentials: CLI args take precedence, fall back to IMPORT_* env vars.
     s3_key = args.s3_key or os.environ.get("IMPORT_AWS_ACCESS_KEY_ID")
@@ -376,9 +428,12 @@ def main() -> None:
 
     try:
         with SessionLocal() as session:
-            if args.clear_existing:
+            if args.metadata_only:
+                update_existing_submission_metadata(session, root)
+            elif args.clear_existing:
                 clear_existing_submissions(session, root)
-            import_source_data(session, root, args.source, args.license, remote_images)
+            if not args.metadata_only:
+                import_source_data(session, root, args.source, args.license, remote_images)
             session.commit()
         print("Import complete.")
     finally:

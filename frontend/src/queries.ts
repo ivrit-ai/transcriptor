@@ -18,7 +18,11 @@ export const queryKeys = {
     next: ['session', 'next'] as const,
     forPage: (pageId: string) => ['session', 'page', pageId] as const,
   },
-  profile: { me: ['profile', 'me'] as const, documents: ['profile', 'documents'] as const },
+  profile: {
+    me: ['profile', 'me'] as const,
+    documents: ['profile', 'documents'] as const,
+    contributedPages: ['profile', 'contributedPages'] as const,
+  },
   community: { stats: ['community', 'stats'] as const },
   admin: {
     stats: ['admin', 'stats'] as const,
@@ -36,7 +40,7 @@ export const queryKeys = {
   // Shared by CurateListScreen (filtered browsing) and CuratePageScreen
   // (unfiltered dataset-wide prev/next navigation) — same fetch, same cache.
   pages: (page: number, pageSize: number, statuses: PageStatusFilter[] = [], filters: PageListFilters = {}) =>
-    ['pages', page, pageSize, [...statuses].sort(), filters.batchId ?? '', filters.pageId ?? '', filters.batchExternalId ?? ''] as const,
+    ['pages', page, pageSize, [...statuses].sort(), filters.batchId ?? '', filters.pageId ?? '', filters.batchExternalId ?? '', filters.submitterEmail ?? ''] as const,
   pageLines: (pageId: string) => ['pageLines', pageId] as const,
   leaderboard: {
     allTime: ['leaderboard', 'allTime'] as const,

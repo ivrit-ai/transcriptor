@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_contribution_consent
+from app.api.deps import get_current_user, get_db, require_contribution_consent
 from app.models.event import Event
 from app.models.line import Line
 from app.models.page import Page
@@ -78,6 +78,37 @@ def skip_page(
 class ReportProblemBody(BaseModel):
     description: str
     line_id: uuid.UUID | None = None
+
+
+@router.post("/report", status_code=201)
+def report_general_problem(
+    body: ReportProblemBody,
+    request: Request,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    description = body.description.strip()
+    if not description:
+        raise HTTPException(status_code=422, detail="description is required")
+    if len(description) > _MAX_REPORT_LENGTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"description too long (max {_MAX_REPORT_LENGTH} chars)",
+        )
+
+    event = Event(
+        user_id=user.id,
+        line_id=None,
+        event_type="problem",
+        payload={
+            "description": description,
+            "user_agent": request.headers.get("user-agent"),
+        },
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return {"event_id": str(event.id)}
 
 
 @router.post("/pages/{page_id}/report", status_code=201)

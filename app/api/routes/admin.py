@@ -1,3 +1,4 @@
+import hashlib
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -11,6 +12,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Session
 
 from app.api.deps import _effective_role, get_db, require_admin, require_curator
+from app.config import settings
 from app.db import SessionLocal
 from app.models.batch import Batch
 from app.models.event import Event
@@ -314,6 +316,7 @@ def admin_pages(
     batch_id: str | None = Query(None),
     page_id: str | None = Query(None),
     batch_external_id: str | None = Query(None),
+    submitter_email: str | None = Query(None),
 ) -> dict:
     """
     Flat paginated list of manuscript pages ordered by (batch, page).
@@ -326,6 +329,8 @@ def admin_pages(
     `batch_id` and `page_id` are exact-match filters on the system-internal
     UUIDs of the batch and page respectively. `batch_external_id` is a
     case-insensitive "contains" filter on the human-readable batch id.
+    `submitter_email` filters by batches whose `submitter_fingerprint`
+    matches the SHA-256 hash of (salt + normalized_email).
     Any curator may use them.
     """
     page = max(1, page)
@@ -420,6 +425,15 @@ def admin_pages(
         count_query = count_query.where(Batch.external_id.ilike(pattern))
         approved_count_query = approved_count_query.where(Batch.external_id.ilike(pattern))
         rows_query = rows_query.where(Batch.external_id.ilike(pattern))
+
+    if submitter_email and submitter_email.strip():
+        normalized = submitter_email.strip().lower()
+        fp = hashlib.sha256(
+            (settings.submitter_fingerprint_salt + normalized).encode()
+        ).hexdigest()
+        count_query = count_query.where(Batch.submitter_fingerprint == fp)
+        approved_count_query = approved_count_query.where(Batch.submitter_fingerprint == fp)
+        rows_query = rows_query.where(Batch.submitter_fingerprint == fp)
 
     if status_filter is not None:
         count_query = count_query.where(status_filter)
@@ -834,8 +848,8 @@ def admin_queue(
 
 # ── User-reported problems ────────────────────────────────────────────────────
 #
-# Backed by `Event` rows with event_type="reported_problem" (see
-# app/api/routes/session.py::report_problem) rather than a dedicated table.
+# Backed by `Event` rows with event_type="reported_problem" or "problem" (see
+# app/api/routes/session.py) rather than a dedicated table.
 # page_id/batch_id live inside Event.payload (JSONB) for these events, so we
 # extract them with a `->>` cast to join back to Page/Batch; Event.line_id is
 # a real FK column and joins directly to Line when the reporter was focused
@@ -856,7 +870,9 @@ def admin_reports(
     payload_page_id = cast(Event.payload["page_id"].astext, PG_UUID)
 
     total: int = db.execute(
-        select(func.count(Event.id)).where(Event.event_type == "reported_problem")
+        select(func.count(Event.id)).where(
+            Event.event_type.in_(("reported_problem", "problem"))
+        )
     ).scalar_one()
 
     rows = (
@@ -881,7 +897,7 @@ def admin_reports(
             .outerjoin(Page, Page.id == payload_page_id)
             .outerjoin(Batch, Batch.id == Page.batch_id)
             .outerjoin(Line, Line.id == Event.line_id)
-            .where(Event.event_type == "reported_problem")
+            .where(Event.event_type.in_(("reported_problem", "problem")))
             .order_by(Event.created_at.desc())
             .offset(offset)
             .limit(page_size)
@@ -936,6 +952,7 @@ class ImportStartRequest(BaseModel):
     # prefix within the configured bucket. custom-s3: full s3://bucket/prefix URI.
     data_path: str | None = None
     clear_existing: bool = False
+    metadata_only: bool = False
     # custom-s3 only. Passed to the subprocess via env, never stored or returned.
     s3_key: str | None = None
     s3_secret: str | None = None
@@ -976,6 +993,7 @@ def admin_import_start(
             s3_secret=body.s3_secret,
             s3_region=body.s3_region,
             clear_existing=body.clear_existing,
+            metadata_only=body.metadata_only,
         )
     except import_runner.ImportAlreadyRunning as e:
         raise HTTPException(status_code=409, detail=str(e)) from e

@@ -6,13 +6,15 @@ import { Icon } from "./shared";
 export function ReportProblemModal({
   pageId,
   lineId,
+  initialDescription = "",
   onClose,
 }: {
-  pageId: string;
+  pageId?: string;
   lineId?: string;
+  initialDescription?: string;
   onClose: () => void;
 }) {
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(initialDescription);
   const [submitted, setSubmitted] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = window.innerWidth < 768;
@@ -31,7 +33,9 @@ export function ReportProblemModal({
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.reportProblem(pageId, { description: description.trim(), line_id: lineId }),
+      pageId
+        ? api.reportProblem(pageId, { description: description.trim(), line_id: lineId })
+        : api.reportGeneralProblem({ description: description.trim() }),
     onSuccess: () => {
       setSubmitted(true);
       setTimeout(onClose, 1400);

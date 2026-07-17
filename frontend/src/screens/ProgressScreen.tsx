@@ -3,11 +3,13 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
-import { TopNav, Icon, ManuscriptPreview } from '../components/shared'
+import { TopNav, Icon, ManuscriptPreview, PrimaryBtn } from '../components/shared'
+import { ReportProblemModal } from '../components/ReportProblemModal'
 import { api } from '../api'
-import type { ProfileDTO, DocumentDTO } from '../api'
+import type { ProfileDTO, DocumentDTO, ContributedPageDTO } from '../api'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
+const GALLERY_PAGE_SIZE = 16
 
 const FALLBACK: ProfileDTO = {
   name: 'מתנדב', today: 0, goal: 150, streak: 0, week: 0, total: 0, pages: 0,
@@ -281,8 +283,58 @@ function DocFolio({ doc, thumbWidth, onOpen }: { doc: DocumentDTO; thumbWidth: n
   )
 }
 
+function GalleryPager({ page, pageCount, onChange }: { page: number; pageCount: number; onChange: (page: number) => void }) {
+  if (pageCount <= 1) return null
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 18 }}>
+      <button type="button" className="pg-ghost" disabled={page === 0} onClick={() => onChange(page - 1)}>
+        הקודם
+      </button>
+      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--tl-muted)' }}>
+        {page + 1} מתוך {pageCount}
+      </span>
+      <button type="button" className="pg-ghost" disabled={page >= pageCount - 1} onClick={() => onChange(page + 1)}>
+        הבא
+      </button>
+    </div>
+  )
+}
+
+function ContributedPageFolio({ page, thumbWidth, onOpen }: { page: ContributedPageDTO; thumbWidth: number; onOpen: () => void }) {
+  const canOpen = page.approved
+  return (
+    <div
+      role={canOpen ? 'button' : undefined}
+      tabIndex={canOpen ? 0 : undefined}
+      onClick={canOpen ? onOpen : undefined}
+      onKeyDown={canOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } : undefined}
+      className={canOpen ? 'pg-folio' : undefined}
+      style={{ width: thumbWidth, flexShrink: 0, borderRadius: 10, cursor: canOpen ? 'pointer' : 'default', opacity: canOpen ? 1 : 0.68 }}
+    >
+      <div style={{ position: 'relative' }}>
+        <img
+          src={page.image_url}
+          alt={page.document_name}
+          style={{ width: thumbWidth, borderRadius: 8, objectFit: 'cover', display: 'block' }}
+        />
+        {!page.approved && (
+          <span style={{
+            position: 'absolute', top: 0, insetInlineStart: 0, padding: '4px 7px', borderRadius: 999,
+            background: 'oklch(0.62 0.13 50)', color: '#fff', fontFamily: 'var(--font-ui)', fontSize: 11,
+            fontWeight: 600, boxShadow: '0 2px 6px rgba(40,30,20,0.28)',
+          }}>
+            לא אושר עדיין
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DocumentGallery({ isMobile }: { isMobile: boolean }) {
   const navigate = useNavigate()
+  const [galleryPage, setGalleryPage] = useState(0)
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.profile.documents,
     queryFn: () => api.getMyDocuments(),
@@ -291,10 +343,12 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
 
   const docs = data ?? []
   const thumbWidth = isMobile ? 150 : 168
+  const pageCount = Math.ceil(docs.length / GALLERY_PAGE_SIZE)
+  const visibleDocs = docs.slice(galleryPage * GALLERY_PAGE_SIZE, (galleryPage + 1) * GALLERY_PAGE_SIZE)
 
   const header = (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
-      כתבי היד שתעתקתם
+      כתבי היד שתעתקת
     </div>
   )
 
@@ -317,7 +371,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
   } else if (docs.length === 0) {
     body = (
       <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', padding: '8px 0 4px' }}>
-        עדיין לא תיעדתם עמודים — התחילו לתעתק וכתבי היד שלכם יופיעו כאן.
+        עדיין לא תעקתם עמודים — התחילו לתעתק וכתבי היד שלכם יופיעו כאן.
       </div>
     )
   } else {
@@ -330,7 +384,7 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
           ? { overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' as const }
           : { flexWrap: 'wrap' as const, justifyContent: 'center' as const }),
       }}>
-        {docs.map((doc) => (
+        {visibleDocs.map((doc) => (
           <DocFolio
             key={doc.page_id}
             doc={doc}
@@ -349,6 +403,81 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
     }}>
       {header}
       {body}
+      <GalleryPager page={galleryPage} pageCount={pageCount} onChange={setGalleryPage} />
+    </div>
+  )
+}
+
+function ContributedPagesGallery({ isMobile }: { isMobile: boolean }) {
+  const navigate = useNavigate()
+  const [galleryPage, setGalleryPage] = useState(0)
+  const [reportOpen, setReportOpen] = useState(false)
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.profile.contributedPages,
+    queryFn: () => api.getMyContributedPages(),
+    staleTime: 30_000,
+  })
+
+  const pages = data ?? []
+  const thumbWidth = isMobile ? 150 : 168
+  const pageCount = Math.ceil(pages.length / GALLERY_PAGE_SIZE)
+  const visiblePages = pages.slice(galleryPage * GALLERY_PAGE_SIZE, (galleryPage + 1) * GALLERY_PAGE_SIZE)
+
+  return (
+    <div style={{
+      background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
+      borderRadius: 16, padding: isMobile ? '18px' : '22px 24px',
+    }}>
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--tl-ink)', marginBottom: 16 }}>
+        כתבי יד שתרמת
+      </div>
+      {isLoading ? (
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', padding: '8px 0 4px' }}>טוען…</div>
+      ) : pages.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--tl-muted)', padding: '8px 0 4px' }}>
+          <div>עדיין לא נמצאו כתבי יד שתרמתם.</div>
+          <PrimaryBtn size="sm" onClick={() => setReportOpen(true)}>
+            לא רואה כתבי יד שתרמת?
+          </PrimaryBtn>
+        </div>
+      ) : (
+        <>
+          <div style={{
+            display: 'flex', gap: 18, direction: 'rtl',
+            ...(isMobile
+              ? { overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' as const }
+              : { flexWrap: 'wrap' as const, justifyContent: 'center' as const }),
+          }}>
+            {visiblePages.map((page) => (
+              <ContributedPageFolio
+                key={page.page_id}
+                page={page}
+                thumbWidth={thumbWidth}
+                onOpen={() => navigate(`/work/${page.page_id}`)}
+              />
+            ))}
+          </div>
+          <GalleryPager page={galleryPage} pageCount={pageCount} onChange={setGalleryPage} />
+        </>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 16 }}>
+        <PrimaryBtn size="sm" onClick={() => setReportOpen(true)}>
+          לא רואה כתבי יד שתרמת?
+        </PrimaryBtn>
+        {pages.some(p => !p.approved) && (
+          <PrimaryBtn size="sm" onClick={() => setReportOpen(true)}>
+            שנזרז אישור כתבי יד שתרמת?
+          </PrimaryBtn>
+        )}
+      </div>
+      {reportOpen && (
+        <ReportProblemModal
+          initialDescription={pages.length === 0
+            ? 'תרמתי כתבי יד אבל אני לא רואה אותם!'
+            : 'אשרו בבקשה עמודים שתרמתי!'}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -467,6 +596,7 @@ export function ProgressScreen() {
           {statsRow}
           {activityCard}
           <DocumentGallery isMobile={isMobile} />
+          <ContributedPagesGallery isMobile={isMobile} />
           {resumeCard}
         </div>
       </div>
@@ -492,6 +622,7 @@ export function ProgressScreen() {
           </div>
         </div>
         <DocumentGallery isMobile={isMobile} />
+        <ContributedPagesGallery isMobile={isMobile} />
         {resumeCard}
       </div>
     </div>

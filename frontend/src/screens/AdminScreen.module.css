@@ -138,6 +138,40 @@
   background: var(--tl-muted-fill);
 }
 
+.rowActions {
+  position: relative;
+}
+
+.rowActions summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--tl-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.rowActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.rowActions button {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--tl-border);
+  border-radius: 7px;
+  background: var(--tl-surface);
+  color: var(--tl-ink);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.rowActions button:hover {
+  background: var(--tl-muted-fill);
+}
+
 .muted {
   color: var(--tl-muted);
 }
@@ -202,4 +236,3 @@
   margin-right: 5px;
   vertical-align: middle;
 }
-

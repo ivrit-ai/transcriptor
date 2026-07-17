@@ -1,4 +1,5 @@
 import bisect
+import hashlib
 import time
 from datetime import UTC, date, datetime, timedelta
 from threading import Lock
@@ -9,6 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.config import settings
+from app.models.batch import Batch
 from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
@@ -352,3 +355,35 @@ def my_documents(
             }
         )
     return result
+
+
+@router.get("/me/contributed-pages")
+def my_contributed_pages(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict]:
+    normalized_email = user.email.strip().lower()
+    fingerprint = hashlib.sha256(
+        (settings.submitter_fingerprint_salt + normalized_email).encode()
+    ).hexdigest()
+
+    pages = db.execute(
+        select(Page)
+        .join(Batch, Batch.id == Page.batch_id)
+        .where(Batch.submitter_fingerprint == fingerprint)
+        .order_by(Batch.external_id, Page.external_id)
+    ).scalars().all()
+
+    return [
+        {
+            "page_id": str(page.id),
+            "document_name": page.document_name,
+            "page_label": page.external_id,
+            "image_url": resolve_image_url(page.image_path),
+            "width_px": page.width_px,
+            "height_px": page.height_px,
+            "image_rotation": page.image_rotation,
+            "approved": page.approved,
+        }
+        for page in pages
+    ]
