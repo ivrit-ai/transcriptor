@@ -53,12 +53,24 @@ def _parse_s3_uri(uri: str) -> tuple[str, str]:
     return bucket, prefix
 
 
-def _download_s3_to_temp(uri: str, aws_key: str, aws_secret: str, aws_region: str) -> Path:
+def _download_s3_to_temp(
+    uri: str,
+    aws_key: str,
+    aws_secret: str,
+    aws_region: str,
+    metadata_only: bool = False,
+) -> Path:
     """Download only manifests, metadata.json, and lines JSON files from S3.
 
     Skips image files since they are served directly from the S3 bucket.
+
+    When metadata_only=True, avoids listing the bucket prefix entirely:
+    fetches submissions.csv by key, then fetches each submission's
+    metadata.json directly by key (no pages.csv, no lines JSON, no
+    paginated listing over potentially many image objects).
     """
     import boto3
+    from botocore.exceptions import ClientError
 
     bucket, prefix = _parse_s3_uri(uri)
     s3 = boto3.client(
@@ -68,6 +80,40 @@ def _download_s3_to_temp(uri: str, aws_key: str, aws_secret: str, aws_region: st
         region_name=aws_region,
     )
     tmpdir = Path(tempfile.mkdtemp(prefix="import_source_"))
+
+    if metadata_only:
+        submissions_key = f"{prefix}submissions.csv"
+        submissions_dest = tmpdir / "submissions.csv"
+        try:
+            s3.download_file(bucket, submissions_key, str(submissions_dest))
+        except ClientError as e:
+            print(f"ERROR: could not download s3://{bucket}/{submissions_key}: {e}")
+            sys.exit(1)
+
+        with open(submissions_dest, newline="") as f:
+            submission_ids = [row["submission_id"] for row in csv.DictReader(f)]
+
+        downloaded = 0
+        missing = 0
+        for submission_id in submission_ids:
+            metadata_key = f"{prefix}{submission_id}/metadata.json"
+            metadata_dest = tmpdir / submission_id / "metadata.json"
+            metadata_dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                s3.download_file(bucket, metadata_key, str(metadata_dest))
+                downloaded += 1
+            except ClientError as e:
+                code = e.response.get("Error", {}).get("Code")
+                if code in ("404", "NoSuchKey"):
+                    missing += 1
+                    continue
+                raise
+
+        print(
+            f"Fetched {downloaded} metadata.json files directly by key "
+            f"({missing} missing) for {len(submission_ids)} submissions"
+        )
+        return tmpdir
 
     # File patterns we actually need for import
     manifest_names = {"submissions.csv", "pages.csv"}
@@ -417,7 +463,13 @@ def main() -> None:
                 "or set IMPORT_AWS_ACCESS_KEY_ID / IMPORT_AWS_SECRET_ACCESS_KEY / IMPORT_AWS_REGION"
             )
         print(f"Downloading from S3 (manifests only): {args.source_path}")
-        root = _download_s3_to_temp(args.source_path, s3_key, s3_secret, s3_region)
+        root = _download_s3_to_temp(
+            args.source_path,
+            s3_key,
+            s3_secret,
+            s3_region,
+            metadata_only=args.metadata_only,
+        )
         cleanup_temp = True
         remote_images = True
     else:
