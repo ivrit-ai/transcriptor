@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
@@ -110,6 +110,7 @@ function IdFilterField({
 
 export function CurateListScreen() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [globalIdx, setGlobalIdx] = useState(0)
   const [statuses, setStatuses] = useState<PageStatusFilter[]>([])
   const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
@@ -123,8 +124,8 @@ export function CurateListScreen() {
   const [pageIdFilter, setPageIdFilter] = useState('')
   const [extBatchIdDraft, setExtBatchIdDraft] = useState('')
   const [extBatchIdFilter, setExtBatchIdFilter] = useState('')
-  const [submitterEmailDraft, setSubmitterEmailDraft] = useState('')
-  const [submitterEmailFilter, setSubmitterEmailFilter] = useState('')
+  const [submitterEmailDraft, setSubmitterEmailDraft] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
+  const [submitterEmailFilter, setSubmitterEmailFilter] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
 
   const filters: PageListFilters = useMemo(
     () => ({
