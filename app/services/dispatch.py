@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -5,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription
@@ -209,7 +211,14 @@ def get_session_for_page(
     target: int = 3,
 ) -> SessionDTO | None:
     page = session.get(Page, page_id)
-    if page is None:
+    if page is None or not page.approved:
+        return None
+
+    normalized_email = user.email.strip().lower()
+    fingerprint = hashlib.sha256(
+        (settings.submitter_fingerprint_salt + normalized_email).encode()
+    ).hexdigest()
+    if page.batch.submitter_fingerprint != fingerprint:
         return None
 
     return _build_session_dto(session, user, page, target)

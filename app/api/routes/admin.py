@@ -848,8 +848,8 @@ def admin_queue(
 
 # ── User-reported problems ────────────────────────────────────────────────────
 #
-# Backed by `Event` rows with event_type="reported_problem" (see
-# app/api/routes/session.py::report_problem) rather than a dedicated table.
+# Backed by `Event` rows with event_type="reported_problem" or "problem" (see
+# app/api/routes/session.py) rather than a dedicated table.
 # page_id/batch_id live inside Event.payload (JSONB) for these events, so we
 # extract them with a `->>` cast to join back to Page/Batch; Event.line_id is
 # a real FK column and joins directly to Line when the reporter was focused
@@ -870,7 +870,9 @@ def admin_reports(
     payload_page_id = cast(Event.payload["page_id"].astext, PG_UUID)
 
     total: int = db.execute(
-        select(func.count(Event.id)).where(Event.event_type == "reported_problem")
+        select(func.count(Event.id)).where(
+            Event.event_type.in_(("reported_problem", "problem"))
+        )
     ).scalar_one()
 
     rows = (
@@ -895,7 +897,7 @@ def admin_reports(
             .outerjoin(Page, Page.id == payload_page_id)
             .outerjoin(Batch, Batch.id == Page.batch_id)
             .outerjoin(Line, Line.id == Event.line_id)
-            .where(Event.event_type == "reported_problem")
+            .where(Event.event_type.in_(("reported_problem", "problem")))
             .order_by(Event.created_at.desc())
             .offset(offset)
             .limit(page_size)
