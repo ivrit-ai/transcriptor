@@ -14,6 +14,7 @@ import { LeaderboardScreen } from './screens/LeaderboardScreen'
 import { AdminScreen } from './screens/AdminScreen'
 import { CurateListScreen } from './screens/CurateListScreen'
 import { CuratePageScreen } from './screens/CuratePageScreen'
+import { AboutScreen } from './screens/AboutScreen'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             {/* /login kept as alias for old OAuth redirect */}
             <Route path="/login" element={<AuthScreen />} />
             <Route path="/guidelines" element={<GuidelinesScreen />} />
+            <Route path="/about" element={<AboutScreen />} />
 
             {/* Protected */}
             <Route path="/work" element={<AuthGuard><WorkScreen /></AuthGuard>} />

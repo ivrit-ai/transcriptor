@@ -64,6 +64,7 @@ export function TopNav({ active, compact = false, safeTop = 0 }: TopNavProps) {
     { id: 'guide',       label: 'מדריך',           path: '/guidelines'   },
     { id: 'progress',    label: 'ההתקדמות שלי',  path: '/me'           },
     { id: 'leaderboard', label: 'לוח דירוג',      path: '/leaderboard'  },
+    { id: 'about',       label: 'אודות',          path: '/about'        },
     ...(isCurator ? [{ id: 'curate' as const, label: 'אוֹצֵר', path: '/curate' }] : []),
     ...(isAdmin ? [{ id: 'admin' as const, label: 'מנהל', path: '/admin' }] : []),
   ]
