@@ -7,15 +7,10 @@ interface PageLinesPreviewProps {
   heightPx: number
   lines: AdminPageLineDTO[]
   hoveredLineIndex?: number | null
+  rotation?: number
 }
 
-/**
- * Fits a manuscript page image to its container width and draws every line's
- * bounding box on top. Mirrors the faint line-outline overlay used in the
- * WorkScreen folio stage (WorkScreen.tsx) but renders all lines equally for a
- * read-only admin preview.
- */
-export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLineIndex }: PageLinesPreviewProps) {
+export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLineIndex, rotation = 0 }: PageLinesPreviewProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [dispW, setDispW] = useState(0)
 
@@ -29,23 +24,52 @@ export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLi
     return () => ro.disconnect()
   }, [])
 
+  const norm = ((rotation % 360) + 360) % 360
+  const rotated = norm % 180 !== 0
   const pagePxW = widthPx || 474
   const pagePxH = heightPx || 218
-  const scale = dispW > 0 ? dispW / pagePxW : 0
-  const dispH = pagePxH * scale
+  const displayW = rotated ? pagePxH : pagePxW
+  const displayH = rotated ? pagePxW : pagePxH
+  const scale = dispW > 0 ? dispW / displayW : 0
+  const dispH = displayH * scale
+
+  let imgW: number | string
+  let imgH: number | string
+  let imgTransform: string
+  if (norm === 90) {
+    imgW = dispH
+    imgH = dispW
+    imgTransform = `translate(${dispW}px, 0) rotate(90deg)`
+  } else if (norm === 180) {
+    imgW = dispW
+    imgH = dispH
+    imgTransform = `translate(${dispW}px, ${dispH}px) rotate(180deg)`
+  } else if (norm === 270) {
+    imgW = dispH
+    imgH = dispW
+    imgTransform = `translate(0, ${dispH}px) rotate(270deg)`
+  } else {
+    imgW = '100%'
+    imgH = '100%'
+    imgTransform = 'none'
+  }
 
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>
-      <div style={{ position: 'relative', width: '100%', height: dispH }}>
+      <div style={{ position: 'relative', width: '100%', height: dispH, overflow: 'hidden', borderRadius: 6, boxShadow: '0 8px 30px rgba(40,30,20,0.18)' }}>
         <img
           src={imageUrl}
           alt=""
           draggable={false}
           style={{
-            width: '100%',
+            position: norm === 0 ? 'static' : 'absolute',
+            top: 0,
+            left: 0,
+            width: imgW,
+            height: imgH,
+            transform: imgTransform,
+            transformOrigin: '0 0',
             display: 'block',
-            borderRadius: 6,
-            boxShadow: '0 8px 30px rgba(40,30,20,0.18)',
           }}
         />
         {scale > 0 && lines.map((line, i) => {

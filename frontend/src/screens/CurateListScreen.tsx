@@ -497,6 +497,7 @@ export function CurateListScreen() {
                   heightPx={preview.height_px}
                   lines={preview.lines}
                   hoveredLineIndex={hoveredLineIdx}
+                  rotation={preview.image_rotation}
                 />
                 <div className={css.lineGrid}>
                   {preview.lines.map((l, i) => (

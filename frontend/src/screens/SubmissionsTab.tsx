@@ -162,6 +162,7 @@ function TranscriptionPreviewModal({
               heightPx={preview.height_px}
               lines={preview.lines}
               hoveredLineIndex={targetIndex >= 0 ? targetIndex : null}
+              rotation={preview.image_rotation}
             />
           )}
           {!isLoading && !preview && (
