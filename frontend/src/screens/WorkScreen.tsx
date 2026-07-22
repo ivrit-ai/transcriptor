@@ -227,6 +227,7 @@ const SPECIAL_CHARS = [
   { char: '√', label: 'שורש ריבועי' },
   { char: '✓', label: 'וי (סימן אישור)' },
   { char: '☐', label: 'תיבת סימון ריקה' },
+  { char: '•', label: 'נקודה (סימן רשימה)' },
   { char: '←', label: 'חץ שמאל' },
   { char: '→', label: 'חץ ימין' },
   { char: '≠', label: 'לא שווה' },
