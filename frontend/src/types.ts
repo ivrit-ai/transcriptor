@@ -72,7 +72,6 @@ export interface AdminUserDTO {
 export interface AdminCoverageDTO {
   batch_id: string
   external_id: string
-  source: string
   total_pages: number
   total_lines: number
   lines_with_any: number
@@ -235,6 +234,43 @@ export interface AdminReportRowDTO {
 
 export interface AdminReportsDTO {
   items: AdminReportRowDTO[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
+
+// ── Transcriptions list (admin "Transcriptions" tab) ─────────────────────────
+//
+// One row per Transcription (any kind), newest first. `batch_id` doubles as
+// the "submission id" filter — a Batch is the manuscript-source group a page
+// belongs to, the closest analog to a "submission" in this schema.
+
+export interface TranscriptionListFilters {
+  userEmail?: string
+  batchId?: string
+  pageId?: string
+}
+
+export interface AdminTranscriptionListRowDTO {
+  transcription_id: string
+  kind: string
+  text: string | null
+  created_at: string
+  user_id: string
+  display_name: string
+  email: string
+  line_id: string
+  line_index: number
+  line_external_id: string
+  page_id: string
+  page_external_id: string
+  batch_id: string
+  batch_external_id: string
+}
+
+export interface AdminTranscriptionListDTO {
+  items: AdminTranscriptionListRowDTO[]
   page: number
   page_size: number
   total: number

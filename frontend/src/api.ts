@@ -1,4 +1,4 @@
-import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, PageListFilters, AdminBatchDTO, AdminPageDTO, ReportProblemBody, AdminReportsDTO } from './types'
+import type { SessionDTO, LineStatusDTO, SubmitKind, AdminStatsDTO, AdminUserDTO, AdminCoverageDTO, AdminQueueDTO, ImportStatusDTO, ImportStartBody, AdminDatasetDTO, AdminPageLinesDTO, UpdatePageLinesBody, UpdatePageLinesResponse, PageStatusFilter, PageListFilters, AdminBatchDTO, AdminPageDTO, ReportProblemBody, AdminReportsDTO, TranscriptionListFilters, AdminTranscriptionListDTO } from './types'
 
 const BASE = ''
 
@@ -240,6 +240,21 @@ export const api = {
   getAdminReports: (page = 1, pageSize = 50): Promise<AdminReportsDTO | null> => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     return request<AdminReportsDTO>(`/api/admin/reports?${params.toString()}`)
+  },
+
+  // Flat, paginated list of individual transcription submissions (one row
+  // per Transcription, any kind), newest first. Powers the admin
+  // "Transcriptions" tab.
+  getAdminTranscriptions: (
+    page = 1,
+    pageSize = 50,
+    filters: TranscriptionListFilters = {},
+  ): Promise<AdminTranscriptionListDTO | null> => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (filters.userEmail) params.append('user_email', filters.userEmail)
+    if (filters.batchId) params.append('batch_id', filters.batchId)
+    if (filters.pageId) params.append('page_id', filters.pageId)
+    return request<AdminTranscriptionListDTO>(`/api/admin/transcriptions?${params.toString()}`)
   },
 
   getBatches: (): Promise<AdminBatchDTO[] | null> =>

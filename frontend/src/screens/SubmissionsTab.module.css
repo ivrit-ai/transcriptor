@@ -1,0 +1,245 @@
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Filter bar */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tl-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.filterInputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterInput {
+  width: 170px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  border-radius: 7px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  color: var(--tl-ink);
+  outline: none;
+}
+
+.filterInput:focus {
+  border-color: var(--tl-accent);
+}
+
+.filterApplyBtn {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  border-radius: 6px;
+  border: 0.5px solid var(--tl-accent);
+  background: var(--tl-accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.filterClearBtn {
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  border-radius: 6px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  color: var(--tl-muted);
+  cursor: pointer;
+}
+
+/* "Filter by this" hover icon on any cell value */
+.filterableCell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 20px;
+}
+
+.filterIconBtn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tl-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+tr:hover .filterIconBtn,
+.filterableCell:hover .filterIconBtn,
+.filterIconBtnActive {
+  opacity: 1;
+}
+
+.filterIconBtn:hover {
+  background: var(--tl-muted-fill);
+  color: var(--tl-ink);
+}
+
+.filterIconBtnActive {
+  color: var(--tl-accent);
+}
+
+/* Preview button */
+.previewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  border-radius: 7px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  color: var(--tl-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.previewBtn:hover {
+  background: var(--tl-muted-fill);
+}
+
+/* Pager */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.pagerBtn {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 7px;
+  border: 0.5px solid var(--tl-border);
+  background: var(--tl-surface);
+  color: var(--tl-ink);
+  cursor: pointer;
+}
+
+.pagerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Preview lightbox modal */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(30, 22, 12, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modalPanel {
+  background: var(--tl-page);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 60px rgba(30, 22, 12, 0.25);
+}
+
+.modalHeader {
+  padding: 16px 22px 12px;
+  border-bottom: 0.5px solid var(--tl-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.modalTitle {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--tl-ink);
+}
+
+.modalCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--tl-muted);
+  padding: 4px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.modalBody {
+  flex: 1;
+  overflow: auto;
+  padding: 22px;
+  font-family: var(--font-ui);
+}
+
+.modalTextBlock {
+  margin-top: 18px;
+}
+
+.modalTextMeta {
+  font-size: 12.5px;
+  color: var(--tl-muted);
+  margin-bottom: 8px;
+}
+
+.modalTextBody {
+  direction: rtl;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--tl-ink);
+  white-space: pre-wrap;
+  background: var(--tl-surface);
+  border: 0.5px solid var(--tl-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}

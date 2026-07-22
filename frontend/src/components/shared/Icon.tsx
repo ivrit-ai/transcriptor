@@ -13,6 +13,8 @@ import {
   Sun,
   Moon,
   LogOut,
+  Filter,
+  Image,
 } from "lucide-react";
 
 const icons = {
@@ -30,6 +32,8 @@ const icons = {
   sun: Sun,
   moon: Moon,
   logout: LogOut,
+  filter: Filter,
+  image: Image,
 } as const;
 
 interface IconProps {
