@@ -1,25 +1,48 @@
+import os
+from collections.abc import Generator
+
 import pytest
-from sqlalchemy import create_engine, text
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
+from testcontainers.postgres import PostgresContainer
 
 import app.models  # noqa: F401 — registers all models
+from app.api.deps import get_current_user
 from app.config import settings
 from app.db import Base, get_db
 from app.main import app
+from app.models.batch import Batch
 from app.models.consent import ConsentType
 from app.models.line import Line
 from app.models.page import Page
-from app.models.batch import Batch
+from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
-from app.api.deps import get_current_user
 from app.services.consent import record_consent
 
 
 @pytest.fixture(scope="session")
-def test_engine():
-    engine = create_engine(settings.test_database_url)
-    Base.metadata.create_all(engine)
+def postgres_container() -> Generator[PostgresContainer, None, None]:
+    with PostgresContainer("postgres:16-alpine") as postgres:
+        yield postgres
+
+
+@pytest.fixture(scope="session")
+def test_engine(postgres_container: PostgresContainer):
+    connection_url = postgres_container.get_connection_url()
+
+    old_db_url = os.environ.pop("DATABASE_URL", None)
+    os.environ["DATABASE_URL"] = connection_url
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+    if old_db_url is not None:
+        os.environ["DATABASE_URL"] = old_db_url
+    else:
+        del os.environ["DATABASE_URL"]
+
+    engine = create_engine(connection_url)
     yield engine
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -122,3 +145,10 @@ def make_line(session, page, line_index=0, bbox=None, external_id=None):
     session.add(line)
     session.flush()
     return line
+
+
+def make_transcription(session, line, user, kind=TranscriptionKind.text, text="hello"):
+    t = Transcription(line_id=line.id, user_id=user.id, kind=kind, text=text)
+    session.add(t)
+    session.flush()
+    return t
