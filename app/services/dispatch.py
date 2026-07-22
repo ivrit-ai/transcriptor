@@ -219,7 +219,16 @@ def get_session_for_page(
         (settings.submitter_fingerprint_salt + normalized_email).encode()
     ).hexdigest()
     if page.batch.submitter_fingerprint != fingerprint:
-        return None
+        user_has_prior_work = session.execute(
+            select(Transcription)
+            .join(Line, Line.id == Transcription.line_id)
+            .where(Line.page_id == page.id, Transcription.user_id == user.id)
+            .limit(1)
+            .exists()
+            .select()
+        ).scalar_one()
+        if not user_has_prior_work:
+            return None
 
     return _build_session_dto(session, user, page, target)
 

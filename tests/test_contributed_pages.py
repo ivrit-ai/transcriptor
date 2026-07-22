@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.event import Event
-from tests.conftest import make_batch, make_line, make_page
+from tests.conftest import make_batch, make_line, make_page, make_transcription
 
 
 def _fingerprint(email: str) -> str:
@@ -54,6 +54,20 @@ def test_explicit_session_requires_matching_approved_contribution(client, consen
     assert client.get(f"/api/sessions/{approved_page.id}").status_code == 200
     assert client.get(f"/api/sessions/{pending_page.id}").status_code == 404
     assert client.get(f"/api/sessions/{other_page.id}").status_code == 404
+
+
+def test_session_accessible_when_user_has_prior_work(client, consented_user, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "submitter_fingerprint_salt", "test-salt-")
+
+    other_batch = make_batch(db_session, external_id="other")
+    other_batch.submitter_fingerprint = _fingerprint("someone-else@example.com")
+    other_page = make_page(db_session, other_batch, external_id="other")
+    other_page.approved = True
+    line = make_line(db_session, other_page)
+    make_transcription(db_session, line, consented_user)
+    db_session.flush()
+
+    assert client.get(f"/api/sessions/{other_page.id}").status_code == 200
 
 
 def test_general_problem_report_creates_problem_event(client, consented_user, db_session):

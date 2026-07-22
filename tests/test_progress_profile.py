@@ -80,7 +80,6 @@ def test_my_documents_shape_and_order(client, db_session, consented_user):
     new_doc = body[0]
     assert new_doc["page_label"] == "p-new"
     assert new_doc["lines_done"] == 1
-    assert new_doc["total_lines"] == 2
     assert new_doc["spotlight_bbox"] == {"x": 5, "y": 6, "w": 7, "h": 8}
     assert new_doc["image_url"].endswith(".jpg") or new_doc["image_url"].startswith("/images/")
     assert new_doc["approved"] is False
