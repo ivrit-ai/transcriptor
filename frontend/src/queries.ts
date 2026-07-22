@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import type { PageStatusFilter, PageListFilters } from './types'
+import type { PageStatusFilter, PageListFilters, TranscriptionListFilters } from './types'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +36,8 @@ export const queryKeys = {
     batches: ['admin', 'batches'] as const,
     batchPages: (batchId: string, page: number, perPage: number) => ['admin', 'batchPages', batchId, page, perPage] as const,
     reports: (page: number, pageSize: number) => ['admin', 'reports', page, pageSize] as const,
+    transcriptions: (page: number, pageSize: number, filters: TranscriptionListFilters = {}) =>
+      ['admin', 'transcriptions', page, pageSize, filters.userEmail ?? '', filters.batchId ?? '', filters.pageId ?? ''] as const,
   },
   // Shared by CurateListScreen (filtered browsing) and CuratePageScreen
   // (unfiltered dataset-wide prev/next navigation) — same fetch, same cache.

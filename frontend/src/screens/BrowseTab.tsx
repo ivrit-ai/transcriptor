@@ -307,7 +307,6 @@ export function BrowseTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; q
             <thead>
               <tr>
                 <th>Manuscript ID</th>
-                <th>Source</th>
                 <th style={{ textAlign: 'right' }}>Pages</th>
                 <th style={{ textAlign: 'right' }}>Lines</th>
                 <th>Completion</th>
@@ -321,7 +320,6 @@ export function BrowseTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; q
                 return (
                   <tr key={b.batch_id}>
                     <td style={{ fontWeight: 500 }}>{b.external_id}</td>
-                    <td className={css.muted}>{b.source}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total_pages)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total_lines)}</td>
                     <td>
@@ -348,7 +346,7 @@ export function BrowseTab({ coverage, queue }: { coverage: AdminCoverageDTO[]; q
                 )
               })}
               {coverage.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>No manuscripts loaded</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--tl-muted)', padding: 32 }}>No manuscripts loaded</td></tr>
               )}
             </tbody>
           </table>

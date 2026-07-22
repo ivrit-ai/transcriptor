@@ -237,25 +237,38 @@ def admin_coverage(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict]:
+    coverage_cte = (
+        select(
+            Batch.id,
+            Batch.external_id,
+            func.count(func.distinct(Page.id)).label("total_pages"),
+            func.count(Line.id).label("total_lines"),
+            func.count(case((Line.transcription_count > 0, Line.id))).label(
+                "lines_with_any"
+            ),
+            func.count(
+                case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
+            ).label("lines_complete"),
+            func.round(
+                100.0
+                * func.count(
+                    case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
+                )
+                / func.nullif(func.count(Line.id), 0),
+                1,
+            ).label("completion_pct"),
+        )
+        .join(Page, Page.batch_id == Batch.id)
+        .join(Line, Line.page_id == Page.id)
+        .group_by(Batch.id, Batch.external_id)
+    ).cte("coverage")
+
     rows = (
         db.execute(
-            select(
-                Batch.id,
-                Batch.external_id,
-                Batch.source,
-                func.count(func.distinct(Page.id)).label("total_pages"),
-                func.count(Line.id).label("total_lines"),
-                func.count(case((Line.transcription_count > 0, Line.id))).label(
-                    "lines_with_any"
-                ),
-                func.count(
-                    case((Line.transcription_count >= _COMPLETION_TARGET, Line.id))
-                ).label("lines_complete"),
+            select(coverage_cte).order_by(
+                coverage_cte.c.completion_pct.desc(),
+                coverage_cte.c.lines_with_any.desc(),
             )
-            .join(Page, Page.batch_id == Batch.id)
-            .join(Line, Line.page_id == Page.id)
-            .group_by(Batch.id, Batch.external_id, Batch.source)
-            .order_by(Batch.external_id)
         )
         .mappings()
         .all()
@@ -265,14 +278,11 @@ def admin_coverage(
         {
             "batch_id": str(r["id"]),
             "external_id": r["external_id"],
-            "source": r["source"],
             "total_pages": r["total_pages"],
             "total_lines": r["total_lines"],
             "lines_with_any": r["lines_with_any"],
             "lines_complete": r["lines_complete"],
-            "completion_pct": round(100.0 * r["lines_complete"] / r["total_lines"], 1)
-            if r["total_lines"]
-            else 0.0,
+            "completion_pct": float(r["completion_pct"] or 0.0),
         }
         for r in rows
     ]
@@ -304,6 +314,121 @@ def admin_batches(
         }
         for r in rows
     ]
+
+
+@router.get("/transcriptions")
+def admin_transcriptions(
+    _: Annotated[User, Depends(require_curator)],
+    db: Annotated[Session, Depends(get_db)],
+    page: int = 1,
+    page_size: int = 50,
+    user_email: str | None = Query(None),
+    batch_id: str | None = Query(None),
+    page_id: str | None = Query(None),
+) -> dict:
+    """
+    Flat, paginated list of individual transcription submissions (one row per
+    Transcription, i.e. one user's response to one line — regardless of
+    `kind`), newest first. Each row carries the submitting user, the line/page
+    it belongs to, and the manuscript (batch) the page belongs to.
+
+    `user_email` is an exact, case-insensitive match on the *transcriber's*
+    `User.email` (not to be confused with `Batch.submitter_fingerprint`, which
+    hashes the email of whoever submitted the source manuscript).
+
+    `batch_id` and `page_id` are exact-match filters on the system-internal
+    UUIDs of the batch ("submission id") and page respectively.
+    """
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    offset = (page - 1) * page_size
+
+    batch_uuid: uuid.UUID | None = None
+    if batch_id is not None:
+        try:
+            batch_uuid = uuid.UUID(batch_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid batch_id") from e
+
+    page_uuid: uuid.UUID | None = None
+    if page_id is not None:
+        try:
+            page_uuid = uuid.UUID(page_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid page_id") from e
+
+    base_query = (
+        select(
+            Transcription.id.label("transcription_id"),
+            Transcription.kind,
+            Transcription.text,
+            Transcription.created_at,
+            User.id.label("user_id"),
+            User.display_name,
+            User.email,
+            Line.id.label("line_id"),
+            Line.line_index,
+            Line.external_id.label("line_external_id"),
+            Page.id.label("page_id"),
+            Page.external_id.label("page_external_id"),
+            Batch.id.label("batch_id"),
+            Batch.external_id.label("batch_external_id"),
+        )
+        .join(User, User.id == Transcription.user_id)
+        .join(Line, Line.id == Transcription.line_id)
+        .join(Page, Page.id == Line.page_id)
+        .join(Batch, Batch.id == Page.batch_id)
+    )
+
+    if user_email and user_email.strip():
+        base_query = base_query.where(
+            func.lower(User.email) == user_email.strip().lower()
+        )
+    if batch_uuid is not None:
+        base_query = base_query.where(Page.batch_id == batch_uuid)
+    if page_uuid is not None:
+        base_query = base_query.where(Line.page_id == page_uuid)
+
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total: int = db.execute(count_query).scalar_one()
+
+    rows_query = (
+        base_query.order_by(Transcription.created_at.desc(), Transcription.id.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+
+    rows = db.execute(rows_query).mappings().all()
+
+    items = [
+        {
+            "transcription_id": str(r["transcription_id"]),
+            "kind": r["kind"],
+            "text": r["text"],
+            "created_at": r["created_at"].isoformat(),
+            "user_id": str(r["user_id"]),
+            "display_name": r["display_name"],
+            "email": r["email"],
+            "line_id": str(r["line_id"]),
+            "line_index": r["line_index"],
+            "line_external_id": r["line_external_id"],
+            "page_id": str(r["page_id"]),
+            "page_external_id": r["page_external_id"],
+            "batch_id": str(r["batch_id"]),
+            "batch_external_id": r["batch_external_id"],
+        }
+        for r in rows
+    ]
+
+    total_pages = (total + page_size - 1) // page_size if page_size else 1
+
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/pages")
@@ -429,7 +554,9 @@ def admin_pages(
     if batch_external_id and batch_external_id.strip():
         pattern = f"%{batch_external_id.strip()}%"
         count_query = count_query.where(Batch.external_id.ilike(pattern))
-        approved_count_query = approved_count_query.where(Batch.external_id.ilike(pattern))
+        approved_count_query = approved_count_query.where(
+            Batch.external_id.ilike(pattern)
+        )
         rows_query = rows_query.where(Batch.external_id.ilike(pattern))
 
     if submitter_email and submitter_email.strip():
@@ -438,7 +565,9 @@ def admin_pages(
             (settings.submitter_fingerprint_salt + normalized).encode()
         ).hexdigest()
         count_query = count_query.where(Batch.submitter_fingerprint == fp)
-        approved_count_query = approved_count_query.where(Batch.submitter_fingerprint == fp)
+        approved_count_query = approved_count_query.where(
+            Batch.submitter_fingerprint == fp
+        )
         rows_query = rows_query.where(Batch.submitter_fingerprint == fp)
 
     if status_filter is not None:
@@ -448,9 +577,7 @@ def admin_pages(
     total: int = db.execute(count_query).scalar_one()
     approved_count: int = db.execute(approved_count_query).scalar_one()
 
-    rows = (
-        db.execute(rows_query.offset(offset).limit(page_size)).mappings().all()
-    )
+    rows = db.execute(rows_query.offset(offset).limit(page_size)).mappings().all()
 
     items = [
         {
@@ -711,7 +838,9 @@ def admin_export(
         .join(Batch, Batch.id == Page.batch_id)
         .join(Transcription, Transcription.line_id == Line.id)
         .where(Line.transcription_count >= 1)
-        .order_by(Batch.external_id, Page.external_id, Line.line_index, Transcription.user_id)
+        .order_by(
+            Batch.external_id, Page.external_id, Line.line_index, Transcription.user_id
+        )
     )
 
     def generate():
@@ -763,7 +892,9 @@ def admin_export(
     return StreamingResponse(
         generate(),
         media_type="application/x-ndjson",
-        headers={"Content-Disposition": 'attachment; filename="transcriptor_export.jsonl"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="transcriptor_export.jsonl"'
+        },
     )
 
 
