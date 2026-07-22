@@ -48,6 +48,7 @@ export function CuratePageScreen() {
 
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
   const [annotationDirty, setAnnotationDirty] = useState(false);
+  const [rotateImageOnly, setRotateImageOnly] = useState(false);
 
   const {
     data: serverData,
@@ -281,16 +282,18 @@ export function CuratePageScreen() {
   const rotateBy = useCallback(
     (deltaRotation: number) => {
       if (!page) return;
-      const coordW = currentRotation % 180 === 0 ? imgW : imgH;
-      const coordH = currentRotation % 180 === 0 ? imgH : imgW;
-      setLocalLines((lines) =>
-        lines
-          ? applyRotationToLines(lines, deltaRotation, coordW, coordH)
-          : lines,
-      );
+      if (!rotateImageOnly) {
+        const coordW = currentRotation % 180 === 0 ? imgW : imgH;
+        const coordH = currentRotation % 180 === 0 ? imgH : imgW;
+        setLocalLines((lines) =>
+          lines
+            ? applyRotationToLines(lines, deltaRotation, coordW, coordH)
+            : lines,
+        );
+      }
       setCurrentRotation((r) => (((r + deltaRotation) % 360) + 360) % 360);
     },
-    [page, currentRotation, imgW, imgH],
+    [page, currentRotation, imgW, imgH, rotateImageOnly],
   );
 
   const rotateLeft = useCallback(() => {
@@ -512,7 +515,8 @@ export function CuratePageScreen() {
                   type="button"
                   className={css.actionBtn}
                   onClick={rotateLeft}
-                  title="Rotate 90° left  [7]"
+                  disabled={rotateImageOnly}
+                  title={rotateImageOnly ? "Disabled in image-only mode — use 180°" : "Rotate 90° left  [7]"}
                 >
                   ↺ 90° <span className={css.keyHint}>7</span>
                 </button>
@@ -520,7 +524,8 @@ export function CuratePageScreen() {
                   type="button"
                   className={css.actionBtn}
                   onClick={rotateRight}
-                  title="Rotate 90° right  [9]"
+                  disabled={rotateImageOnly}
+                  title={rotateImageOnly ? "Disabled in image-only mode — use 180°" : "Rotate 90° right  [9]"}
                 >
                   ↻ 90° <span className={css.keyHint}>9</span>
                 </button>
@@ -533,6 +538,14 @@ export function CuratePageScreen() {
                   ↻ 180° <span className={css.keyHint}>2</span>
                 </button>
               </div>
+              <label className={css.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={rotateImageOnly}
+                  onChange={(e) => setRotateImageOnly(e.target.checked)}
+                />
+                Rotate image only
+              </label>
             </div>
 
             <div className={css.actionsSection}>
