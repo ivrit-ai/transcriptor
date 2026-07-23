@@ -15,6 +15,7 @@ import {
   LogOut,
   Filter,
   Image,
+  Link2,
 } from "lucide-react";
 
 const icons = {
@@ -34,6 +35,7 @@ const icons = {
   logout: LogOut,
   filter: Filter,
   image: Image,
+  link: Link2,
 } as const;
 
 interface IconProps {

@@ -31,7 +31,7 @@ export interface SaveToast {
   kind: SaveToastKind;
 }
 
-export const ALLOWED_ESCAPES = ['לא ברור', 'שפה שונה', 'מחוק'] as const
+export const ALLOWED_ESCAPES = ["לא ברור", "שפה שונה", "מחוק"] as const;
 
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
   { kind: "cant_read", label: "טקסט לא ברור" },
@@ -83,6 +83,7 @@ export interface LoopState {
   pageFill: number;
   loading: boolean;
   noSession: boolean;
+  pageNotFound: boolean;
   finished: boolean;
   editing: boolean;
   toast: SaveToast | null;
@@ -96,13 +97,14 @@ export function useLoop(pageId?: string): LoopState {
   const [cursor, setCursor] = useState(0);
   const [input, setInput] = useState("");
   const setInputAndClearError = useCallback((v: string) => {
-    setInput(v)
-    setSubmitError(null)
-  }, [])
+    setInput(v);
+    setSubmitError(null);
+  }, []);
   const [daily, setDaily] = useState(0);
   const [done, setDone] = useState(0);
   const [eligibleTotal, setEligibleTotal] = useState(0);
   const [noSession, setNoSession] = useState(false);
+  const [pageNotFound, setPageNotFound] = useState(false);
   const [finished, setFinished] = useState(false);
   const [toast, setToast] = useState<SaveToast | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,7 +129,8 @@ export function useLoop(pageId?: string): LoopState {
     queryFn: () => (pageId ? api.getSession(pageId) : api.nextSession()),
     staleTime: Infinity,
     retry: (failureCount, err) =>
-      err instanceof ApiError && (err.status === 401 || err.status === 403)
+      err instanceof ApiError &&
+      (err.status === 401 || err.status === 403 || err.status === 404)
         ? false
         : failureCount < 2,
   });
@@ -147,7 +150,19 @@ export function useLoop(pageId?: string): LoopState {
 
   useEffect(() => {
     if (isLoading) return;
-    if (isError) return;
+    if (isError) {
+      // GET /api/sessions/{pageId} returns 404 when the page doesn't exist
+      // (e.g. a stale/mistyped link into /work/:pageId). That's distinct from
+      // "no work left" (noSession, which only applies to /api/next-session)
+      // and needs its own friendly UI rather than getting stuck loading.
+      if (pageId && error instanceof ApiError && error.status === 404) {
+        setPage(null);
+        setLines([]);
+        setPageNotFound(true);
+      }
+      return;
+    }
+    setPageNotFound(false);
     if (!session || session.lines.length === 0) {
       setPage(null);
       setLines([]);
@@ -177,7 +192,7 @@ export function useLoop(pageId?: string): LoopState {
       setInput("");
     }
     setFinished(false);
-  }, [session, isLoading, isError]);
+  }, [session, isLoading, isError, error, pageId]);
 
   const loading = isLoading || (!session && isFetching);
 
@@ -212,25 +227,30 @@ export function useLoop(pageId?: string): LoopState {
   }, []);
 
   const validateEscape = (t: string): string | null => {
-    const re = /\(\(([^)]*)\)\)/g
-    let match: RegExpExecArray | null
+    const re = /\(\(([^)]*)\)\)/g;
+    let match: RegExpExecArray | null;
     while ((match = re.exec(t)) !== null) {
-      const inner = match[1].trim()
-      if (inner && !ALLOWED_ESCAPES.includes(inner as typeof ALLOWED_ESCAPES[number])) {
-        return inner
+      const inner = match[1].trim();
+      if (
+        inner &&
+        !ALLOWED_ESCAPES.includes(inner as (typeof ALLOWED_ESCAPES)[number])
+      ) {
+        return inner;
       }
     }
-    return null
-  }
+    return null;
+  };
 
   const submit = useCallback(() => {
     const text = input.trim();
     if (!text) return;
 
-    const bad = validateEscape(text)
+    const bad = validateEscape(text);
     if (bad) {
-      setSubmitError(`הסוגריים הכפולים מכילים ערך לא חוקי: "${bad}". הערכים החוקיים: ${ALLOWED_ESCAPES.join(', ')}`)
-      return
+      setSubmitError(
+        `הסוגריים הכפולים מכילים ערך לא חוקי: "${bad}". הערכים החוקיים: ${ALLOWED_ESCAPES.join(", ")}`,
+      );
+      return;
     }
 
     const idx = cursor;
@@ -261,7 +281,10 @@ export function useLoop(pageId?: string): LoopState {
     }
 
     const time_spent_ms = Date.now() - lineStartTime.current;
-    submitMutation.mutate({ lineId: line.id, body: { kind: "text", text, time_spent_ms } });
+    submitMutation.mutate({
+      lineId: line.id,
+      body: { kind: "text", text, time_spent_ms },
+    });
     advance(idx);
   }, [input, cursor, submitMutation, advance]);
 
@@ -275,13 +298,18 @@ export function useLoop(pageId?: string): LoopState {
 
       setLines((ls) =>
         ls.map((l, i) =>
-          i === idx ? { ...l, status: "flagged", prior_kind: kind, your_text: '' } : l,
+          i === idx
+            ? { ...l, status: "flagged", prior_kind: kind, your_text: "" }
+            : l,
         ),
       );
       if (!isReflag) setDone((d) => d + 1);
 
       const time_spent_ms = Date.now() - lineStartTime.current;
-      submitMutation.mutate({ lineId: line.id, body: { kind, text, time_spent_ms } });
+      submitMutation.mutate({
+        lineId: line.id,
+        body: { kind, text, time_spent_ms },
+      });
       advance(idx);
     },
     [cursor, submitMutation, advance],
@@ -339,6 +367,7 @@ export function useLoop(pageId?: string): LoopState {
     pageFill,
     loading,
     noSession,
+    pageNotFound,
     finished,
     editing,
     toast,

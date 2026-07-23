@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -65,6 +65,35 @@ function bucketFor(count: number): number {
   if (count <= 3) return 1;
   if (count <= 9) return 2;
   return 3;
+}
+
+function LinkCopiedToast({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 20,
+        insetInlineStart: 20,
+        zIndex: 200,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        fontFamily: "var(--font-ui)",
+        fontSize: 13,
+        fontWeight: 500,
+        color: "oklch(0.45 0.08 150)",
+        background: "var(--tl-surface)",
+        border: "0.5px solid var(--tl-border)",
+        borderRadius: 999,
+        padding: "9px 15px",
+        boxShadow: "0 4px 16px rgba(40,30,20,0.16)",
+      }}
+    >
+      <Icon name="check" size={13} color="oklch(0.6 0.08 150)" />
+      קישור לעמוד הועתק
+    </div>
+  );
 }
 
 function GoalRing({
@@ -355,10 +384,12 @@ function DocFolio({
   doc,
   thumbWidth,
   onOpen,
+  onShare,
 }: {
   doc: DocumentDTO;
   thumbWidth: number;
   onOpen: () => void;
+  onShare: () => void;
 }) {
   const title = doc.skipped
     ? "עמוד שדילגתם עליו — לחצו לפתיחה מחדש"
@@ -366,23 +397,33 @@ function DocFolio({
       ? "עמוד שהושלם — לחצו לצפייה"
       : "המשיכו לעבוד על העמוד הזה";
 
+  // Approved pages get explicit hover actions (open / share link) instead of
+  // a single ambiguous whole-card click, since there are now two things to
+  // do. Non-approved pages (not yet available for others to work on) keep
+  // the plain click-to-open behavior.
+  const clickable = !doc.approved;
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onOpen : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
       title={title}
       className="pg-folio"
       style={{
         width: thumbWidth,
         flexShrink: 0,
-        cursor: "pointer",
+        cursor: clickable ? "pointer" : "default",
         borderRadius: 10,
       }}
     >
@@ -396,6 +437,30 @@ function DocFolio({
           rotation={doc.image_rotation}
           customBbox={doc.spotlight_bbox ?? undefined}
         />
+        {doc.approved && (
+          <div className="pg-folio-actions">
+            <button
+              type="button"
+              className="pg-folio-action-btn pg-folio-action-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+            >
+              לתעתוק
+            </button>
+            <button
+              type="button"
+              className="pg-folio-action-btn pg-folio-action-secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare();
+              }}
+            >
+              שתף קישור
+            </button>
+          </div>
+        )}
         {doc.status == "skipped" && (
           <span
             title="דילגתם על עמוד זה"
@@ -503,6 +568,119 @@ function DocFolio({
   );
 }
 
+// A faint, non-interactive chevron shown at one edge of a horizontally
+// scrolling row to hint that more content is reachable by swiping that way.
+// `side="start"` sits at the reading-direction start (physically right, in
+// RTL) and points back; `side="end"` sits at the physical left and points
+// onward.
+function ScrollEdgeArrow({
+  side,
+  visible,
+}: {
+  side: "start" | "end";
+  visible: boolean;
+}) {
+  const isStart = side === "start";
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        top: 0,
+        bottom: 6,
+        insetInlineStart: isStart ? 0 : undefined,
+        insetInlineEnd: isStart ? undefined : 0,
+        width: 40,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: isStart ? "flex-start" : "flex-end",
+        pointerEvents: "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.2s",
+      }}
+    >
+      <div
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: "var(--tl-surface)",
+          border: "0.5px solid var(--tl-border)",
+          boxShadow: "0 2px 8px rgba(40,30,20,0.16)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name={isStart ? "back" : "forward"} size={14} color="var(--tl-muted)" />
+      </div>
+    </div>
+  );
+}
+
+// Mobile gallery row: horizontally scrollable, no pagination (side-scrolling
+// and paging don't make sense together). Shows faint edge arrows while more
+// content is reachable in that direction.
+function MobileScrollRow({ children }: { children: ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollStart, setCanScrollStart] = useState(false);
+  const [canScrollEnd, setCanScrollEnd] = useState(false);
+
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 1) {
+      setCanScrollStart(false);
+      setCanScrollEnd(false);
+      return;
+    }
+    // RTL: scrollLeft starts at 0 (first item, physically on the right) and
+    // goes negative as later items (physically to the left) are scrolled
+    // into view — so "distance scrolled" is the negated value.
+    const scrolled = -el.scrollLeft;
+    setCanScrollStart(scrolled > 1);
+    setCanScrollEnd(scrolled < max - 1);
+  }, []);
+
+  // Re-measure on every render (content — e.g. async-loaded folios — can
+  // change size without the ref itself changing).
+  useEffect(() => {
+    updateEdges();
+  });
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateEdges, { passive: true });
+    window.addEventListener("resize", updateEdges);
+    return () => {
+      el.removeEventListener("scroll", updateEdges);
+      window.removeEventListener("resize", updateEdges);
+    };
+  }, [updateEdges]);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          gap: 18,
+          direction: "rtl",
+          overflowX: "auto",
+          paddingBottom: 6,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {children}
+      </div>
+      <ScrollEdgeArrow side="start" visible={canScrollStart} />
+      <ScrollEdgeArrow side="end" visible={canScrollEnd} />
+    </div>
+  );
+}
+
 function GalleryPager({
   page,
   pageCount,
@@ -557,33 +735,22 @@ function ContributedPageFolio({
   page,
   thumbWidth,
   onOpen,
+  onShare,
 }: {
   page: ContributedPageDTO;
   thumbWidth: number;
   onOpen: () => void;
+  onShare: () => void;
 }) {
   const canOpen = page.approved;
   return (
     <div
-      role={canOpen ? "button" : undefined}
-      tabIndex={canOpen ? 0 : undefined}
-      onClick={canOpen ? onOpen : undefined}
-      onKeyDown={
-        canOpen
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen();
-              }
-            }
-          : undefined
-      }
       className={canOpen ? "pg-folio" : undefined}
       style={{
         width: thumbWidth,
         flexShrink: 0,
         borderRadius: 10,
-        cursor: canOpen ? "pointer" : "default",
+        cursor: "default",
         opacity: canOpen ? 1 : 0.68,
       }}
     >
@@ -617,12 +784,36 @@ function ContributedPageFolio({
             לא אושר עדיין
           </span>
         )}
+        {canOpen && (
+          <div className="pg-folio-actions">
+            <button
+              type="button"
+              className="pg-folio-action-btn pg-folio-action-primary"
+              onClick={onOpen}
+            >
+              לתעתוק
+            </button>
+            <button
+              type="button"
+              className="pg-folio-action-btn pg-folio-action-secondary"
+              onClick={onShare}
+            >
+              שתף קישור
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function DocumentGallery({ isMobile }: { isMobile: boolean }) {
+function DocumentGallery({
+  isMobile,
+  onShareLink,
+}: {
+  isMobile: boolean;
+  onShareLink: (pageId: string) => void;
+}) {
   const navigate = useNavigate();
   const [galleryPage, setGalleryPage] = useState(0);
   const { data, isLoading } = useQuery({
@@ -633,11 +824,15 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
 
   const docs = data ?? [];
   const thumbWidth = isMobile ? 150 : 168;
-  const pageCount = Math.ceil(docs.length / GALLERY_PAGE_SIZE);
-  const visibleDocs = docs.slice(
-    galleryPage * GALLERY_PAGE_SIZE,
-    (galleryPage + 1) * GALLERY_PAGE_SIZE,
-  );
+  // Mobile side-scrolls the full list instead of paging (doing both at once
+  // doesn't make sense); pagination is a desktop-only affordance.
+  const pageCount = isMobile ? 1 : Math.ceil(docs.length / GALLERY_PAGE_SIZE);
+  const visibleDocs = isMobile
+    ? docs
+    : docs.slice(
+        galleryPage * GALLERY_PAGE_SIZE,
+        (galleryPage + 1) * GALLERY_PAGE_SIZE,
+      );
 
   const header = (
     <div
@@ -707,29 +902,28 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
       </div>
     );
   } else {
-    body = (
+    const folios = visibleDocs.map((doc) => (
+      <DocFolio
+        key={doc.page_id}
+        doc={doc}
+        thumbWidth={thumbWidth}
+        onOpen={() => navigate(`/work/${doc.page_id}`)}
+        onShare={() => onShareLink(doc.page_id)}
+      />
+    ));
+    body = isMobile ? (
+      <MobileScrollRow>{folios}</MobileScrollRow>
+    ) : (
       <div
         style={{
           display: "flex",
           gap: 18,
           direction: "rtl",
-          ...(isMobile
-            ? {
-                overflowX: "auto",
-                paddingBottom: 6,
-                WebkitOverflowScrolling: "touch" as const,
-              }
-            : { flexWrap: "wrap" as const, justifyContent: "center" as const }),
+          flexWrap: "wrap",
+          justifyContent: "center",
         }}
       >
-        {visibleDocs.map((doc) => (
-          <DocFolio
-            key={doc.page_id}
-            doc={doc}
-            thumbWidth={thumbWidth}
-            onOpen={() => navigate(`/work/${doc.page_id}`)}
-          />
-        ))}
+        {folios}
       </div>
     );
   }
@@ -754,7 +948,13 @@ function DocumentGallery({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-function ContributedPagesGallery({ isMobile }: { isMobile: boolean }) {
+function ContributedPagesGallery({
+  isMobile,
+  onShareLink,
+}: {
+  isMobile: boolean;
+  onShareLink: (pageId: string) => void;
+}) {
   const navigate = useNavigate();
   const [galleryPage, setGalleryPage] = useState(0);
   const [reportReason, setReportReason] = useState<
@@ -768,11 +968,24 @@ function ContributedPagesGallery({ isMobile }: { isMobile: boolean }) {
 
   const pages = data ?? [];
   const thumbWidth = isMobile ? 150 : 168;
-  const pageCount = Math.ceil(pages.length / GALLERY_PAGE_SIZE);
-  const visiblePages = pages.slice(
-    galleryPage * GALLERY_PAGE_SIZE,
-    (galleryPage + 1) * GALLERY_PAGE_SIZE,
-  );
+  // Mobile side-scrolls the full list instead of paging (doing both at once
+  // doesn't make sense); pagination is a desktop-only affordance.
+  const pageCount = isMobile ? 1 : Math.ceil(pages.length / GALLERY_PAGE_SIZE);
+  const visiblePages = isMobile
+    ? pages
+    : pages.slice(
+        galleryPage * GALLERY_PAGE_SIZE,
+        (galleryPage + 1) * GALLERY_PAGE_SIZE,
+      );
+  const folios = visiblePages.map((page) => (
+    <ContributedPageFolio
+      key={page.page_id}
+      page={page}
+      thumbWidth={thumbWidth}
+      onOpen={() => navigate(`/work/${page.page_id}`)}
+      onShare={() => onShareLink(page.page_id)}
+    />
+  ));
 
   return (
     <div
@@ -825,32 +1038,21 @@ function ContributedPagesGallery({ isMobile }: { isMobile: boolean }) {
         </div>
       ) : (
         <>
-          <div
-            style={{
-              display: "flex",
-              gap: 18,
-              direction: "rtl",
-              ...(isMobile
-                ? {
-                    overflowX: "auto",
-                    paddingBottom: 6,
-                    WebkitOverflowScrolling: "touch" as const,
-                  }
-                : {
-                    flexWrap: "wrap" as const,
-                    justifyContent: "center" as const,
-                  }),
-            }}
-          >
-            {visiblePages.map((page) => (
-              <ContributedPageFolio
-                key={page.page_id}
-                page={page}
-                thumbWidth={thumbWidth}
-                onOpen={() => navigate(`/work/${page.page_id}`)}
-              />
-            ))}
-          </div>
+          {isMobile ? (
+            <MobileScrollRow>{folios}</MobileScrollRow>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                gap: 18,
+                direction: "rtl",
+                flexWrap: "wrap",
+                justifyContent: "center",
+              }}
+            >
+              {folios}
+            </div>
+          )}
           <GalleryPager
             page={galleryPage}
             pageCount={pageCount}
@@ -903,6 +1105,27 @@ export function ProgressScreen() {
   }, []);
 
   const isMobile = viewportW < 768;
+
+  const [linkCopied, setLinkCopied] = useState(false);
+  const linkCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const shareWorkLink = useCallback((pageId: string) => {
+    const url = `${window.location.origin}/work/${pageId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setLinkCopied(true);
+        if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current);
+        linkCopiedTimer.current = setTimeout(() => setLinkCopied(false), 3000);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current);
+    };
+  }, []);
 
   const { data: profileData } = useQuery({
     queryKey: queryKeys.profile.me,
@@ -1119,10 +1342,14 @@ export function ProgressScreen() {
           </div>
           {statsRow}
           {activityCard}
-          <DocumentGallery isMobile={isMobile} />
-          <ContributedPagesGallery isMobile={isMobile} />
+          <DocumentGallery isMobile={isMobile} onShareLink={shareWorkLink} />
+          <ContributedPagesGallery
+            isMobile={isMobile}
+            onShareLink={shareWorkLink}
+          />
           {resumeCard}
         </div>
+        <LinkCopiedToast visible={linkCopied} />
       </div>
     );
   }
@@ -1182,10 +1409,14 @@ export function ProgressScreen() {
             {activityCard}
           </div>
         </div>
-        <DocumentGallery isMobile={isMobile} />
-        <ContributedPagesGallery isMobile={isMobile} />
+        <DocumentGallery isMobile={isMobile} onShareLink={shareWorkLink} />
+        <ContributedPagesGallery
+          isMobile={isMobile}
+          onShareLink={shareWorkLink}
+        />
         {resumeCard}
       </div>
+      <LinkCopiedToast visible={linkCopied} />
     </div>
   );
 }

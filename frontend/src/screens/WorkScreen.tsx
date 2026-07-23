@@ -8,6 +8,7 @@ import type { LoopLine, SaveToast } from '../hooks/useLoop'
 import { Icon, TopNav } from '../components/shared'
 import { GuidelinesModal } from '../components/GuidelinesModal'
 import { ReportProblemModal } from '../components/ReportProblemModal'
+import { PageNotFound } from '../components/PageNotFound'
 import { FlagSelector } from '../components/FlagSelector'
 import { AnnotationViewer } from '../components/AnnotationViewer'
 import css from './WorkScreen.module.css'
@@ -107,6 +108,25 @@ function FinishedOverlay({ daily, done, onContinue }: {
       >
         המשך לעמוד הבא <Icon name="forward" size={16} color="#fff" />
       </button>
+    </div>
+  )
+}
+
+// ── Link-copied toast ─────────────────────────────────────────────────────────
+function LinkCopiedToast({ visible }: { visible: boolean }) {
+  if (!visible) return null
+  return (
+    <div style={{
+      position: 'absolute', bottom: 16, insetInlineStart: 16, zIndex: 50,
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
+      color: 'oklch(0.45 0.08 150)',
+      background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
+      borderRadius: 999, padding: '7px 13px',
+      boxShadow: '0 4px 16px rgba(40,30,20,0.12)',
+    }}>
+      <Icon name="check" size={13} color="oklch(0.6 0.08 150)" />
+      קישור לעמוד הועתק
     </div>
   )
 }
@@ -452,8 +472,30 @@ export function WorkScreen() {
   const [focusedRecalcKey, setFocusedRecalcKey] = useState(0)
   const [guidelinesOpen, setGuidelinesOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const linkCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const wide = viewportW >= 960
+
+  // Share link: from /work/:pageId, the current URL already points at this
+  // exact page; from the general /work auto-dispatch flow, append the loaded
+  // page's id so the recipient lands on this same page.
+  const canShareLink = !!pageId || !!L.page
+  const shareLink = useCallback(() => {
+    if (!canShareLink) return
+    const url = pageId ? window.location.href : `${window.location.origin}/work/${L.page?.page_id}`
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current)
+      linkCopiedTimer.current = setTimeout(() => setLinkCopied(false), 3000)
+    }).catch(() => {})
+  }, [pageId, L.page, canShareLink])
+
+  useEffect(() => {
+    return () => {
+      if (linkCopiedTimer.current) clearTimeout(linkCopiedTimer.current)
+    }
+  }, [])
 
   // Navigate to AllCaughtUp when no session
   useEffect(() => {
@@ -976,6 +1018,25 @@ export function WorkScreen() {
             הנחיות לתעתוק
           </button>
           <button
+            onClick={shareLink}
+            disabled={!canShareLink}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '4px 10px', cursor: canShareLink ? 'pointer' : 'default',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              transition: 'background 0.15s',
+              opacity: canShareLink ? 1 : 0.5,
+            }}
+            onMouseEnter={e => canShareLink && (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <Icon name="link" size={12} color="oklch(0.5 0.08 220)" />
+            שתף קישור
+          </button>
+          <button
             onClick={() => setReportOpen(true)}
             style={{
               fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
@@ -1095,6 +1156,25 @@ export function WorkScreen() {
             הנחיות לתעתוק
           </button>
           <button
+            onClick={shareLink}
+            disabled={!canShareLink}
+            style={{
+              fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+              color: 'oklch(0.5 0.08 220)',
+              background: 'none', border: '0.5px solid oklch(0.5 0.08 220 / 0.3)',
+              borderRadius: 8, padding: '3px 8px', cursor: canShareLink ? 'pointer' : 'default',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              transition: 'background 0.15s',
+              opacity: canShareLink ? 1 : 0.5,
+            }}
+            onMouseEnter={e => canShareLink && (e.currentTarget.style.background = 'oklch(0.5 0.08 220 / 0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <Icon name="link" size={11} color="oklch(0.5 0.08 220)" />
+            שתף קישור
+          </button>
+          <button
             onClick={() => setReportOpen(true)}
             style={{
               fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
@@ -1142,40 +1222,52 @@ export function WorkScreen() {
       position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
       <TopNav active="work" />
-      {innerContent}
+      {L.pageNotFound ? (
+        <PageNotFound
+          onNextPage={goNextPage}
+          onBackToProgress={() => navigate('/me')}
+          onReportProblem={() => setReportOpen(true)}
+        />
+      ) : (
+        <>
+          {innerContent}
 
-      {/* page-fill progress bar (fills RTL) */}
-      <div role="progressbar" aria-valuenow={Math.round(L.pageFill * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="התקדמות בעמוד" style={{ height: 5, background: 'var(--tl-muted-fill)', flexShrink: 0 }}>
-        <div style={{
-          height: '100%', width: `${L.pageFill * 100}%`,
-          background: 'oklch(0.62 0.08 150)',
-          transition: 'width .35s', float: 'right',
-        }} />
-      </div>
+          {/* page-fill progress bar (fills RTL) */}
+          <div role="progressbar" aria-valuenow={Math.round(L.pageFill * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="התקדמות בעמוד" style={{ height: 5, background: 'var(--tl-muted-fill)', flexShrink: 0 }}>
+            <div style={{
+              height: '100%', width: `${L.pageFill * 100}%`,
+              background: 'oklch(0.62 0.08 150)',
+              transition: 'width .35s', float: 'right',
+            }} />
+          </div>
+
+          {L.finished && (
+            <FinishedOverlay daily={L.daily} done={L.done} onContinue={goNextPage} />
+          )}
+          {pendingNavIdx !== null && (
+            <NavConfirmDialog
+              onSubmitAndMove={confirmSubmitAndNav}
+              onMoveOnly={confirmMoveOnly}
+              onCancel={() => setPendingNavIdx(null)}
+            />
+          )}
+          {skipPagePending && (
+            <NavConfirmDialog
+              message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
+              onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.skipPage(); goNextPage() }}
+              onMoveOnly={() => { setSkipPagePending(false); L.skipPage(); goNextPage() }}
+              onCancel={() => setSkipPagePending(false)}
+            />
+          )}
+        </>
+      )}
 
       <SaveToastBadge toast={L.toast} />
-      {L.finished && (
-        <FinishedOverlay daily={L.daily} done={L.done} onContinue={goNextPage} />
-      )}
-      {pendingNavIdx !== null && (
-        <NavConfirmDialog
-          onSubmitAndMove={confirmSubmitAndNav}
-          onMoveOnly={confirmMoveOnly}
-          onCancel={() => setPendingNavIdx(null)}
-        />
-      )}
-      {skipPagePending && (
-        <NavConfirmDialog
-          message="יש טקסט בתיבה — מה לעשות לפני המעבר לעמוד אחר?"
-          onSubmitAndMove={() => { L.submit(); setSkipPagePending(false); L.skipPage(); goNextPage() }}
-          onMoveOnly={() => { setSkipPagePending(false); L.skipPage(); goNextPage() }}
-          onCancel={() => setSkipPagePending(false)}
-        />
-      )}
+      <LinkCopiedToast visible={linkCopied} />
       {guidelinesOpen && <GuidelinesModal onClose={() => setGuidelinesOpen(false)} />}
-      {reportOpen && page && (
+      {reportOpen && (
         <ReportProblemModal
-          pageId={page.page_id}
+          pageId={page?.page_id}
           lineId={L.current?.id}
           onClose={() => setReportOpen(false)}
         />
