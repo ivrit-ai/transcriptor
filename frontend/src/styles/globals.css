@@ -143,6 +143,64 @@ body {
 .pg-folio:active { transform: translateY(0); }
 .pg-folio:focus-visible { outline: 2px solid var(--tl-accent); outline-offset: 3px; }
 
+/* Hover-reveal action buttons on an approved folio's thumbnail (profile
+   gallery) — offers "open" + "copy share link" instead of a single
+   whole-card click, since a folio can now do either. */
+.pg-folio-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(20,15,8,0.18) 0%, rgba(20,15,8,0.6) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.pg-folio:hover .pg-folio-actions,
+.pg-folio:focus-within .pg-folio-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* On touch/mobile widths there's no hover to reveal the actions, and a
+   "tap once to reveal, tap again to act" pattern isn't obvious — so on
+   eligible folios they're always shown instead. */
+@media (max-width: 767px) {
+  .pg-folio-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.pg-folio-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, transform 0.08s;
+}
+.pg-folio-action-btn:active { transform: translateY(1px); }
+.pg-folio-action-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.pg-folio-action-primary { color: #fff; background: var(--tl-accent); }
+.pg-folio-action-primary:hover { background: var(--tl-accent-hover); }
+
+.pg-folio-action-secondary { color: var(--tl-ink); background: #fff; }
+.pg-folio-action-secondary:hover { background: oklch(0.97 0.01 60); }
+
 /* Auth / form inputs */
 .pg-input {
   width: 100%;
