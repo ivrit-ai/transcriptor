@@ -457,7 +457,7 @@ function DocFolio({
                 onShare();
               }}
             >
-              שתף קישור
+              שיתוף קישור
             </button>
           </div>
         )}
@@ -798,7 +798,7 @@ function ContributedPageFolio({
               className="pg-folio-action-btn pg-folio-action-secondary"
               onClick={onShare}
             >
-              שתף קישור
+              שיתוף קישור
             </button>
           </div>
         )}

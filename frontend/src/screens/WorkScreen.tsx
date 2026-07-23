@@ -1034,7 +1034,7 @@ export function WorkScreen() {
             onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
             <Icon name="link" size={12} color="oklch(0.5 0.08 220)" />
-            שתף קישור
+            שיתוף קישור
           </button>
           <button
             onClick={() => setReportOpen(true)}
@@ -1172,7 +1172,7 @@ export function WorkScreen() {
             onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
             <Icon name="link" size={11} color="oklch(0.5 0.08 220)" />
-            שתף קישור
+            שיתוף קישור
           </button>
           <button
             onClick={() => setReportOpen(true)}
