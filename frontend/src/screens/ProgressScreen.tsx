@@ -731,6 +731,15 @@ function GalleryPager({
   );
 }
 
+// Bounding-box size (in the same units as w/h) of a w × h rectangle after
+// rotating it by `rotationDeg` degrees about its center.
+function rotatedBoxSize(w: number, h: number, rotationDeg: number) {
+  const theta = (rotationDeg * Math.PI) / 180;
+  const rw = Math.abs(w * Math.cos(theta)) + Math.abs(h * Math.sin(theta));
+  const rh = Math.abs(w * Math.sin(theta)) + Math.abs(h * Math.cos(theta));
+  return { rw, rh };
+}
+
 function ContributedPageFolio({
   page,
   thumbWidth,
@@ -743,6 +752,12 @@ function ContributedPageFolio({
   onShare: () => void;
 }) {
   const canOpen = page.approved;
+  const rotation = page.image_rotation ?? 0;
+  const { rw, rh } = rotatedBoxSize(page.width_px, page.height_px, rotation);
+  const scale = thumbWidth / rw;
+  const imgW = page.width_px * scale;
+  const imgH = page.height_px * scale;
+  const containerH = rh * scale;
   return (
     <div
       className={canOpen ? "pg-folio" : undefined}
@@ -754,15 +769,28 @@ function ContributedPageFolio({
         opacity: canOpen ? 1 : 0.68,
       }}
     >
-      <div style={{ position: "relative" }}>
+      <div
+        style={{
+          position: "relative",
+          width: thumbWidth,
+          height: containerH,
+          overflow: "hidden",
+          borderRadius: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <img
           src={page.image_url}
           alt={page.document_name}
           style={{
-            width: thumbWidth,
-            borderRadius: 8,
+            width: imgW,
+            height: imgH,
             objectFit: "cover",
             display: "block",
+            flexShrink: 0,
+            transform: `rotate(${rotation}deg)`,
           }}
         />
         {!page.approved && (
