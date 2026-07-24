@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
@@ -108,24 +108,45 @@ function IdFilterField({
 // shifts. Editing (approve/reject/rotate/annotate) happens on CuratePageScreen,
 // which navigates the *unfiltered* dataset independently.
 
+// Parses the initial filter/paging state from the URL search params so a
+// fresh mount (including navigating "back" from CuratePageScreen, which is a
+// real route change and therefore a real remount) restores exactly what the
+// curator had before — filters, status, and the selected row/page.
+function parseInitialState(searchParams: URLSearchParams) {
+  const rawIdx = parseInt(searchParams.get('idx') ?? '', 10)
+  const status = searchParams.get('status')
+  return {
+    globalIdx: Number.isFinite(rawIdx) && rawIdx > 0 ? rawIdx : 0,
+    statusFilter: (status === 'approved' || status === 'rejected' || status === 'unreviewed' ? status : '') as
+      | PageStatusFilter
+      | 'unreviewed'
+      | '',
+    batchId: searchParams.get('batchId')?.trim() ?? '',
+    pageId: searchParams.get('pageId')?.trim() ?? '',
+    extBatchId: searchParams.get('extBatchId')?.trim() ?? '',
+    submitterEmail: searchParams.get('submitterEmail')?.trim() ?? '',
+  }
+}
+
 export function CurateListScreen() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const [globalIdx, setGlobalIdx] = useState(0)
-  const [statusFilter, setStatusFilter] = useState<PageStatusFilter | 'unreviewed' | ''>('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [initial] = useState(() => parseInitialState(searchParams))
+  const [globalIdx, setGlobalIdx] = useState(initial.globalIdx)
+  const [statusFilter, setStatusFilter] = useState<PageStatusFilter | 'unreviewed' | ''>(initial.statusFilter)
   const [hoveredLineIdx, setHoveredLineIdx] = useState<number | null>(null)
 
   // Internal Batch ID / Page ID (UUID) filters — independent of each other
   // and of `statuses`. Uncommitted "draft" text only takes effect once the
   // user clicks "Filter" (or presses Enter); "Clear" resets both.
-  const [batchIdDraft, setBatchIdDraft] = useState('')
-  const [batchIdFilter, setBatchIdFilter] = useState('')
-  const [pageIdDraft, setPageIdDraft] = useState('')
-  const [pageIdFilter, setPageIdFilter] = useState('')
-  const [extBatchIdDraft, setExtBatchIdDraft] = useState('')
-  const [extBatchIdFilter, setExtBatchIdFilter] = useState('')
-  const [submitterEmailDraft, setSubmitterEmailDraft] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
-  const [submitterEmailFilter, setSubmitterEmailFilter] = useState(() => searchParams.get('submitterEmail')?.trim() ?? '')
+  const [batchIdDraft, setBatchIdDraft] = useState(initial.batchId)
+  const [batchIdFilter, setBatchIdFilter] = useState(initial.batchId)
+  const [pageIdDraft, setPageIdDraft] = useState(initial.pageId)
+  const [pageIdFilter, setPageIdFilter] = useState(initial.pageId)
+  const [extBatchIdDraft, setExtBatchIdDraft] = useState(initial.extBatchId)
+  const [extBatchIdFilter, setExtBatchIdFilter] = useState(initial.extBatchId)
+  const [submitterEmailDraft, setSubmitterEmailDraft] = useState(initial.submitterEmail)
+  const [submitterEmailFilter, setSubmitterEmailFilter] = useState(initial.submitterEmail)
 
   const filters: PageListFilters = useMemo(
     () => ({
@@ -181,6 +202,29 @@ export function CurateListScreen() {
     setGlobalIdx(0)
   }, [])
 
+  // ── URL sync ──────────────────────────────────────────────────────────────
+  //
+  // The URL is the source of truth for "where the curator was" — filters,
+  // status, and the selected row (`idx`, an absolute index over the current
+  // filtered set). Kept as a `replace` (not push) so paging/filtering doesn't
+  // spam browser history; navigating to CuratePageScreen still pushes a new
+  // entry on top of this one, so "back" (button or browser) lands here with
+  // the query string intact.
+  const buildSearch = useCallback(() => {
+    const params = new URLSearchParams()
+    if (batchIdFilter) params.set('batchId', batchIdFilter)
+    if (pageIdFilter) params.set('pageId', pageIdFilter)
+    if (extBatchIdFilter) params.set('extBatchId', extBatchIdFilter)
+    if (submitterEmailFilter) params.set('submitterEmail', submitterEmailFilter)
+    if (statusFilter) params.set('status', statusFilter)
+    if (globalIdx > 0) params.set('idx', String(globalIdx))
+    return params
+  }, [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter, statusFilter, globalIdx])
+
+  useEffect(() => {
+    setSearchParams(buildSearch(), { replace: true })
+  }, [buildSearch, setSearchParams])
+
   const listRef = useRef<HTMLDivElement>(null)
   const lastTotalRef = useRef(0)
 
@@ -233,6 +277,14 @@ export function CurateListScreen() {
   const goTo = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(next, clampedMax))
     setGlobalIdx(clamped)
+    // Row buttons are keyed by page_id, so crossing a server-page boundary
+    // unmounts every row (new page's rows have different keys) — including
+    // whichever one currently holds DOM focus (e.g. after a mouse click).
+    // A removed focused element reverts focus to <body>, which is not a
+    // descendant of `listCol`, so subsequent keydown events would stop
+    // reaching its handler. Pin focus back on the persistent container so
+    // arrow-key navigation keeps working across page boundaries.
+    listRef.current?.focus()
   }, [clampedMax])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -245,8 +297,9 @@ export function CurateListScreen() {
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 
   const openCurate = useCallback((pageId: string) => {
-    navigate(`/curate/${pageId}`, { state: { listPage: neededServerPage } })
-  }, [navigate, neededServerPage])
+    const search = buildSearch().toString()
+    navigate(`/curate/${pageId}`, { state: { listSearch: search ? `?${search}` : '' } })
+  }, [navigate, buildSearch])
 
   const queryClient = useQueryClient()
   const updateStatusMutation = useMutation({

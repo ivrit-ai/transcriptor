@@ -34,7 +34,7 @@ export function CuratePageScreen() {
 
   const navState =
     (location.state as {
-      listPage?: number;
+      listSearch?: string;
     } | null) ?? null;
 
   const [error, setError] = useState<string | null>(null);
@@ -75,10 +75,12 @@ export function CuratePageScreen() {
   const imgW = page?.width_px ?? 1;
   const imgH = page?.height_px ?? 1;
 
-  // `listPage` is only a hint for "← Back To List" to resume near where the
-  // user came from — it has no bearing on Prev/Next below, which always walk
-  // the full, unfiltered dataset via `serverData.rank`/`dataset_total`.
-  const listPageNum = navState?.listPage ?? 1;
+  // `listSearch` is the full query string CurateListScreen had when the
+  // curator opened this page (filters, status, selected row) — used only to
+  // restore that list state on "← Back To List" / Escape. It has no bearing
+  // on Prev/Next below, which always walk the full, unfiltered dataset via
+  // `serverData.rank`/`dataset_total`.
+  const listSearch = navState?.listSearch ?? "";
 
   // ── Build annotations for AnnotationEditor ─────────────────────────────
 
@@ -334,10 +336,10 @@ export function CuratePageScreen() {
       if (!targetItem) return;
 
       navigate(`/curate/${targetItem.page_id}`, {
-        state: { listPage: listPageNum },
+        state: { listSearch },
       });
     },
-    [page, navigate, listPageNum],
+    [page, navigate, listSearch],
   );
 
   const goPrev = useCallback(() => {
@@ -415,7 +417,7 @@ export function CuratePageScreen() {
           break;
         case "Escape":
           e.preventDefault();
-          navigate("/curate", { state: { listPage: listPageNum } });
+          navigate(`/curate${listSearch}`);
           break;
         case "ArrowLeft":
           e.preventDefault();
@@ -439,6 +441,7 @@ export function CuratePageScreen() {
     rotate180,
     handleSave,
     navigate,
+    listSearch,
     goPrev,
     goNext,
     approveSaveNext,
@@ -623,7 +626,7 @@ export function CuratePageScreen() {
               <button
                 type="button"
                 className={css.backBtn}
-                onClick={() => navigate("/curate", { state: { listPage: listPageNum } })}
+                onClick={() => navigate(`/curate${listSearch}`)}
               >
                 ← Back To List <span className={css.keyHint}>Esc</span>
               </button>
