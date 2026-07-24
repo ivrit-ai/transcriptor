@@ -763,7 +763,6 @@ function ContributedPageFolio({
             borderRadius: 8,
             objectFit: "cover",
             display: "block",
-            transform: `rotate(${page.image_rotation ?? 0}deg)`,
           }}
         />
         {!page.approved && (
