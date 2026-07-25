@@ -2,15 +2,19 @@
 
 Supports local directory or S3 URI as the data root.
 
+Note: pillow/boto3 live in the optional "scripts" dependency group, which a
+plain `uv run`/`uv sync` does NOT install. Pass `--group scripts` (as shown
+below) or run `uv sync --group scripts` once beforehand.
+
 Usage:
-    uv run python scripts/import_source_data.py <path_or_s3_uri> \
+    uv run --group scripts python scripts/import_source_data.py <path_or_s3_uri> \
         --source <source_name> --license <license>
 
 Examples:
-    uv run python scripts/import_source_data.py data/output/ \
+    uv run --group scripts python scripts/import_source_data.py data/output/ \
         --source handwriting_form --license CC-BY-4.0
 
-    uv run python scripts/import_source_data.py s3://my-bucket/data/ \
+    uv run --group scripts python scripts/import_source_data.py s3://my-bucket/data/ \
         --source handwriting_form --license CC-BY-4.0 \
         --s3-key <key> --s3-secret <secret> --s3-region <region>
 """

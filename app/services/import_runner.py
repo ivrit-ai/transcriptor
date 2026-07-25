@@ -334,9 +334,13 @@ def _build_invocation(
         raise ImportConfigError(f"unknown import mode: {mode}")
 
     # Run via `uv run` so the subprocess gets the project's managed environment.
+    # `--group scripts` is required: pillow/boto3 live in the optional "scripts"
+    # dependency group, which a plain `uv run`/`uv sync` does NOT install.
     argv = [
         "uv",
         "run",
+        "--group",
+        "scripts",
         "python",
         "-u",
         str(_SCRIPT_PATH),
