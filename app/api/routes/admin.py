@@ -1090,6 +1090,7 @@ class ImportStartRequest(BaseModel):
     data_path: str | None = None
     clear_existing: bool = False
     metadata_only: bool = False
+    backfill_raw_images: bool = False
     # custom-s3 only. Passed to the subprocess via env, never stored or returned.
     s3_key: str | None = None
     s3_secret: str | None = None
@@ -1131,6 +1132,7 @@ def admin_import_start(
             s3_region=body.s3_region,
             clear_existing=body.clear_existing,
             metadata_only=body.metadata_only,
+            backfill_raw_images=body.backfill_raw_images,
         )
     except import_runner.ImportAlreadyRunning as e:
         raise HTTPException(status_code=409, detail=str(e)) from e

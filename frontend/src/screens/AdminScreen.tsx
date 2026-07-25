@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery, useMutation } from '@tanstack/react-query'
 import { queryKeys, queryClient } from '../queries'
 import { api } from '../api'
@@ -14,6 +15,13 @@ const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
 const pct = (n: number) => `${n.toFixed(1)}%`
 
 type Tab = 'overview' | 'users' | 'coverage' | 'transcriptions' | 'reports' | 'import'
+
+const TABS_ORDER: Tab[] = ['overview', 'users', 'coverage', 'transcriptions', 'reports', 'import']
+const DEFAULT_TAB: Tab = 'overview'
+
+function isTab(value: string | null): value is Tab {
+  return value !== null && (TABS_ORDER as string[]).includes(value)
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -166,13 +174,37 @@ const STATUS_COLORS: Record<string, string> = {
   idle: 'var(--tl-muted)',
 }
 
+type ImportAction = 'normal' | 'clear' | 'metadata' | 'backfill'
+
+const IMPORT_ACTIONS: { value: ImportAction; label: string; description: string }[] = [
+  {
+    value: 'normal',
+    label: 'Normal import',
+    description: 'Add new submissions/pages and update existing ones from the manifest.',
+  },
+  {
+    value: 'clear',
+    label: 'Clear existing, then import',
+    description: 'Delete all manifest submissions (and their pages/lines) first, then import fresh.',
+  },
+  {
+    value: 'metadata',
+    label: 'Metadata only',
+    description: 'Update batch metadata for existing submissions. No import, no deletes.',
+  },
+  {
+    value: 'backfill',
+    label: 'Backfill raw images only',
+    description: 'Fill raw_image fields on already-imported pages from their JSON files. No import, no deletes.',
+  },
+]
+
 function ImportTab() {
   const [mode, setMode] = useState<ImportMode>('local-folder')
   const [source, setSource] = useState('handwriting_form')
   const [license, setLicense] = useState('CC-BY-4.0')
   const [dataPath, setDataPath] = useState('')
-  const [clearExisting, setClearExisting] = useState(false)
-  const [metadataOnly, setMetadataOnly] = useState(false)
+  const [action, setAction] = useState<ImportAction>('normal')
   const [s3Key, setS3Key] = useState('')
   const [s3Secret, setS3Secret] = useState('')
   const [s3Region, setS3Region] = useState('')
@@ -226,8 +258,9 @@ function ImportTab() {
       mode,
       source: source.trim(),
       license: license.trim(),
-      clear_existing: clearExisting,
-      metadata_only: metadataOnly,
+      clear_existing: action === 'clear',
+      metadata_only: action === 'metadata',
+      backfill_raw_images: action === 'backfill',
       data_path: mode === 'default-s3' && !dataPath.trim() ? null : dataPath.trim() || null,
       ...(mode === 'custom-s3'
         ? { s3_key: s3Key.trim(), s3_secret: s3Secret.trim(), s3_region: s3Region.trim() }
@@ -279,8 +312,12 @@ function ImportTab() {
               {importStatus.data_path && (
                 <div><span className={css.muted}>Path: </span>{importStatus.data_path}</div>
               )}
-              <div><span className={css.muted}>Clear existing: </span>{importStatus.clear_existing ? 'Yes' : 'No'}</div>
-              <div><span className={css.muted}>Metadata only: </span>{importStatus.metadata_only ? 'Yes' : 'No'}</div>
+              <div><span className={css.muted}>Action: </span>{
+                importStatus.backfill_raw_images ? 'Backfill raw images only' :
+                importStatus.metadata_only ? 'Metadata only' :
+                importStatus.clear_existing ? 'Clear existing, then import' :
+                'Normal import'
+              }</div>
               {importStatus.started_at && (
                 <div><span className={css.muted}>Started: </span>{new Date(importStatus.started_at).toLocaleString()}</div>
               )}
@@ -401,26 +438,20 @@ function ImportTab() {
               </div>
             )}
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={clearExisting}
-                onChange={e => setClearExisting(e.target.checked)}
-                disabled={metadataOnly}
-              />
-              Clear existing submissions in manifest before import
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={metadataOnly}
-                onChange={e => {
-                  setMetadataOnly(e.target.checked)
-                  if (e.target.checked) setClearExisting(false)
-                }}
-              />
-              Update metadata only for existing submissions
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tl-muted)' }}>ACTION</span>
+              <select
+                value={action}
+                onChange={e => setAction(e.target.value as ImportAction)}
+                style={inputStyle}
+              >
+                {IMPORT_ACTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <span className={css.muted} style={{ fontSize: 12 }}>
+                {IMPORT_ACTIONS.find(opt => opt.value === action)?.description}
+              </span>
             </label>
 
             {error && (
@@ -507,7 +538,19 @@ const inputStyle: React.CSSProperties = {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export function AdminScreen() {
-  const [tab, setTab] = useState<Tab>('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab')
+  const tab: Tab = isTab(rawTab) ? rawTab : DEFAULT_TAB
+
+  const setTab = (next: Tab) => {
+    const params = new URLSearchParams(searchParams)
+    if (next === DEFAULT_TAB) {
+      params.delete('tab')
+    } else {
+      params.set('tab', next)
+    }
+    setSearchParams(params, { replace: true })
+  }
 
   const [statsQuery, usersQuery, coverageQuery, queueQuery] = useQueries({
     queries: [
