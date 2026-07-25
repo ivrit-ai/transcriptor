@@ -2,15 +2,19 @@
 
 Supports local directory or S3 URI as the data root.
 
+Note: pillow/boto3 live in the optional "scripts" dependency group, which a
+plain `uv run`/`uv sync` does NOT install. Pass `--group scripts` (as shown
+below) or run `uv sync --group scripts` once beforehand.
+
 Usage:
-    uv run python scripts/import_source_data.py <path_or_s3_uri> \
+    uv run --group scripts python scripts/import_source_data.py <path_or_s3_uri> \
         --source <source_name> --license <license>
 
 Examples:
-    uv run python scripts/import_source_data.py data/output/ \
+    uv run --group scripts python scripts/import_source_data.py data/output/ \
         --source handwriting_form --license CC-BY-4.0
 
-    uv run python scripts/import_source_data.py s3://my-bucket/data/ \
+    uv run --group scripts python scripts/import_source_data.py s3://my-bucket/data/ \
         --source handwriting_form --license CC-BY-4.0 \
         --s3-key <key> --s3-secret <secret> --s3-region <region>
 """
@@ -150,6 +154,26 @@ def _image_dims(image_path: Path) -> tuple[int, int]:
         return img.size  # (width, height)
 
 
+def _extract_raw_image_fields(
+    page_data: dict | None, submission_id: str
+) -> tuple[str | None, int | None, int | None]:
+    """Return (raw_image_path, raw_width_px, raw_height_px) from a page JSON dict.
+
+    raw_image_path is the submission-relative path (submission_id/raw_image_filename),
+    mirroring how image_path is built. Returns (None, None, None) when the page
+    JSON is missing or does not have raw image data.
+    """
+    if not page_data:
+        return None, None, None
+
+    raw_image_filename = page_data.get("raw_image_filename")
+    if not raw_image_filename:
+        return None, None, None
+
+    raw_image_path = f"{submission_id}/{raw_image_filename}"
+    return raw_image_path, page_data.get("raw_image_width"), page_data.get("raw_image_height")
+
+
 # ── Clear existing data ─────────────────────────────────────────────────────
 
 def clear_existing_submissions(session: Session, root: Path) -> None:
@@ -234,6 +258,82 @@ def update_existing_submission_metadata(session: Session, root: Path) -> None:
         "Updated metadata for "
         f"{updated} existing submissions "
         f"({not_imported} not imported, {missing_metadata} missing metadata)"
+    )
+
+
+def backfill_raw_image_fields(session: Session, root: Path) -> None:
+    """Backfill raw_image_path/raw_width_px/raw_height_px on already-imported pages.
+
+    Only operates on pages that already exist in the DB: for each, looks up the
+    page's JSON file in the data source and fills in the raw image fields when
+    present. Does nothing else (no batch/page/line creation, no other field
+    updates).
+    """
+    pages_csv = root / "pages.csv"
+    if not pages_csv.exists():
+        print(f"ERROR: {pages_csv} not found")
+        sys.exit(1)
+
+    with open(pages_csv, newline="") as f:
+        page_rows = list(csv.DictReader(f))
+
+    updated = 0
+    not_imported = 0
+    missing_json = 0
+    no_raw_data = 0
+
+    for row in page_rows:
+        submission_id = row["submission_id"]
+        doc_filename = row["doc_filename"]
+        page_number = int(row["page_number"])
+        lines_filename = row.get("lines_filename", "")
+        page_external_id = f"{doc_filename}:p{page_number}"
+
+        batch = session.execute(
+            select(Batch).where(Batch.external_id == submission_id)
+        ).scalar_one_or_none()
+        if batch is None:
+            not_imported += 1
+            continue
+
+        page = session.execute(
+            select(Page).where(
+                Page.batch_id == batch.id,
+                Page.external_id == page_external_id,
+            )
+        ).scalar_one_or_none()
+        if page is None:
+            not_imported += 1
+            continue
+
+        if not lines_filename:
+            missing_json += 1
+            continue
+
+        json_path = root / submission_id / lines_filename
+        if not json_path.exists():
+            missing_json += 1
+            continue
+
+        page_data = json.loads(json_path.read_text())
+        raw_image_path, raw_width_px, raw_height_px = _extract_raw_image_fields(
+            page_data, submission_id
+        )
+
+        if raw_image_path is None:
+            no_raw_data += 1
+            continue
+
+        page.raw_image_path = raw_image_path
+        page.raw_width_px = raw_width_px
+        page.raw_height_px = raw_height_px
+        updated += 1
+
+    session.flush()
+    print(
+        "Backfilled raw image fields for "
+        f"{updated} pages ({not_imported} not imported, "
+        f"{missing_json} missing json, {no_raw_data} no raw data in json)"
     )
 
 
@@ -342,6 +442,10 @@ def import_source_data(
                     continue
                 width_px, height_px = _image_dims(image_path)
 
+            raw_image_path, raw_width_px, raw_height_px = _extract_raw_image_fields(
+                lines_data, submission_id
+            )
+
             # Upsert Page
             page = session.execute(
                 select(Page).where(
@@ -357,6 +461,9 @@ def import_source_data(
                     image_path=image_path_relative,
                     width_px=width_px,
                     height_px=height_px,
+                    raw_image_path=raw_image_path,
+                    raw_width_px=raw_width_px,
+                    raw_height_px=raw_height_px,
                 )
                 session.add(page)
                 session.flush()
@@ -365,6 +472,9 @@ def import_source_data(
                 page.image_path = image_path_relative
                 page.width_px = width_px
                 page.height_px = height_px
+                page.raw_image_path = raw_image_path
+                page.raw_width_px = raw_width_px
+                page.raw_height_px = raw_height_px
 
             # Upsert Lines
             if lines_data is not None:
@@ -444,10 +554,21 @@ def main() -> None:
         action="store_true",
         help="Update metadata on existing submissions without importing or deleting data",
     )
+    parser.add_argument(
+        "--backfill-raw-images",
+        action="store_true",
+        help=(
+            "Backfill raw_image_path/raw_width_px/raw_height_px on already-imported "
+            "pages from their JSON files. Does nothing else (no import, no deletes)."
+        ),
+    )
 
     args = parser.parse_args()
-    if args.metadata_only and args.clear_existing:
-        parser.error("--metadata-only cannot be used with --clear-existing")
+    if sum([args.metadata_only, args.clear_existing, args.backfill_raw_images]) > 1:
+        parser.error(
+            "--metadata-only, --clear-existing, and --backfill-raw-images "
+            "are mutually exclusive"
+        )
 
     # S3 credentials: CLI args take precedence, fall back to IMPORT_* env vars.
     s3_key = args.s3_key or os.environ.get("IMPORT_AWS_ACCESS_KEY_ID")
@@ -482,9 +603,11 @@ def main() -> None:
         with SessionLocal() as session:
             if args.metadata_only:
                 update_existing_submission_metadata(session, root)
-            elif args.clear_existing:
-                clear_existing_submissions(session, root)
-            if not args.metadata_only:
+            elif args.backfill_raw_images:
+                backfill_raw_image_fields(session, root)
+            else:
+                if args.clear_existing:
+                    clear_existing_submissions(session, root)
                 import_source_data(session, root, args.source, args.license, remote_images)
             session.commit()
         print("Import complete.")

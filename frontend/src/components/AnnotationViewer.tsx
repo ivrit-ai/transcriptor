@@ -31,6 +31,16 @@ export interface AnnotationViewerProps {
   disableZoom?: boolean;
   /** Increment to force recalculation (e.g. after container resize) */
   recalcKey?: number;
+  /**
+   * Optional higher-resolution source image (e.g. a raw AVIF capture) to
+   * render instead of `imageUrl` once it finishes loading. It MUST share
+   * `imageUrl`'s aspect ratio and rotation — all geometry (annotations,
+   * crop/zoom math) stays anchored to `imageWidth`/`imageHeight`, the source
+   * pixel resolution is irrelevant to layout since it is scaled into that
+   * box. Falls back to `imageUrl` while loading, on load failure (e.g. the
+   * browser doesn't support the format), or when omitted.
+   */
+  highQualityImageUrl?: string | null;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -103,6 +113,7 @@ export function AnnotationViewer({
   autoFitHighlighted = false,
   disableZoom = false,
   recalcKey,
+  highQualityImageUrl,
 }: AnnotationViewerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -110,6 +121,14 @@ export function AnnotationViewer({
   const worldRef = useRef<Konva.Group>(null);
   const [rootSize, setRootSize] = useState({ w: 0, h: 0 });
   const [image] = useImage(imageUrl, "anonymous");
+  // Higher-resolution source, loaded in parallel. Renders in place of `image`
+  // once available; silently stays on `image` if it 404s, fails to decode
+  // (e.g. AVIF unsupported by the browser), or was never provided. Since
+  // Konva scales any source into imageWidth x imageHeight, no geometry needs
+  // to change when swapping sources — see prop doc above.
+  const [highQualityImage, highQualityStatus] = useImage(highQualityImageUrl || "", "anonymous");
+  const displayImage =
+    highQualityStatus === "loaded" && highQualityImage ? highQualityImage : image;
 
   // ── Zoom / pan ─────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
@@ -422,7 +441,7 @@ export function AnnotationViewer({
       return;
     }
 
-    if (highlightedIndex == null || !image) return;
+    if (highlightedIndex == null || !displayImage) return;
     const a = annotations[highlightedIndex];
     if (!a) return;
     const { x, y, w, h } = a.bbox;
@@ -438,7 +457,7 @@ export function AnnotationViewer({
       const ctx = renderCanvas.getContext("2d")!;
       ctx.translate(imagePos.x, imagePos.y);
       ctx.rotate((norm * Math.PI) / 180);
-      ctx.drawImage(image, 0, 0, imageWidth, imageHeight);
+      ctx.drawImage(displayImage, 0, 0, imageWidth, imageHeight);
       // extract the bbox region
       const regionCanvas = document.createElement("canvas");
       regionCanvas.width = w;
@@ -458,7 +477,7 @@ export function AnnotationViewer({
     } finally {
       setRevealing(false);
     }
-  }, [revealed, highlightedIndex, annotations, image, rotated, imageWidth, imageHeight, imagePos, norm]);
+  }, [revealed, highlightedIndex, annotations, displayImage, rotated, imageWidth, imageHeight, imagePos, norm]);
 
   // reset reveal when highlighted annotation changes
   useEffect(() => {
@@ -515,7 +534,7 @@ export function AnnotationViewer({
                 {ready && (
                   <KonvaImage
                     name="page-image"
-                    image={image}
+                    image={displayImage}
                     width={imageWidth}
                     height={imageHeight}
                     rotation={norm}
@@ -556,7 +575,7 @@ export function AnnotationViewer({
                           }}
                         >
                           <KonvaImage
-                            image={image}
+                            image={displayImage}
                             width={imageWidth}
                             height={imageHeight}
                             rotation={norm}

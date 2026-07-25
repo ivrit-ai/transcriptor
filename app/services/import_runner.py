@@ -101,6 +101,7 @@ class RunState:
     data_path: str | None = None  # local path or s3://bucket/prefix (no creds)
     clear_existing: bool = False
     metadata_only: bool = False
+    backfill_raw_images: bool = False
     pid: int | None = None
     started_at: str | None = None
     finished_at: str | None = None
@@ -116,6 +117,7 @@ class RunState:
             "data_path": self.data_path,
             "clear_existing": self.clear_existing,
             "metadata_only": self.metadata_only,
+            "backfill_raw_images": self.backfill_raw_images,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "exit_code": self.exit_code,
@@ -156,6 +158,7 @@ def _read_state() -> RunState | None:
         data_path=raw.get("data_path"),
         clear_existing=raw.get("clear_existing", False),
         metadata_only=raw.get("metadata_only", False),
+        backfill_raw_images=raw.get("backfill_raw_images", False),
         pid=raw.get("pid"),
         started_at=raw.get("started_at"),
         finished_at=raw.get("finished_at"),
@@ -173,6 +176,7 @@ def _write_state(state: RunState) -> None:
         "data_path": state.data_path,
         "clear_existing": state.clear_existing,
         "metadata_only": state.metadata_only,
+        "backfill_raw_images": state.backfill_raw_images,
         "pid": state.pid,
         "started_at": state.started_at,
         "finished_at": state.finished_at,
@@ -247,6 +251,7 @@ def _watch_process(proc: subprocess.Popen, state: RunState) -> None:
         data_path=state.data_path,
         clear_existing=state.clear_existing,
         metadata_only=state.metadata_only,
+        backfill_raw_images=state.backfill_raw_images,
         pid=state.pid,
         started_at=state.started_at,
         finished_at=datetime.now(UTC).isoformat(),
@@ -286,6 +291,7 @@ def _build_invocation(
     s3_region: str | None,
     clear_existing: bool,
     metadata_only: bool,
+    backfill_raw_images: bool,
 ) -> tuple[list[str], dict[str, str], str]:
     """Return (argv, extra_env, public_data_path).
 
@@ -328,9 +334,13 @@ def _build_invocation(
         raise ImportConfigError(f"unknown import mode: {mode}")
 
     # Run via `uv run` so the subprocess gets the project's managed environment.
+    # `--group scripts` is required: pillow/boto3 live in the optional "scripts"
+    # dependency group, which a plain `uv run`/`uv sync` does NOT install.
     argv = [
         "uv",
         "run",
+        "--group",
+        "scripts",
         "python",
         "-u",
         str(_SCRIPT_PATH),
@@ -344,6 +354,8 @@ def _build_invocation(
         argv.append("--clear-existing")
     if metadata_only:
         argv.append("--metadata-only")
+    if backfill_raw_images:
+        argv.append("--backfill-raw-images")
 
     return argv, extra_env, resolved
 
@@ -359,6 +371,7 @@ def start_import(
     s3_region: str | None = None,
     clear_existing: bool = False,
     metadata_only: bool = False,
+    backfill_raw_images: bool = False,
 ) -> RunState:
     """Spawn the import subprocess.
 
@@ -370,8 +383,10 @@ def start_import(
         ImportAlreadyRunning: if another import is active or the lock is held.
         ImportConfigError: if the supplied parameters are invalid.
     """
-    if clear_existing and metadata_only:
-        raise ImportConfigError("metadata_only cannot be used with clear_existing")
+    if sum([clear_existing, metadata_only, backfill_raw_images]) > 1:
+        raise ImportConfigError(
+            "clear_existing, metadata_only, and backfill_raw_images are mutually exclusive"
+        )
 
     _ensure_work_dir()
 
@@ -387,6 +402,7 @@ def start_import(
         s3_region=s3_region,
         clear_existing=clear_existing,
         metadata_only=metadata_only,
+        backfill_raw_images=backfill_raw_images,
     )
 
     # --- critical section: exclusively locked ---
@@ -435,6 +451,7 @@ def start_import(
             data_path=public_path,
             clear_existing=clear_existing,
             metadata_only=metadata_only,
+            backfill_raw_images=backfill_raw_images,
             pid=proc.pid,
             started_at=datetime.now(UTC).isoformat(),
         )

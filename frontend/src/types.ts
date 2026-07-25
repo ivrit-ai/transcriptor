@@ -26,6 +26,11 @@ export interface SessionDTO {
   image_rotation: number
   page_label?: string | number
   lines: SessionLine[]
+  // Higher-resolution "raw" source image, when available. Same aspect ratio
+  // and rotation as image_url; line bbox/polygon coordinates are always in
+  // image_url's pixel space, NOT the raw image's. null/absent -> no raw image,
+  // fall back to image_url.
+  raw_image_url?: string | null
 }
 
 export type FlagKind = 'cant_read' | 'bad_crop' | 'not_hebrew' | 'not_text' | 'other'
@@ -290,6 +295,7 @@ export interface ImportStatusDTO {
   data_path: string | null
   clear_existing: boolean
   metadata_only: boolean
+  backfill_raw_images: boolean
   started_at: string | null
   finished_at: string | null
   exit_code: number | null
@@ -303,6 +309,7 @@ export interface ImportStartBody {
   data_path?: string | null
   clear_existing: boolean
   metadata_only: boolean
+  backfill_raw_images: boolean
   s3_key?: string | null
   s3_secret?: string | null
   s3_region?: string | null
