@@ -36,6 +36,11 @@ class SessionDTO:
     image_rotation: int
     page_label: str | None
     lines: list[SessionLineDTO]
+    # Higher-resolution "raw" source image, when available (same aspect ratio
+    # and rotation as image_url; line bbox/polygon coordinates are always in
+    # image_url's pixel space, NOT the raw image's). None when the page has
+    # no raw image on record — clients must fall back to image_url.
+    raw_image_url: str | None = None
 
 
 def get_next_session(
@@ -260,6 +265,7 @@ def _build_session_dto(
         height_px=page.height_px,
         image_rotation=page.image_rotation,
         page_label=page.external_id,
+        raw_image_url=resolve_image_url(page.raw_image_path) if page.raw_image_path else None,
         lines=[
             SessionLineDTO(
                 id=item["id"],

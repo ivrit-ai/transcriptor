@@ -20,6 +20,7 @@ export interface LoopLine {
 export interface LoopPage {
   page_id: string;
   image_url: string;
+  raw_image_url: string | null;
   width_px: number;
   height_px: number;
   image_rotation: number;
@@ -173,6 +174,7 @@ export function useLoop(pageId?: string): LoopState {
     setPage({
       page_id: session.page_id,
       image_url: session.image_url,
+      raw_image_url: session.raw_image_url ?? null,
       width_px: session.width_px,
       height_px: session.height_px,
       image_rotation: session.image_rotation ?? 0,

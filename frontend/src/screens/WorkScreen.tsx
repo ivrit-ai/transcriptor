@@ -952,11 +952,15 @@ export function WorkScreen() {
   )
 
   // ── Focused annotation viewer (top panel, wide mode) ────────────────────
+  // Zoomed in heavily on a single line, so prefer the higher-resolution raw
+  // source image when the page has one — falls back to the normal image
+  // automatically (still loading, missing, or the browser can't decode it).
   const focusedStage = (
     <div style={{ position: 'absolute', inset: 0, background: 'var(--tl-page)' }}>
       {L.current && (
         <AnnotationViewer
           imageUrl={page?.image_url ?? ''}
+          highQualityImageUrl={page?.raw_image_url}
           imageWidth={pagePxW}
           imageHeight={pagePxH}
           imageRotation={rotation}
