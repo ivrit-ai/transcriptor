@@ -803,6 +803,7 @@ export function WorkScreen() {
         >
           <AnnotationViewer
             imageUrl={page?.image_url ?? ''}
+            highQualityImageUrl={page?.raw_image_url}
             imageWidth={pagePxW}
             imageHeight={pagePxH}
             imageRotation={rotation}
