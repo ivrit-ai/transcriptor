@@ -1080,15 +1080,24 @@ def admin_queue(
         )
     ).scalar_one()
 
+    # batches_complete: has at least one line, and every line has
+    # >= COMPLETION_TARGET transcriptions. Without the existence guard, a
+    # batch with zero pages/lines is vacuously "complete" (no line fails the
+    # NOT EXISTS check) while being entirely absent from /admin/coverage,
+    # which inner-joins it away — mirrors the pages_complete guard above.
     batches_complete: int = db.execute(
         select(func.count(Batch.id)).where(
+            select(Line.id)
+            .join(Page, Page.id == Line.page_id)
+            .where(Page.batch_id == Batch.id)
+            .exists(),
             ~select(Page.id)
             .join(Line, Line.page_id == Page.id)
             .where(
                 Page.batch_id == Batch.id,
                 Line.transcription_count < _COMPLETION_TARGET,
             )
-            .exists()
+            .exists(),
         )
     ).scalar_one()
 
