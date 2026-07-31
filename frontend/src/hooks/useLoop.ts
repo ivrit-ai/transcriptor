@@ -32,6 +32,18 @@ export interface SaveToast {
   kind: SaveToastKind;
 }
 
+// Enough state to undo an optimistic submit()/flag() if the mutation
+// ultimately fails after all retries are exhausted.
+interface RevertInfo {
+  lineId: string;
+  prevStatus: LoopLineStatus;
+  prevText?: string;
+  prevPriorKind?: string;
+  prevTranscriptionCount: number;
+  countedDone: boolean;
+  countedDaily: boolean;
+}
+
 export const ALLOWED_ESCAPES = ["לא ברור", "שפה שונה", "מחוק"] as const;
 
 export const FLAG_REASONS: { kind: FlagKind; label: string }[] = [
@@ -53,8 +65,17 @@ function firstEligibleIdx(lines: LoopLine[]): number {
   return doneByYou !== -1 ? doneByYou : 0;
 }
 
-function nextEligibleIdx(lines: LoopLine[], from: number): number {
+export function nextEligibleIdx(lines: LoopLine[], from: number): number {
+  // The tick bar lets you jump to and submit any line in any order, so an
+  // eligible line can sit *before* `from` (e.g. the last line was submitted
+  // first). Prefer continuing forward for the common top-to-bottom flow,
+  // but wrap around to the start rather than only scanning forward — a
+  // forward-only scan would falsely report "page finished" while earlier
+  // lines are still untouched.
   for (let i = from + 1; i < lines.length; i++) {
+    if (lines[i].status === "eligible") return i;
+  }
+  for (let i = 0; i <= from && i < lines.length; i++) {
     if (lines[i].status === "eligible") return i;
   }
   return -1;
@@ -208,11 +229,47 @@ export function useLoop(pageId?: string): LoopState {
     mutationFn: (params: {
       lineId: string;
       body: { kind: SubmitKind; text?: string; time_spent_ms?: number };
+      revert: RevertInfo;
     }) => api.submitResponse(params.lineId, params.body),
-    retry: 3,
+    // Same total retry count as before (`retry: 3` === `failureCount < 3`),
+    // now also surfacing the transient "retrying…" toast on each attempt.
+    retry: (failureCount) => {
+      const willRetry = failureCount < 3;
+      if (willRetry) showToast("retry", 4000);
+      return willRetry;
+    },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 4000),
-    onError: () => {
+    // Fires once, after retries are exhausted (permanent failure). The
+    // optimistic update from submit()/flag() never actually saved, so it
+    // must be undone: restore the line's prior status/text/count, undo any
+    // done/daily increments, and send the cursor back to the failed line so
+    // the user can find and retry it instead of it silently vanishing.
+    onError: (_err, variables) => {
       showToast("error", 5000);
+      const { revert } = variables;
+
+      setLines((ls) =>
+        ls.map((l) =>
+          l.id === revert.lineId
+            ? {
+                ...l,
+                status: revert.prevStatus,
+                your_text: revert.prevText,
+                prior_kind: revert.prevPriorKind,
+                transcription_count: revert.prevTranscriptionCount,
+              }
+            : l,
+        ),
+      );
+      if (revert.countedDone) setDone((d) => Math.max(0, d - 1));
+      if (revert.countedDaily) setDaily((d) => Math.max(0, d - 1));
+
+      const idx = linesRef.current.findIndex((l) => l.id === revert.lineId);
+      if (idx !== -1) {
+        setFinished(false);
+        setCursor(idx);
+        setInput(revert.prevText ?? "");
+      }
     },
   });
 
@@ -260,6 +317,10 @@ export function useLoop(pageId?: string): LoopState {
     if (!line || line.status === "full") return;
 
     const isEdit = line.status === "done_by_you" || line.status === "flagged";
+    const prevStatus = line.status;
+    const prevText = line.your_text;
+    const prevPriorKind = line.prior_kind;
+    const prevTranscriptionCount = line.transcription_count;
 
     setLines((ls) =>
       ls.map((l, i) =>
@@ -286,6 +347,15 @@ export function useLoop(pageId?: string): LoopState {
     submitMutation.mutate({
       lineId: line.id,
       body: { kind: "text", text, time_spent_ms },
+      revert: {
+        lineId: line.id,
+        prevStatus,
+        prevText,
+        prevPriorKind,
+        prevTranscriptionCount,
+        countedDone: !isEdit,
+        countedDaily: !isEdit,
+      },
     });
     advance(idx);
   }, [input, cursor, submitMutation, advance]);
@@ -296,7 +366,15 @@ export function useLoop(pageId?: string): LoopState {
       const line = linesRef.current[idx];
       if (!line || line.status === "full") return;
 
-      const isReflag = line.status === "flagged";
+      // Match submit()'s already-counted check: a line already transcribed
+      // by you (done_by_you) is just as "already counted" as one already
+      // flagged — re-flagging either must not double-count `done`.
+      const alreadyCounted =
+        line.status === "done_by_you" || line.status === "flagged";
+      const prevStatus = line.status;
+      const prevText = line.your_text;
+      const prevPriorKind = line.prior_kind;
+      const prevTranscriptionCount = line.transcription_count;
 
       setLines((ls) =>
         ls.map((l, i) =>
@@ -305,12 +383,21 @@ export function useLoop(pageId?: string): LoopState {
             : l,
         ),
       );
-      if (!isReflag) setDone((d) => d + 1);
+      if (!alreadyCounted) setDone((d) => d + 1);
 
       const time_spent_ms = Date.now() - lineStartTime.current;
       submitMutation.mutate({
         lineId: line.id,
         body: { kind, text, time_spent_ms },
+        revert: {
+          lineId: line.id,
+          prevStatus,
+          prevText,
+          prevPriorKind,
+          prevTranscriptionCount,
+          countedDone: !alreadyCounted,
+          countedDaily: false,
+        },
       });
       advance(idx);
     },

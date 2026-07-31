@@ -135,22 +135,28 @@ function LinkCopiedToast({ visible }: { visible: boolean }) {
 function SaveToastBadge({ toast }: { toast: SaveToast | null }) {
   if (!toast) return null
   const isRetry = toast.kind === 'retry'
+  // 'retry' = a mid-flight retry attempt (transient, pulsing amber).
+  // 'error' = retries exhausted — a *permanent* failure that needs the
+  // user's attention, not a success state. The badge only ever fires from
+  // submitMutation's retry/onError handlers, so there is no "saved"
+  // message to show here — showing one on kind 'error' would report a
+  // failed save as successful.
   return (
     <div style={{
       position: 'absolute', bottom: 16, insetInlineStart: 16, zIndex: 50,
       display: 'flex', alignItems: 'center', gap: 8,
       fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 500,
-      color: isRetry ? 'var(--tl-ink)' : 'oklch(0.45 0.08 150)',
+      color: isRetry ? 'var(--tl-ink)' : 'oklch(0.55 0.16 30)',
       background: 'var(--tl-surface)', border: '0.5px solid var(--tl-border)',
       borderRadius: 999, padding: '7px 13px',
       boxShadow: '0 4px 16px rgba(40,30,20,0.12)',
     }}>
       <span style={{
         width: 8, height: 8, borderRadius: 4,
-        background: isRetry ? 'oklch(0.7 0.09 70)' : 'oklch(0.6 0.08 150)',
+        background: isRetry ? 'oklch(0.7 0.09 70)' : 'oklch(0.6 0.16 30)',
         animation: isRetry ? 'tlpulse 1s ease-in-out infinite' : 'none',
       }} />
-      {isRetry ? 'שמירה נכשלה — מנסה שוב…' : 'נשמר ✓'}
+      {isRetry ? 'שמירה נכשלה — מנסה שוב…' : 'השמירה נכשלה — השורה הוחזרה לעריכה'}
     </div>
   )
 }
