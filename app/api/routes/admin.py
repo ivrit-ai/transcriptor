@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
@@ -724,6 +725,66 @@ class UpdatePageLinesRequest(BaseModel):
     rejected: bool | None = None
 
 
+# These mirror frontend/src/utils/bbox.ts exactly. Rotation is always a
+# lossless 90/180/270 axis transform, so re-deriving "what this line's bbox
+# should look like after rotation" server-side lets us tell a pure
+# rotation/no-op resend apart from an actual curator edit, per line.
+def _rotate_bbox(bbox: dict, rotation: int, img_w: int, img_h: int) -> dict:
+    r = rotation % 360
+    if r == 90:
+        return {"x": img_h - bbox["y"] - bbox["h"], "y": bbox["x"], "w": bbox["h"], "h": bbox["w"]}
+    if r == 180:
+        return {"x": img_w - bbox["x"] - bbox["w"], "y": img_h - bbox["y"] - bbox["h"], "w": bbox["w"], "h": bbox["h"]}
+    if r == 270:
+        return {"x": bbox["y"], "y": img_w - bbox["x"] - bbox["w"], "w": bbox["h"], "h": bbox["w"]}
+    return dict(bbox)
+
+
+def _rotate_polygon(poly: list | None, rotation: int, img_w: int, img_h: int) -> list | None:
+    if not poly:
+        return poly
+    r = rotation % 360
+    if r == 0:
+        return poly
+
+    def rotate_point(pt):
+        is_tuple = isinstance(pt, (list, tuple))
+        px = float(pt[0] if is_tuple else pt.get("x", 0))
+        py = float(pt[1] if is_tuple else pt.get("y", 0))
+        if r == 90:
+            nx, ny = img_h - py, px
+        elif r == 180:
+            nx, ny = img_w - px, img_h - py
+        else:  # 270
+            nx, ny = py, img_w - px
+        if is_tuple:
+            return [nx, ny, *list(pt[2:])]
+        return {**pt, "x": nx, "y": ny}
+
+    return [rotate_point(pt) for pt in poly]
+
+
+def _bbox_close(a: dict, b: dict, tol: float = 0.5) -> bool:
+    return all(math.isclose(float(a.get(k, 0)), float(b.get(k, 0)), abs_tol=tol) for k in ("x", "y", "w", "h"))
+
+
+def _polygon_close(a: list | None, b: list | None, tol: float = 0.5) -> bool:
+    if a is None or b is None:
+        return a == b
+    if not isinstance(a, list) or not isinstance(b, list) or len(a) != len(b):
+        return False
+    for pa, pb in zip(a, b):
+        pa_is_tuple = isinstance(pa, (list, tuple))
+        pb_is_tuple = isinstance(pb, (list, tuple))
+        if pa_is_tuple != pb_is_tuple or (pa_is_tuple and len(pa) != len(pb)):
+            return False
+        ax, ay = (pa[0], pa[1]) if pa_is_tuple else (pa.get("x", 0), pa.get("y", 0))
+        bx, by = (pb[0], pb[1]) if pb_is_tuple else (pb.get("x", 0), pb.get("y", 0))
+        if not (math.isclose(float(ax), float(bx), abs_tol=tol) and math.isclose(float(ay), float(by), abs_tol=tol)):
+            return False
+    return True
+
+
 @router.put("/page_lines")
 def update_page_lines(
     _: Annotated[User, Depends(require_curator)],
@@ -746,6 +807,7 @@ def update_page_lines(
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
 
+    old_rotation = page.image_rotation
     if body.rotation is not None:
         page.image_rotation = body.rotation
 
@@ -773,27 +835,87 @@ def update_page_lines(
     update_line_ids: list[str] | None = None
 
     if body.lines is not None:
-        db.query(Line).filter(Line.page_id == page.id).delete()
-        new_lines = []
+        # New rotation for this save (falls back to the pre-existing value
+        # when only line edits were sent without a rotation change).
+        new_rotation = body.rotation if body.rotation is not None else old_rotation
+        delta_rotation = (new_rotation - old_rotation) % 360
+        img_w = page.width_px
+        img_h = page.height_px
+
+        existing_by_external_id: dict[str, Line] = {
+            line.external_id: line
+            for line in db.query(Line).filter(Line.page_id == page.id).all()
+        }
+
         # Sort lines by visual flow: top-to-bottom (y asc), right-to-left (x+w desc)
         sorted_lines = sorted(
             body.lines,
             key=lambda ld: (ld["bbox"]["y"], -(ld["bbox"]["x"] + ld["bbox"]["w"])),
         )
+
+        seen_external_ids: set[str] = set()
+        result_lines: list[Line] = []
+
         for idx, line_data in enumerate(sorted_lines):
-            new_line = Line(
-                page_id=page.id,
-                line_index=idx,
-                bbox=line_data["bbox"],
-                polygon=line_data.get("polygon"),
-                detection_confidence=line_data.get("detection_confidence"),
-                external_id=line_data["external_id"],
-                transcription_count=line_data.get("transcription_count", 0),
+            external_id = line_data["external_id"]
+            seen_external_ids.add(external_id)
+            incoming_bbox = line_data["bbox"]
+            incoming_polygon = line_data.get("polygon")
+            existing = existing_by_external_id.get(external_id)
+
+            if existing is None:
+                # Genuinely new line — no prior transcriptions to preserve,
+                # and the client's transcription_count is never trusted.
+                new_line = Line(
+                    page_id=page.id,
+                    line_index=idx,
+                    bbox=incoming_bbox,
+                    polygon=incoming_polygon,
+                    detection_confidence=line_data.get("detection_confidence"),
+                    external_id=external_id,
+                    transcription_count=0,
+                )
+                db.add(new_line)
+                result_lines.append(new_line)
+                continue
+
+            # Re-derive what this line's bbox/polygon *should* look like if
+            # only the rotation changed and nothing else was edited. If the
+            # client's payload matches that exactly, this is a same-content
+            # resend (pure rotation or an untouched line on a content edit)
+            # and its transcriptions stay intact. If it doesn't match, the
+            # curator actually moved/resized this line, so it now points at
+            # different pixels and its old transcriptions are invalidated.
+            expected_bbox = _rotate_bbox(existing.bbox, delta_rotation, img_w, img_h)
+            expected_polygon = _rotate_polygon(existing.polygon, delta_rotation, img_w, img_h)
+            unchanged = _bbox_close(incoming_bbox, expected_bbox) and _polygon_close(
+                incoming_polygon, expected_polygon
             )
-            db.add(new_line)
-            new_lines.append(new_line)
+
+            if not unchanged:
+                db.query(Transcription).filter(Transcription.line_id == existing.id).delete(
+                    synchronize_session=False
+                )
+                existing.transcription_count = 0
+
+            existing.bbox = incoming_bbox
+            existing.polygon = incoming_polygon
+            existing.detection_confidence = line_data.get("detection_confidence")
+            existing.line_index = idx
+            result_lines.append(existing)
+
+        # Lines whose external_id no longer appears in the payload were
+        # actually removed by the curator — cascade correctly wipes their
+        # transcriptions/progress rows since the line itself is truly gone.
+        removed_external_ids = set(existing_by_external_id) - seen_external_ids
+        if removed_external_ids:
+            db.query(Line).filter(
+                Line.page_id == page.id,
+                Line.external_id.in_(removed_external_ids),
+            ).delete(synchronize_session=False)
+
         db.flush()
-        update_line_ids = [str(l.id) for l in new_lines]
+        update_line_ids = [str(l.id) for l in result_lines]
 
     db.commit()
     db.refresh(page)
