@@ -6,7 +6,7 @@ from threading import Lock
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -367,10 +367,18 @@ def my_contributed_pages(
         (settings.submitter_fingerprint_salt + normalized_email).encode()
     ).hexdigest()
 
+    # Drop pages this user has already finished; keep pages with no progress row yet.
     pages = db.execute(
         select(Page)
         .join(Batch, Batch.id == Page.batch_id)
-        .where(Batch.submitter_fingerprint == fingerprint)
+        .outerjoin(
+            UserProgress,
+            (UserProgress.page_id == Page.id) & (UserProgress.user_id == user.id),
+        )
+        .where(
+            Batch.submitter_fingerprint == fingerprint,
+            or_(UserProgress.done.is_(None), UserProgress.done.is_(False)),
+        )
         .order_by(Batch.external_id, Page.external_id)
     ).scalars().all()
 

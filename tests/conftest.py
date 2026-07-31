@@ -20,6 +20,7 @@ from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription, TranscriptionKind
 from app.models.user import User
+from app.models.user_progress import UserProgress
 from app.services.consent import record_consent
 
 
@@ -152,3 +153,10 @@ def make_transcription(session, line, user, kind=TranscriptionKind.text, text="h
     session.add(t)
     session.flush()
     return t
+
+
+def make_user_progress(session, user, page, done=False, skipped=False):
+    p = UserProgress(user_id=user.id, page_id=page.id, done=done, skipped=skipped)
+    session.add(p)
+    session.flush()
+    return p
