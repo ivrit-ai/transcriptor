@@ -3,7 +3,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -178,9 +178,12 @@ def _next_contributed_page(
     if batch.submitter_fingerprint != fingerprint:
         return None
 
-    done_page_ids_subq = (
+    excluded_page_ids_subq = (
         select(UserProgress.page_id)
-        .where(UserProgress.user_id == user.id, UserProgress.done.is_(True))
+        .where(
+            UserProgress.user_id == user.id,
+            or_(UserProgress.done.is_(True), UserProgress.skipped.is_(True)),
+        )
         .scalar_subquery()
     )
 
@@ -190,7 +193,7 @@ def _next_contributed_page(
             Page.batch_id == batch.id,
             Page.approved.is_(True),
             Page.id != finished_page.id,
-            Page.id.not_in(done_page_ids_subq),
+            Page.id.not_in(excluded_page_ids_subq),
         )
         .order_by(Page.external_id)
     ).scalars().all()
