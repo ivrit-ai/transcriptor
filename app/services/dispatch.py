@@ -3,10 +3,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.batch import Batch
 from app.models.line import Line
 from app.models.page import Page
 from app.models.transcription import Transcription
@@ -131,6 +132,14 @@ def _case_b_with_progress(
         ):
             return _build_session_dto(session, user, page, target)
 
+        # Continue within a contributed manuscript before falling back to unrelated pages.
+        if page is not None:
+            next_contributed = _next_contributed_page(
+                session, user, page, user_transcribed_subq, target
+            )
+            if next_contributed is not None:
+                return _build_session_dto(session, user, next_contributed, target)
+
     unfinished = session.execute(
         select(UserProgress)
         .where(
@@ -149,6 +158,50 @@ def _case_b_with_progress(
             return _build_session_dto(session, user, page, target)
 
     return _case_a_random_with_exclusions(session, user, target)
+
+
+def _next_contributed_page(
+    session: Session,
+    user: User,
+    finished_page: Page,
+    user_transcribed_subq,
+    target: int,
+) -> Page | None:
+    # Next unfinished page in finished_page's batch, only if user contributed it.
+    batch = session.get(Batch, finished_page.batch_id)
+    if batch is None or not batch.submitter_fingerprint:
+        return None
+
+    fingerprint = hashlib.sha256(
+        (settings.submitter_fingerprint_salt + user.email.strip().lower()).encode()
+    ).hexdigest()
+    if batch.submitter_fingerprint != fingerprint:
+        return None
+
+    excluded_page_ids_subq = (
+        select(UserProgress.page_id)
+        .where(
+            UserProgress.user_id == user.id,
+            or_(UserProgress.done.is_(True), UserProgress.skipped.is_(True)),
+        )
+        .scalar_subquery()
+    )
+
+    candidates = session.execute(
+        select(Page)
+        .where(
+            Page.batch_id == batch.id,
+            Page.approved.is_(True),
+            Page.id != finished_page.id,
+            Page.id.not_in(excluded_page_ids_subq),
+        )
+        .order_by(Page.external_id)
+    ).scalars().all()
+
+    for page in candidates:
+        if _page_has_eligible_line(session, page.id, user.id, user_transcribed_subq, target):
+            return page
+    return None
 
 
 def _case_a_random_with_exclusions(

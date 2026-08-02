@@ -985,12 +985,13 @@ function ContributedPagesGallery({
 }) {
   const navigate = useNavigate();
   const [galleryPage, setGalleryPage] = useState(0);
+  const [hideFinished, setHideFinished] = useState(true);
   const [reportReason, setReportReason] = useState<
     "missing" | "approve" | null
   >(null);
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.profile.contributedPages,
-    queryFn: () => api.getMyContributedPages(),
+    queryKey: queryKeys.profile.contributedPages(hideFinished),
+    queryFn: () => api.getMyContributedPages(hideFinished),
     staleTime: 30_000,
   });
 
@@ -1026,14 +1027,41 @@ function ContributedPagesGallery({
     >
       <div
         style={{
-          fontFamily: "var(--font-ui)",
-          fontSize: 14,
-          fontWeight: 600,
-          color: "var(--tl-ink)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
           marginBottom: 16,
         }}
       >
-        כתבי יד שתרמת
+        <div
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--tl-ink)",
+          }}
+        >
+          כתבי יד שתרמת
+        </div>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: "var(--font-ui)",
+            fontSize: 13,
+            color: "var(--tl-muted)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={hideFinished}
+            onChange={(e) => setHideFinished(e.target.checked)}
+          />
+          הסתר עמודים שהושלמו
+        </label>
       </div>
       {isLoading ? (
         <div

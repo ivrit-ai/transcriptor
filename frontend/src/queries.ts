@@ -21,7 +21,7 @@ export const queryKeys = {
   profile: {
     me: ['profile', 'me'] as const,
     documents: ['profile', 'documents'] as const,
-    contributedPages: ['profile', 'contributedPages'] as const,
+    contributedPages: (hideFinished: boolean) => ['profile', 'contributedPages', hideFinished] as const,
   },
   community: { stats: ['community', 'stats'] as const },
   admin: {

@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.event import Event
-from tests.conftest import make_batch, make_line, make_page, make_transcription
+from tests.conftest import make_batch, make_line, make_page, make_transcription, make_user_progress
 
 
 def _fingerprint(email: str) -> str:
@@ -34,6 +34,43 @@ def test_contributed_pages_are_scoped_to_current_user(client, consented_user, db
         str(pending_page.id),
     }
     assert {item["approved"] for item in response.json()} == {True, False}
+
+
+def test_contributed_pages_excludes_pages_the_user_finished(client, consented_user, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "submitter_fingerprint_salt", "test-salt-")
+    batch = make_batch(db_session, external_id="matching")
+    batch.submitter_fingerprint = _fingerprint(consented_user.email)
+    done_page = make_page(db_session, batch, external_id="done")
+    done_page.approved = True
+    pending_page = make_page(db_session, batch, external_id="pending")
+    pending_page.approved = True
+    make_user_progress(db_session, consented_user, done_page, done=True)
+    db_session.flush()
+
+    response = client.get("/api/me/contributed-pages")
+
+    assert response.status_code == 200
+    assert {item["page_id"] for item in response.json()} == {str(pending_page.id)}
+
+
+def test_contributed_pages_hide_finished_false_shows_everything(client, consented_user, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "submitter_fingerprint_salt", "test-salt-")
+    batch = make_batch(db_session, external_id="matching")
+    batch.submitter_fingerprint = _fingerprint(consented_user.email)
+    done_page = make_page(db_session, batch, external_id="done")
+    done_page.approved = True
+    pending_page = make_page(db_session, batch, external_id="pending")
+    pending_page.approved = True
+    make_user_progress(db_session, consented_user, done_page, done=True)
+    db_session.flush()
+
+    response = client.get("/api/me/contributed-pages?hide_finished=false")
+
+    assert response.status_code == 200
+    assert {item["page_id"] for item in response.json()} == {
+        str(done_page.id),
+        str(pending_page.id),
+    }
 
 
 def test_explicit_session_requires_matching_approved_contribution(client, consented_user, db_session, monkeypatch):

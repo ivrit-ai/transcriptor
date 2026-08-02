@@ -143,8 +143,8 @@ export const api = {
   getMyDocuments: (): Promise<DocumentDTO[] | null> =>
     request<DocumentDTO[]>('/api/me/documents'),
 
-  getMyContributedPages: (): Promise<ContributedPageDTO[] | null> =>
-    request<ContributedPageDTO[]>('/api/me/contributed-pages'),
+  getMyContributedPages: (hideFinished = true): Promise<ContributedPageDTO[] | null> =>
+    request<ContributedPageDTO[]>(`/api/me/contributed-pages?hide_finished=${hideFinished}`),
 
   getCommunityStats: (): Promise<CommunityDTO | null> =>
     request<CommunityDTO>('/api/community'),

@@ -6,7 +6,7 @@ from threading import Lock
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -361,17 +361,27 @@ def my_documents(
 def my_contributed_pages(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    hide_finished: bool = True,
 ) -> list[dict]:
     normalized_email = user.email.strip().lower()
     fingerprint = hashlib.sha256(
         (settings.submitter_fingerprint_salt + normalized_email).encode()
     ).hexdigest()
 
-    pages = db.execute(
+    query = (
         select(Page)
         .join(Batch, Batch.id == Page.batch_id)
         .where(Batch.submitter_fingerprint == fingerprint)
-        .order_by(Batch.external_id, Page.external_id)
+    )
+    if hide_finished:
+        # Drop pages this user has already finished; keep pages with no progress row yet.
+        query = query.outerjoin(
+            UserProgress,
+            (UserProgress.page_id == Page.id) & (UserProgress.user_id == user.id),
+        ).where(or_(UserProgress.done.is_(None), UserProgress.done.is_(False)))
+
+    pages = db.execute(
+        query.order_by(Batch.external_id, Page.external_id)
     ).scalars().all()
 
     return [
