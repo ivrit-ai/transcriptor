@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +33,9 @@ class Page(Base):
     rejected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     rejected_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, default=None)
     image_rotation: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    curated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc),

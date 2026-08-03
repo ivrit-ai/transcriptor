@@ -476,6 +476,17 @@ def import_source_data(
                 page.raw_width_px = raw_width_px
                 page.raw_height_px = raw_height_px
 
+            # Skip lines of curated pages: a re-import would overwrite the
+            # curator's bbox/polygon edits, resurrect deleted lines, and
+            # duplicate curator-added lines. Page-level source metadata is
+            # still refreshed above.
+            if page.curated_at is not None:
+                print(
+                    f"    SKIP: page {page_external_id} curated at {page.curated_at}, "
+                    f"keeping its lines"
+                )
+                continue
+
             # Upsert Lines
             if lines_data is not None:
                 for line_entry in lines_data.get("lines", []):

@@ -917,6 +917,7 @@ def update_page_lines(
         db.flush()
         update_line_ids = [str(l.id) for l in result_lines]
 
+    page.curated_at = datetime.now(UTC)
     db.commit()
     db.refresh(page)
 

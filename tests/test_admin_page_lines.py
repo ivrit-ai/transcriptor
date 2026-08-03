@@ -7,6 +7,7 @@ UserProgress rows and trusting the client's stale transcription_count.
 """
 
 from app.models.line import Line
+from app.models.page import Page
 from app.models.transcription import Transcription
 
 from .conftest import make_batch, make_line, make_page, make_transcription
@@ -100,6 +101,29 @@ def test_actual_bbox_edit_invalidates_only_that_line(client, db_session, consent
     remaining = db_session.query(Transcription).filter(Transcription.line_id == untouched_id).all()
     assert len(remaining) == 1
     assert remaining[0].text == "stays intact"
+
+
+def test_curation_sets_curated_at(client, db_session, consented_user):
+    _promote_curator(db_session, consented_user)
+    batch = make_batch(db_session)
+    page = make_page(db_session, batch, w=800, h=1200)
+    make_line(db_session, page, line_index=0, bbox={"x": 0, "y": 0, "w": 100, "h": 30}, external_id="ln-1")
+    assert page.curated_at is None
+    db_session.flush()
+
+    resp = client.put(
+        f"/api/admin/page_lines?page_id={page.id}",
+        json={
+            "lines": [
+                {"external_id": "ln-1", "bbox": {"x": 5, "y": 5, "w": 100, "h": 30}},
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    db_session.expire_all()
+    page = db_session.get(Page, page.id)
+    assert page.curated_at is not None
 
 
 def test_removed_line_cascades_and_new_line_ignores_client_count(client, db_session, consented_user):
