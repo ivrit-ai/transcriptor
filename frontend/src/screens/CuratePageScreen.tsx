@@ -185,13 +185,22 @@ export function CuratePageScreen() {
 
         const result = await api.updatePageLines(pageId, body);
         if (result) {
-          const nextLines =
-            result.line_ids && result.line_ids.length === linesForSave!.length
-              ? linesForSave!.map((line, idx) => ({
-                  ...line,
-                  id: result.line_ids![idx],
-                }))
-              : linesForSave!;
+          // Match server-assigned row ids back onto our lines by stable
+          // external_id. The backend returns id/external_id pairs built from
+          // its own (visually sorted) result list, so we never have to assume
+          // that our send order equals the server's sort order.
+          const extIds = result.line_external_ids;
+          const ids = result.line_ids;
+          const idByExternalId =
+            extIds && ids && extIds.length === ids.length && extIds.length === linesForSave!.length
+              ? new Map(extIds.map((ext, idx) => [ext, ids[idx]]))
+              : null;
+          const nextLines = idByExternalId
+            ? linesForSave!.map((line) => ({
+                ...line,
+                id: idByExternalId.get(line.external_id ?? "") ?? line.id,
+              }))
+            : linesForSave!;
           setApproved(result.approved);
           setRejected(result.rejected);
           setCurrentRotation(result.image_rotation);
@@ -242,9 +251,14 @@ export function CuratePageScreen() {
         if (status === "deleted") continue;
 
         if (status === "new") {
-          // Created annotation → new line with confidence 1
+          // Created annotation → new line with confidence 1. The client temp
+          // id doubles as a stable external_id so a follow-up save (even a
+          // no-op resend) re-matches the same DB row instead of minting a
+          // fresh identity.
+          const tempId = `new-${Date.now()}-${i}`;
           nextLines.push({
-            id: `new-${Date.now()}-${i}`,
+            id: tempId,
+            external_id: tempId,
             line_index: 0, // will be re-indexed below
             bbox: a.bbox,
             polygon: normalizePolygon(a.polygon),

@@ -126,6 +126,66 @@ def test_curation_sets_curated_at(client, db_session, consented_user):
     assert page.curated_at is not None
 
 
+def test_line_ids_paired_by_external_id_in_server_order(client, db_session, consented_user):
+    """The PUT response pairs each row id with its external_id, built from the
+    server's own (visual-flow) sort order — so the client can map ids back by
+    identity even when its send order differs from that sort."""
+    _promote_curator(db_session, consented_user)
+    batch = make_batch(db_session)
+    page = make_page(db_session, batch, w=800, h=1200)
+    high = make_line(db_session, page, line_index=0, bbox={"x": 0, "y": 100, "w": 100, "h": 30}, external_id="ln-high")
+    low = make_line(db_session, page, line_index=1, bbox={"x": 0, "y": 20, "w": 100, "h": 30}, external_id="ln-low")
+
+    resp = client.put(
+        f"/api/admin/page_lines?page_id={page.id}",
+        json={
+            "lines": [
+                # Sent bottom-first: server's visual-flow sort (y asc) will
+                # reorder these, and the pairs must still stay correct.
+                {"external_id": "ln-high", "bbox": {"x": 0, "y": 100, "w": 100, "h": 30}},
+                {"external_id": "ln-low", "bbox": {"x": 0, "y": 20, "w": 100, "h": 30}},
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert len(body["line_ids"]) == 2
+    assert len(body["line_external_ids"]) == 2
+    by_ext = dict(zip(body["line_external_ids"], body["line_ids"]))
+    assert by_ext["ln-high"] == str(high.id)
+    assert by_ext["ln-low"] == str(low.id)
+
+
+def test_new_line_external_id_stays_stable_across_second_save(client, db_session, consented_user):
+    """A new line whose external_id is the client temp id must be re-matched
+    on a follow-up save (no replacement row, no external_id swap)."""
+    _promote_curator(db_session, consented_user)
+    batch = make_batch(db_session)
+    page = make_page(db_session, batch, w=800, h=1200)
+
+    payload = {
+        "lines": [
+            {"external_id": "new-123-0", "bbox": {"x": 10, "y": 10, "w": 100, "h": 30}},
+        ],
+    }
+    resp = client.put(f"/api/admin/page_lines?page_id={page.id}", json=payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["line_external_ids"] == ["new-123-0"]
+    new_id = body["line_ids"][0]
+
+    resp2 = client.put(f"/api/admin/page_lines?page_id={page.id}", json=payload)
+    assert resp2.status_code == 200, resp2.text
+    body2 = resp2.json()
+    assert body2["line_ids"] == [new_id]
+    assert body2["line_external_ids"] == ["new-123-0"]
+
+    db_session.expire_all()
+    lines = db_session.query(Line).filter(Line.page_id == page.id).all()
+    assert len(lines) == 1
+    assert lines[0].external_id == "new-123-0"
+
+
 def test_removed_line_cascades_and_new_line_ignores_client_count(client, db_session, consented_user):
     _promote_curator(db_session, consented_user)
     batch = make_batch(db_session)

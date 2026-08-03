@@ -833,6 +833,7 @@ def update_page_lines(
             page.rejected_by = None
 
     update_line_ids: list[str] | None = None
+    update_line_external_ids: list[str] | None = None
 
     if body.lines is not None:
         # New rotation for this save (falls back to the pre-existing value
@@ -916,6 +917,7 @@ def update_page_lines(
 
         db.flush()
         update_line_ids = [str(l.id) for l in result_lines]
+        update_line_external_ids = [l.external_id for l in result_lines]
 
     page.curated_at = datetime.now(UTC)
     db.commit()
@@ -927,6 +929,7 @@ def update_page_lines(
         "approved": page.approved,
         "rejected": page.rejected,
         "line_ids": update_line_ids,
+        "line_external_ids": update_line_external_ids,
     }
 
 

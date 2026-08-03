@@ -211,6 +211,10 @@ export interface UpdatePageLinesResponse {
   approved: boolean
   rejected: boolean
   line_ids: string[] | null
+  // Parallel to line_ids: the stable external_id for each line, in the same
+  // server-side order. Lets the client map server row ids back onto its own
+  // lines by identity instead of by array position.
+  line_external_ids: string[] | null
 }
 
 // ── User-reported problems ───────────────────────────────────────────────────
