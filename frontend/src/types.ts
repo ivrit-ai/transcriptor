@@ -100,6 +100,8 @@ export interface AdminQueueDTO {
 
 export type PageStatusFilter = 'approved' | 'rejected' | 'unreviewed'
 
+export type PageTranscriptionsFilter = 'transcribed' | 'not-transcribed'
+
 // Independent, case-insensitive "contains" filters on the human-readable
 // manuscript/page ids. Distinct from each other and from `status`.
 export interface PageListFilters {
@@ -107,6 +109,9 @@ export interface PageListFilters {
   pageId?: string
   batchExternalId?: string
   submitterEmail?: string
+  // 'transcribed' -> pages with >=1 line that has >0 transcriptions;
+  // 'not-transcribed' -> pages where every line has zero transcriptions.
+  transcriptions?: PageTranscriptionsFilter
 }
 
 export interface AdminDatasetRowDTO {

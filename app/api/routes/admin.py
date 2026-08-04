@@ -290,6 +290,7 @@ def admin_coverage(
 
 
 _VALID_PAGE_STATUSES = {"approved", "rejected", "unreviewed"}
+_VALID_TRANSCRIPTION_FILTERS = {"transcribed", "not-transcribed"}
 
 
 @router.get("/batches")
@@ -443,6 +444,7 @@ def admin_pages(
     page_id: str | None = Query(None),
     batch_external_id: str | None = Query(None),
     submitter_email: str | None = Query(None),
+    transcriptions: str | None = Query(None),
 ) -> dict:
     """
     Flat paginated list of manuscript pages ordered by (batch, page).
@@ -460,6 +462,11 @@ def admin_pages(
     case-insensitive "contains" filter on the human-readable batch id.
     `submitter_email` filters by batches whose `submitter_fingerprint`
     matches the SHA-256 hash of (salt + normalized_email).
+
+    `transcriptions` filters by existing transcription coverage:
+    `transcribed` keeps only pages with at least one line that has >0
+    transcriptions; `not-transcribed` keeps only pages where every line has
+    zero transcriptions. Omitted/empty means no filtering.
     Any curator may use them.
     """
     page = max(1, page)
@@ -472,6 +479,13 @@ def admin_pages(
         raise HTTPException(
             status_code=422,
             detail=f"Invalid status filter(s): {', '.join(sorted(invalid))}",
+        )
+
+    transcriptions = (transcriptions or "").strip().lower()
+    if transcriptions and transcriptions not in _VALID_TRANSCRIPTION_FILTERS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid transcriptions filter: {transcriptions}",
         )
 
     batch_uuid: uuid.UUID | None = None
@@ -574,6 +588,15 @@ def admin_pages(
     if status_filter is not None:
         count_query = count_query.where(status_filter)
         rows_query = rows_query.where(status_filter)
+
+    if transcriptions == "transcribed":
+        count_query = count_query.where(annotated_lines_sq >= 1)
+        approved_count_query = approved_count_query.where(annotated_lines_sq >= 1)
+        rows_query = rows_query.where(annotated_lines_sq >= 1)
+    elif transcriptions == "not-transcribed":
+        count_query = count_query.where(annotated_lines_sq < 1)
+        approved_count_query = approved_count_query.where(annotated_lines_sq < 1)
+        rows_query = rows_query.where(annotated_lines_sq < 1)
 
     total: int = db.execute(count_query).scalar_one()
     approved_count: int = db.execute(approved_count_query).scalar_one()

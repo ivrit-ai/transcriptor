@@ -42,7 +42,7 @@ export const queryKeys = {
   // Shared by CurateListScreen (filtered browsing) and CuratePageScreen
   // (unfiltered dataset-wide prev/next navigation) — same fetch, same cache.
   pages: (page: number, pageSize: number, statuses: PageStatusFilter[] = [], filters: PageListFilters = {}) =>
-    ['pages', page, pageSize, [...statuses].sort(), filters.batchId ?? '', filters.pageId ?? '', filters.batchExternalId ?? '', filters.submitterEmail ?? ''] as const,
+    ['pages', page, pageSize, [...statuses].sort(), filters.batchId ?? '', filters.pageId ?? '', filters.batchExternalId ?? '', filters.submitterEmail ?? '', filters.transcriptions ?? ''] as const,
   pageLines: (pageId: string) => ['pageLines', pageId] as const,
   leaderboard: {
     allTime: ['leaderboard', 'allTime'] as const,

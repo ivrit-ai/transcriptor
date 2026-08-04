@@ -194,6 +194,7 @@ export const api = {
     if (filters.pageId) params.append('page_id', filters.pageId)
     if (filters.batchExternalId) params.append('batch_external_id', filters.batchExternalId)
     if (filters.submitterEmail) params.append('submitter_email', filters.submitterEmail)
+    if (filters.transcriptions) params.append('transcriptions', filters.transcriptions)
     return request<AdminDatasetDTO>(`/api/admin/pages?${params.toString()}`)
   },
 

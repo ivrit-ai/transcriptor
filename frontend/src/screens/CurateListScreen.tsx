@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../queries'
 import { api } from '../api'
-import type { PageStatusFilter, PageListFilters } from '../types'
+import type { PageStatusFilter, PageListFilters, PageTranscriptionsFilter } from '../types'
 import { TopNav, PageLinesPreview } from '../components/shared'
 import css from './CurateListScreen.module.css'
 
@@ -125,6 +125,9 @@ function parseInitialState(searchParams: URLSearchParams) {
     pageId: searchParams.get('pageId')?.trim() ?? '',
     extBatchId: searchParams.get('extBatchId')?.trim() ?? '',
     submitterEmail: searchParams.get('submitterEmail')?.trim() ?? '',
+    transcriptionsFilter: (searchParams.get('transcriptions') === 'transcribed' || searchParams.get('transcriptions') === 'not-transcribed'
+      ? searchParams.get('transcriptions')
+      : '') as PageTranscriptionsFilter | '',
   }
 }
 
@@ -147,6 +150,7 @@ export function CurateListScreen() {
   const [extBatchIdFilter, setExtBatchIdFilter] = useState(initial.extBatchId)
   const [submitterEmailDraft, setSubmitterEmailDraft] = useState(initial.submitterEmail)
   const [submitterEmailFilter, setSubmitterEmailFilter] = useState(initial.submitterEmail)
+  const [transcriptionsFilter, setTranscriptionsFilter] = useState<PageTranscriptionsFilter | ''>(initial.transcriptionsFilter)
 
   const filters: PageListFilters = useMemo(
     () => ({
@@ -154,8 +158,9 @@ export function CurateListScreen() {
       pageId: pageIdFilter || undefined,
       batchExternalId: extBatchIdFilter || undefined,
       submitterEmail: submitterEmailFilter || undefined,
+      transcriptions: transcriptionsFilter || undefined,
     }),
-    [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter],
+    [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter, transcriptionsFilter],
   )
 
   const applyBatchFilter = useCallback(() => {
@@ -216,10 +221,11 @@ export function CurateListScreen() {
     if (pageIdFilter) params.set('pageId', pageIdFilter)
     if (extBatchIdFilter) params.set('extBatchId', extBatchIdFilter)
     if (submitterEmailFilter) params.set('submitterEmail', submitterEmailFilter)
+    if (transcriptionsFilter) params.set('transcriptions', transcriptionsFilter)
     if (statusFilter) params.set('status', statusFilter)
     if (globalIdx > 0) params.set('idx', String(globalIdx))
     return params
-  }, [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter, statusFilter, globalIdx])
+  }, [batchIdFilter, pageIdFilter, extBatchIdFilter, submitterEmailFilter, transcriptionsFilter, statusFilter, globalIdx])
 
   useEffect(() => {
     setSearchParams(buildSearch(), { replace: true })
@@ -383,6 +389,30 @@ export function CurateListScreen() {
                 <option value="unreviewed">Unreviewed</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label className={css.filterCheck}>
+              Transcriptions
+              <select
+                value={transcriptionsFilter}
+                onChange={(e) => {
+                  setTranscriptionsFilter(e.target.value as PageTranscriptionsFilter | '')
+                  setGlobalIdx(0)
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-ui)',
+                  borderRadius: 6,
+                  border: '0.5px solid var(--tl-border)',
+                  background: 'var(--tl-surface)',
+                  color: 'var(--tl-ink)',
+                  outline: 'none',
+                }}
+              >
+                <option value="">All</option>
+                <option value="transcribed">Transcribed</option>
+                <option value="not-transcribed">Not transcribed</option>
               </select>
             </label>
           </div>
