@@ -128,6 +128,37 @@ describe('useLoop flag/submit counting', () => {
   })
 })
 
+describe('useLoop submit on the last eligible line', () => {
+  it('marks the page finished instead of re-presenting the same line', async () => {
+    // Regression: submit() optimistically updates `lines` via setLines
+    // (batched/async) and then calls advance() in the same tick. advance()
+    // used to read the not-yet-updated `linesRef.current`, so when the
+    // just-submitted line was the *last* eligible one, the forward scan
+    // found nothing and the wrap-around scan picked up the stale-eligible
+    // current line again — re-presenting it instead of finishing the page.
+    vi.mocked(api.nextSession).mockResolvedValue(
+      makeSession([
+        { id: 'a', status: 'done_by_you', your_text: 'already done' },
+        { id: 'b', status: 'eligible' },
+      ]),
+    )
+    const { result } = renderLoop()
+    await waitFor(() => expect(result.current.lines.length).toBe(2))
+    expect(result.current.cursor).toBe(1)
+
+    act(() => result.current.setInput('שלום עולם'))
+    act(() => result.current.submit())
+
+    expect(result.current.lines[1].status).toBe('done_by_you')
+    expect(result.current.lines[1].your_text).toBe('שלום עולם')
+    // Before the fix, the wrap-around scan in nextEligibleIdx would read the
+    // stale `linesRef.current` (still "eligible" for this line) and set
+    // `cursor` back to 1, re-presenting the just-submitted line instead of
+    // finishing the page.
+    expect(result.current.finished).toBe(true)
+  })
+})
+
 describe('useLoop submit rollback on permanent failure', () => {
   beforeEach(() => {
     vi.useFakeTimers()

@@ -322,21 +322,27 @@ export function useLoop(pageId?: string): LoopState {
     const prevPriorKind = line.prior_kind;
     const prevTranscriptionCount = line.transcription_count;
 
-    setLines((ls) =>
-      ls.map((l, i) =>
-        i === idx
-          ? {
-              ...l,
-              status: "done_by_you",
-              your_text: text,
-              prior_kind: undefined,
-              transcription_count: isEdit
-                ? l.transcription_count
-                : Math.min(3, l.transcription_count + 1),
-            }
-          : l,
-      ),
+    const updatedLines = linesRef.current.map((l, i) =>
+      i === idx
+        ? {
+            ...l,
+            status: "done_by_you" as const,
+            your_text: text,
+            prior_kind: undefined,
+            transcription_count: isEdit
+              ? l.transcription_count
+              : Math.min(3, l.transcription_count + 1),
+          }
+        : l,
     );
+    // Keep the ref in sync *synchronously* — setLines is batched/async, but
+    // advance() (called below, still in this same tick) reads linesRef to
+    // find the next eligible line. Without this, advance() would see the
+    // just-submitted line as still "eligible" and could re-select it (most
+    // visibly when it was the last eligible line: the forward scan finds
+    // nothing and the wrap-around picks the stale-eligible current line).
+    linesRef.current = updatedLines;
+    setLines(updatedLines);
 
     if (!isEdit) {
       setDaily((d) => d + 1);
@@ -376,13 +382,15 @@ export function useLoop(pageId?: string): LoopState {
       const prevPriorKind = line.prior_kind;
       const prevTranscriptionCount = line.transcription_count;
 
-      setLines((ls) =>
-        ls.map((l, i) =>
-          i === idx
-            ? { ...l, status: "flagged", prior_kind: kind, your_text: "" }
-            : l,
-        ),
+      const updatedLines = linesRef.current.map((l, i) =>
+        i === idx
+          ? { ...l, status: "flagged" as const, prior_kind: kind, your_text: "" }
+          : l,
       );
+      // See submit()'s comment: keep linesRef in sync synchronously so the
+      // advance() call below (same tick) doesn't operate on stale statuses.
+      linesRef.current = updatedLines;
+      setLines(updatedLines);
       if (!alreadyCounted) setDone((d) => d + 1);
 
       const time_spent_ms = Date.now() - lineStartTime.current;
