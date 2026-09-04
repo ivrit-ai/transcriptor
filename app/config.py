@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     images_serve_origin: str = ""
     admin_emails: list[str] = []
     submitter_fingerprint_salt: str = ""
+    # Number of distinct-user transcriptions required before a line stops
+    # being dispatched for more work. Single source of truth — every
+    # eligibility/completion check reads this instead of hardcoding it.
+    transcription_target: int = 1
 
     @field_validator("admin_emails", mode="before")
     @classmethod

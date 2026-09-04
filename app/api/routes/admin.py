@@ -26,7 +26,7 @@ from app.storage import resolve_image_url
 
 router = APIRouter()
 
-_COMPLETION_TARGET = 3
+_COMPLETION_TARGET = settings.transcription_target
 
 
 @router.get("/curators")

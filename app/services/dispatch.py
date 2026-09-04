@@ -47,7 +47,7 @@ class SessionDTO:
 def get_next_session(
     session: Session,
     user: User,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO | None:
     has_progress = session.execute(
         select(UserProgress)
@@ -68,7 +68,7 @@ def _page_has_eligible_line(
     page_id: uuid.UUID,
     user_id: uuid.UUID,
     user_transcribed_subq,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> bool:
     return session.execute(
         select(Line)
@@ -85,7 +85,7 @@ def _page_has_eligible_line(
 def _case_a_random(
     session: Session,
     user: User,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO | None:
     line = session.execute(
         select(Line)
@@ -107,7 +107,7 @@ def _case_a_random(
 def _case_b_with_progress(
     session: Session,
     user: User,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO | None:
     user_transcribed_subq = (
         select(Transcription.line_id)
@@ -207,7 +207,7 @@ def _next_contributed_page(
 def _case_a_random_with_exclusions(
     session: Session,
     user: User,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO | None:
     excluded_page_ids_subq = (
         select(UserProgress.page_id)
@@ -266,7 +266,7 @@ def get_session_for_page(
     session: Session,
     user: User,
     page_id: uuid.UUID,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO | None:
     page = session.get(Page, page_id)
     if page is None or not page.approved:
@@ -279,7 +279,7 @@ def _build_session_dto(
     session: Session,
     user: User,
     page: Page,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> SessionDTO:
     lines = session.execute(
         select(Line)

@@ -2,6 +2,8 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
+from app.config import settings
+
 
 def should_increment_count(is_first_response_from_user: bool) -> bool:
     return is_first_response_from_user
@@ -10,7 +12,7 @@ def should_increment_count(is_first_response_from_user: bool) -> bool:
 def is_line_eligible_for_user(
     transcription_count: int,
     user_already_responded: bool,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> bool:
     return transcription_count < target and not user_already_responded
 
@@ -34,7 +36,9 @@ class SessionLine:
     user_transcription: dict | None  # {"kind": ..., "text": ...} or None
 
 
-def order_session_lines(lines: list[SessionLine], target: int = 3) -> list[dict]:
+def order_session_lines(
+    lines: list[SessionLine], target: int = settings.transcription_target
+) -> list[dict]:
     sorted_lines = sorted(lines, key=lambda l: l.line_index)
     result = []
     for line in sorted_lines:
