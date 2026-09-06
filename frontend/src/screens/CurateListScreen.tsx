@@ -5,10 +5,11 @@ import { queryKeys } from '../queries'
 import { api } from '../api'
 import type { PageStatusFilter, PageListFilters, PageTranscriptionsFilter } from '../types'
 import { TopNav, PageLinesPreview } from '../components/shared'
+import { TRANSCRIPTION_TARGET } from '../constants'
 import css from './CurateListScreen.module.css'
 
 const PAGE_SIZE = 20
-const MAX_TRANSCRIPTIONS = 3
+const MAX_TRANSCRIPTIONS = TRANSCRIPTION_TARGET
 
 // ── Internal-id filter field (batch_id / page_id UUID) ──────────────────────
 //

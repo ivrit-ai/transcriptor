@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { queryKeys } from '../queries'
 import { api } from '../api'
 import { rotateBbox } from '../utils/bbox'
+import { TRANSCRIPTION_TARGET } from '../constants'
 import type { AdminCoverageDTO, AdminQueueDTO } from '../types'
 import css from './AdminScreen.module.css'
 import browseCss from './BrowseTab.module.css'
@@ -192,7 +193,7 @@ function PageDetailView({
                     height={rb.h}
                     fill="none"
                     stroke={
-                      line.transcription_count >= 3
+                      line.transcription_count >= TRANSCRIPTION_TARGET
                         ? 'rgba(80,210,130,0.85)'
                         : line.transcription_count > 0
                           ? 'rgba(255,180,80,0.85)'

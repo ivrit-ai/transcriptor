@@ -239,7 +239,7 @@ All routes are prefixed `/api`. Auth is via `Authorization: Bearer <google-id-to
 `GET /api/next-session` returns the page with the most lines still eligible for the requesting user. A line is eligible if:
 
 1. The user has not yet responded to it, **and**
-2. `transcription_count < 3` (configurable target)
+2. `transcription_count < settings.transcription_target` (default `2`, see `app/config.py`)
 
 Once a page has no more eligible lines, the next best page is returned. When no pages remain, the endpoint returns `204 No Content`.
 
@@ -288,5 +288,6 @@ transcriptor/
 
 - **Append-truth:** transcriptions are never deleted; edits are in-place upserts (one row per user per line). Disagreements are resolved offline.
 - **`transcription_count` is a cached counter** on `Line`, incremented once per user per line (not per edit). Do not recompute from `COUNT(transcriptions)` in hot paths.
-- **No consensus in the app.** The platform collects independent responses and exports them. Normalization, voting, and quality filtering happen in downstream scripts.
+- **No consensus in the app.** The platform collects independent responses and exports them. Normalization, voting, and quality filtering happen in downstream scripts. With `transcription_target = 2` each line still gets two independent transcriptions to reconcile offline (down from 3), but there's no longer a tie-breaking third response — downstream consensus tooling that assumed 3-way majority voting will need to fall back to 2-way agreement/disagreement handling instead.
+- **`transcription_target` is a single Settings field** (`app/config.py`), read by every eligibility/completion check (`app/services/rules.py`, `app/services/dispatch.py`, `app/services/transcriptions.py`, `app/api/routes/admin.py::_COMPLETION_TARGET`) and mirrored in the frontend as `frontend/src/constants.ts::TRANSCRIPTION_TARGET`. The two are not wired together via the API, so keep them in sync by hand when this value changes. Lowering it after data has already been collected under a higher target does **not** retroactively update cached `UserProgress.done` flags — run `scripts/backfill_progress_completion.py --target <new_target> --fix` once after deploying the change.
 - **Vite proxy:** `vite.config.ts` must list every backend path prefix. Currently `/api` and `/images`. Adding a new FastAPI mount requires a matching proxy entry.

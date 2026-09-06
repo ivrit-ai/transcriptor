@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.event import Event
 from app.models.line import Line
 from app.models.transcription import Transcription, TranscriptionKind
@@ -36,7 +37,7 @@ def _upsert_user_progress(
     user_id: uuid.UUID,
     page_id: uuid.UUID,
     line_id: uuid.UUID,
-    target: int = 3,
+    target: int = settings.transcription_target,
 ) -> None:
     now = datetime.now(timezone.utc)
     prog = session.execute(
@@ -134,7 +135,9 @@ def submit_response(
         payload=payload,
     ))
 
-    _upsert_user_progress(session, user.id, line.page_id, line_id, target=3)
+    _upsert_user_progress(
+        session, user.id, line.page_id, line_id, target=settings.transcription_target
+    )
     session.flush()
 
     return SubmitResult(

@@ -9,6 +9,7 @@ import { BrowseTab } from './BrowseTab'
 import { ReportsTab } from './ReportsTab'
 import { SubmissionsTab } from './SubmissionsTab'
 import { TopNav } from '../components/shared'
+import { TRANSCRIPTION_TARGET } from '../constants'
 import css from './AdminScreen.module.css'
 
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n)
@@ -84,8 +85,8 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
         <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <StatCard value={fmt(queue.total_lines)} label="Total lines" />
           <StatCard value={fmt(queue.lines_with_any)} label="Lines with ≥1 transcript" />
-          <StatCard value={fmt(queue.lines_complete)} label="Lines with ≥3 transcripts" accent="oklch(0.58 0.1 150)" />
-          <StatCard value={pct(stats.overall_completion_pct)} label="Lines complete (≥3)" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={fmt(queue.lines_complete)} label={`Lines with ≥${TRANSCRIPTION_TARGET} transcript${TRANSCRIPTION_TARGET === 1 ? '' : 's'}`} accent="oklch(0.58 0.1 150)" />
+          <StatCard value={pct(stats.overall_completion_pct)} label={`Lines complete (≥${TRANSCRIPTION_TARGET})`} accent="oklch(0.58 0.1 150)" />
         </div>
       </div>
 
@@ -94,7 +95,7 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
         <div className={css.statRow} style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <StatCard value={fmt(queue.pages_started)} label="Pages started (≥1 line touched)" />
           <StatCard value={fmt(queue.pages_covered)} label="Pages fully covered (all lines ≥1)" />
-          <StatCard value={fmt(queue.pages_complete)} label="Pages complete (all lines ≥3)" accent="oklch(0.58 0.1 150)" />
+          <StatCard value={fmt(queue.pages_complete)} label={`Pages complete (all lines ≥${TRANSCRIPTION_TARGET})`} accent="oklch(0.58 0.1 150)" />
           <StatCard value={fmt(queue.batches_complete)} label="Manuscripts complete" accent="oklch(0.58 0.1 150)" />
         </div>
       </div>
@@ -123,11 +124,11 @@ function OverviewTab({ stats, queue }: { stats: AdminStatsDTO; queue: AdminQueue
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.74 0.1 55)' }} />
-              In progress (1–2 transcripts): {fmt(queue.lines_in_progress)}
+              In progress (below target): {fmt(queue.lines_in_progress)}
             </span>
             <span>
               <span className={css.queueLegendDot} style={{ background: 'oklch(0.58 0.1 150)' }} />
-              Complete (≥3 transcripts): {fmt(queue.lines_complete)}
+              Complete (≥{TRANSCRIPTION_TARGET} transcript{TRANSCRIPTION_TARGET === 1 ? '' : 's'}): {fmt(queue.lines_complete)}
             </span>
           </div>
         </div>

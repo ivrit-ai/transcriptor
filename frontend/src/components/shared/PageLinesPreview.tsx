@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AdminPageLineDTO } from '../../types'
+import { TRANSCRIPTION_TARGET } from '../../constants'
 
 interface PageLinesPreviewProps {
   imageUrl: string
@@ -77,7 +78,7 @@ export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLi
           return (
           <div
             key={line.id}
-            title={`#${line.line_index} · ${line.transcription_count}/3`}
+            title={`#${line.line_index} · ${line.transcription_count}/${TRANSCRIPTION_TARGET}`}
             style={{
               position: 'absolute',
               left: line.bbox.x * scale,
@@ -86,7 +87,7 @@ export function PageLinesPreview({ imageUrl, widthPx, heightPx, lines, hoveredLi
               height: line.bbox.h * scale,
               border: isHovered
                 ? '2px solid #ffdd44'
-                : line.transcription_count >= 3
+                : line.transcription_count >= TRANSCRIPTION_TARGET
                   ? '1.5px solid rgba(80,210,130,0.85)'
                   : line.transcription_count > 0
                     ? '1.5px solid rgba(255,180,80,0.85)'
