@@ -3,4 +3,4 @@
 // more work. Must match the backend's `settings.transcription_target`
 // (see app/config.py) — the two are not fetched from a shared API field,
 // so keep them in sync by hand when this value changes.
-export const TRANSCRIPTION_TARGET = 1
+export const TRANSCRIPTION_TARGET: number = 2

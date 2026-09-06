@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Number of distinct-user transcriptions required before a line stops
     # being dispatched for more work. Single source of truth — every
     # eligibility/completion check reads this instead of hardcoding it.
-    transcription_target: int = 1
+    transcription_target: int = 2
 
     @field_validator("admin_emails", mode="before")
     @classmethod
